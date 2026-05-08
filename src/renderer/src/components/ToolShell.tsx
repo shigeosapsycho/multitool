@@ -79,7 +79,7 @@ export function FilePanel({
     setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (!file) return
-    const p = (file as unknown as { path?: string }).path
+    const p = window.api.files.pathForFile(file)
     if (p && onDropPath) onDropPath(p)
   }
 

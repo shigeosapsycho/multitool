@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 const api = {
   window: {
@@ -32,6 +32,9 @@ const api = {
         deleted: number
       }>,
     pickOutputDir: () => ipcRenderer.invoke('files:pickOutputDir') as Promise<string | null>,
+    // Electron 32+ removed File.path for security; use webUtils to recover the
+    // absolute path of a dropped File. Must run in the preload context.
+    pathForFile: (file: File) => webUtils.getPathForFile(file),
     onOutputChanged: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on('output:changed', handler)
