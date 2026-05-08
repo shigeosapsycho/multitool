@@ -111,24 +111,29 @@ export default function App() {
     )
   }, [])
 
-  // Mouse4 / Mouse5 ("Back" / "Forward" thumb buttons). Listen via two paths
-  // and debounce so duplicates don't double-fire:
+  // Mouse4 / Mouse5 ("Back" / "Forward" thumb buttons). Listen via three paths
+  // and debounce per-direction so a single click that fires multiple events
+  // (mousedown + mouseup + auxclick + APPCOMMAND IPC) only triggers one nav.
   //   1. DOM mousedown/mouseup (e.button === 3 for back, === 4 for forward).
-  //      Works in most cases but Chromium may swallow X-buttons.
-  //   2. Windows APPCOMMAND messages forwarded from the main process via IPC.
-  //      Reliable on Windows when DOM events aren't surfaced.
+  //   2. DOM auxclick — fallback when Chromium swallows mousedown for X-buttons.
+  //   3. Windows APPCOMMAND messages forwarded from the main process via IPC.
+  // The debounce window must cover the worst-case spread between these events,
+  // which can be 100ms+ between DOM and IPC. 250ms still feels snappy for
+  // intentional consecutive clicks.
   useEffect(() => {
-    let last = 0
+    let lastBack = 0
+    let lastForward = 0
+    const DEBOUNCE_MS = 250
     const navBack = () => {
       const now = Date.now()
-      if (now - last < 50) return
-      last = now
+      if (now - lastBack < DEBOUNCE_MS) return
+      lastBack = now
       goBack()
     }
     const navForward = () => {
       const now = Date.now()
-      if (now - last < 50) return
-      last = now
+      if (now - lastForward < DEBOUNCE_MS) return
+      lastForward = now
       goForward()
     }
 
@@ -143,6 +148,7 @@ export default function App() {
     }
     window.addEventListener('mousedown', mouseHandler)
     window.addEventListener('mouseup', mouseHandler)
+    window.addEventListener('auxclick', mouseHandler)
 
     const offBack = window.api.nav.onBack(navBack)
     const offForward = window.api.nav.onForward(navForward)
@@ -150,6 +156,7 @@ export default function App() {
     return () => {
       window.removeEventListener('mousedown', mouseHandler)
       window.removeEventListener('mouseup', mouseHandler)
+      window.removeEventListener('auxclick', mouseHandler)
       offBack()
       offForward()
     }
