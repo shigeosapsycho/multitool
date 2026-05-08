@@ -42,6 +42,13 @@ export function ResultsPage() {
     void load()
   }, [load])
 
+  // Auto-refresh when files appear or disappear in the output folder.
+  useEffect(() => {
+    return window.api.files.onOutputChanged(() => {
+      void load()
+    })
+  }, [load])
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader

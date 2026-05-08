@@ -127,7 +127,9 @@ export default function App() {
       <TitleBar title="Beu MultiTool" version={version} />
       <div className="flex min-h-0 flex-1">
         <Sidebar current={route} onNavigate={navigate} />
-        <main className="min-w-0 flex-1 overflow-auto">{content}</main>
+        <main key={route} className="page-enter min-w-0 flex-1 overflow-auto">
+          {content}
+        </main>
       </div>
     </div>
   )

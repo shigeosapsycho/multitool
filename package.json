@@ -1,6 +1,6 @@
 {
   "name": "beu-multitool",
-  "version": "2.0.12",
+  "version": "2.2.0",
   "description": "Beu MultiTool - desktop edition",
   "main": "./out/main/index.js",
   "author": "beu",
@@ -8,7 +8,8 @@
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "build": "electron-vite build",
-    "build:win": "electron-vite build && electron-builder --win"
+    "build:win": "electron-vite build && electron-builder --win",
+    "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -23,7 +24,9 @@
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.2",
     "vite": "^5.4.11"

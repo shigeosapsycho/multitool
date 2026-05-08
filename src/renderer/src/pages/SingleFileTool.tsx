@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ToolLayout,
   FilePanel,
@@ -7,6 +7,7 @@ import {
   Icons,
   Stat
 } from '../components/ToolShell'
+import { consumePendingFile } from '../lib/pending'
 
 export type SingleFileToolProps = {
   title: string
@@ -57,6 +58,12 @@ export function SingleFileTool(props: SingleFileToolProps) {
     onSetStatus(`Loaded ${path}`)
   }
 
+  // Pick up a file dropped on the Tools landing page.
+  useEffect(() => {
+    const pending = consumePendingFile()
+    if (pending) void loadFromPath(pending)
+  }, [])
+
   async function handlePick() {
     const paths = await window.api.files.open({ title: 'Select a text file' })
     if (paths.length === 0) return
@@ -92,6 +99,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
     <ToolLayout
       title={title}
       onBack={onBack}
+      onRun={handleRun}
       banner={
         content ? (
           <>
@@ -111,10 +119,6 @@ export function SingleFileTool(props: SingleFileToolProps) {
           <Button onClick={handleClear} variant="ghost">
             <Icons.Trash />
             Clear
-          </Button>
-          <Button onClick={handlePick} variant="secondary">
-            <Icons.Folder />
-            {filePath ? 'Change File' : 'Choose File'}
           </Button>
           <Button onClick={handleRun} variant="primary" disabled={!content || running}>
             <Icons.Play />

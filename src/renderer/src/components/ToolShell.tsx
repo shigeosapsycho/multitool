@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type DragEvent } from 'react'
+import { useEffect, useState, type ReactNode, type DragEvent } from 'react'
 import { PageHeader, Button } from './PageHeader'
 import { StatusBanner, Stat } from './StatusBanner'
 import { Card } from './Card'
@@ -202,11 +202,24 @@ type ToolLayoutProps = {
   hint?: ReactNode
   banner?: ReactNode
   onBack: () => void
+  onRun?: () => void
   actions: ReactNode
   children: ReactNode
 }
 
-export function ToolLayout({ title, hint, banner, onBack, actions, children }: ToolLayoutProps) {
+export function ToolLayout({ title, hint, banner, onBack, onRun, actions, children }: ToolLayoutProps) {
+  useEffect(() => {
+    if (!onRun) return
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        onRun()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onRun])
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={title} onBack={onBack} actions={actions} />

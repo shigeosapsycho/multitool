@@ -32,6 +32,11 @@ const api = {
         deleted: number
       }>,
     pickOutputDir: () => ipcRenderer.invoke('files:pickOutputDir') as Promise<string | null>,
+    onOutputChanged: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('output:changed', handler)
+      return () => ipcRenderer.removeListener('output:changed', handler)
+    },
     getOutputDir: () => ipcRenderer.invoke('files:getOutputDir') as Promise<string>
   },
   app: {

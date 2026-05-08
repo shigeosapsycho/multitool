@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import {
   ToolLayout,
   ResultPanel,
@@ -7,6 +7,7 @@ import {
   Stat
 } from '../components/ToolShell'
 import { Card } from '../components/Card'
+import { consumePendingFile } from '../lib/pending'
 
 export type TwoFileToolProps = {
   title: string
@@ -136,6 +137,12 @@ export function TwoFileTool(props: TwoFileToolProps) {
     await loadInto(which, paths[0]!)
   }
 
+  // A file dropped on the Tools landing page lands in slot 1.
+  useEffect(() => {
+    const pending = consumePendingFile()
+    if (pending) void loadInto(1, pending)
+  }, [])
+
   function handleClear() {
     setPath1(null)
     setContent1('')
@@ -167,6 +174,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
     <ToolLayout
       title={title}
       onBack={onBack}
+      onRun={handleRun}
       banner={
         content1 || content2 ? (
           <>

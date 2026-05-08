@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
-import { promises as fs } from 'fs'
+import { promises as fs, watch as fsWatch, type FSWatcher } from 'fs'
+import iconPath from '../../resources/icon.ico?asset'
 
 let outputDirCache = ''
 
@@ -47,6 +48,37 @@ async function ensureOutputDir(): Promise<string> {
   return dir
 }
 
+// Watch the active output dir; debounce + notify renderer so Results auto-refreshes.
+let outputWatcher: FSWatcher | null = null
+let watchDebounce: NodeJS.Timeout | null = null
+
+function startOutputWatcher() {
+  if (outputWatcher) {
+    try {
+      outputWatcher.close()
+    } catch {
+      // ignore
+    }
+    outputWatcher = null
+  }
+  const dir = getOutputDir()
+  try {
+    outputWatcher = fsWatch(dir, { persistent: false }, () => {
+      if (watchDebounce) clearTimeout(watchDebounce)
+      watchDebounce = setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('output:changed')
+        }
+      }, 120)
+    })
+    outputWatcher.on('error', () => {
+      // path went away or some transient; renderer can re-pull on demand
+    })
+  } catch {
+    // dir may not exist yet — caller should ensureOutputDir() first
+  }
+}
+
 function timestamp(): string {
   const d = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -65,6 +97,7 @@ function createWindow() {
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#0a0a10',
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -107,6 +140,8 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   await loadConfig()
+  await ensureOutputDir()
+  startOutputWatcher()
   createWindow()
 
   app.on('activate', () => {
@@ -224,6 +259,7 @@ app.whenReady().then(async () => {
     const newPath = result.filePaths[0]!
     await saveOutputDir(newPath)
     await fs.mkdir(newPath, { recursive: true })
+    startOutputWatcher()
     return newPath
   })
 

@@ -1,5 +1,7 @@
+import { useState, type DragEvent } from 'react'
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
+import { setPendingFile } from '../lib/pending'
 
 const tools: ToolMeta[] = [
   {
@@ -58,6 +60,74 @@ const ChevronIcon = () => (
   </svg>
 )
 
+function ToolCard({
+  tool,
+  onNavigate
+}: {
+  tool: ToolMeta
+  onNavigate: (route: Route) => void
+}) {
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (!file) return
+    const p = (file as unknown as { path?: string }).path
+    if (p) {
+      setPendingFile(p)
+      onNavigate(tool.id)
+    }
+  }
+
+  return (
+    <button
+      onClick={() => onNavigate(tool.id)}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      className={`group relative flex flex-col items-start gap-2 rounded-xl border bg-surface p-5 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
+        dragOver
+          ? 'border-accent shadow-glow-accent'
+          : 'border-border hover:border-border-strong'
+      }`}
+    >
+      <span
+        className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-lg"
+        style={{
+          backgroundColor: `${tool.accent}1f`,
+          color: tool.accent
+        }}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+      </span>
+      <span className="text-[15px] font-semibold tracking-tight text-text-primary">
+        {tool.title}
+      </span>
+      <span className="text-[12.5px] leading-relaxed text-text-secondary">
+        {tool.description}
+      </span>
+      <span className="absolute right-4 top-5 text-text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
+        <ChevronIcon />
+      </span>
+      {dragOver && (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-accent-soft text-[12px] font-semibold uppercase tracking-wider text-accent">
+          Drop to open
+        </span>
+      )}
+    </button>
+  )
+}
+
 type Props = {
   onNavigate: (route: Route) => void
 }
@@ -67,39 +137,11 @@ export function ToolsPage({ onNavigate }: Props) {
     <div className="flex h-full flex-col">
       <PageHeader
         title="Tools"
-        subtitle="Pick a utility to get started."
+        subtitle="Pick a utility to get started — or drop a file onto one."
       />
       <div className="grid grid-cols-2 gap-4 px-8 pb-8 xl:grid-cols-3">
         {tools.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => onNavigate(t.id)}
-            className="group relative flex flex-col items-start gap-2 rounded-xl border border-border bg-surface p-5 text-left transition hover:-translate-y-0.5 hover:border-border-strong hover:bg-surface-2"
-          >
-            <span
-              className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-lg"
-              style={{
-                backgroundColor: `${t.accent}1f`,
-                color: t.accent
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" />
-              </svg>
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight text-text-primary">
-              {t.title}
-            </span>
-            <span className="text-[12.5px] leading-relaxed text-text-secondary">
-              {t.description}
-            </span>
-            <span className="absolute right-4 top-5 text-text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
-              <ChevronIcon />
-            </span>
-          </button>
+          <ToolCard key={t.id} tool={t} onNavigate={onNavigate} />
         ))}
       </div>
     </div>

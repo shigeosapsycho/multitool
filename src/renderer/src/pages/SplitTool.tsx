@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   ToolLayout,
   FilePanel,
@@ -8,6 +8,7 @@ import {
 } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { basenameNoExt, nonEmptyLines } from '../lib/parse'
+import { consumePendingFile } from '../lib/pending'
 
 export type SplitToolProps = {
   title: string
@@ -39,6 +40,12 @@ export function SplitTool(props: SplitToolProps) {
     setError(null)
     onSetStatus(`Loaded ${path}`)
   }
+
+  // Pick up a file dropped on the Tools landing page.
+  useEffect(() => {
+    const pending = consumePendingFile()
+    if (pending) void loadFromPath(pending)
+  }, [])
 
   async function handlePick() {
     const paths = await window.api.files.open({ title: 'Select a text file' })
@@ -85,6 +92,7 @@ export function SplitTool(props: SplitToolProps) {
     <ToolLayout
       title={title}
       onBack={onBack}
+      onRun={handleRun}
       banner={
         content ? (
           <>
