@@ -20,7 +20,7 @@ const tools: ToolMeta[] = [
     id: 'remove-passwords',
     title: 'Remove Passwords',
     description: 'Strip the :password from a user:pass list.',
-    accent: '#34d399'
+    accent: '#f87171'
   },
   {
     id: 'find-non-duplicates',
@@ -59,6 +59,95 @@ const ChevronIcon = () => (
     <polyline points="9 18 15 12 9 6" />
   </svg>
 )
+
+const SVG_PROPS = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  className: 'h-5 w-5'
+}
+
+const DuplicatesIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="3" width="13" height="13" rx="2" />
+    <rect x="8" y="8" width="13" height="13" rx="2" />
+  </svg>
+)
+
+const Duplicates2Icon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="2" y="4" width="8" height="16" rx="1.5" />
+    <rect x="14" y="4" width="8" height="16" rx="1.5" />
+    <circle cx="12" cy="12" r="2.2" />
+  </svg>
+)
+
+const KeyIcon = () => (
+  <svg {...SVG_PROPS}>
+    <circle cx="12" cy="12" r="9" />
+    <line x1="5.5" y1="5.5" x2="18.5" y2="18.5" />
+    <circle cx="9" cy="12" r="2" />
+    <path d="M11 12 L17 12" />
+    <path d="M15 12 L15 14" />
+    <path d="M17 12 L17 14" />
+  </svg>
+)
+
+const StarIcon = () => (
+  <svg {...SVG_PROPS}>
+    <polygon points="12 3 14.5 9 21 9.5 16 13.5 17.5 20 12 16.5 6.5 20 8 13.5 3 9.5 9.5 9" />
+  </svg>
+)
+
+const NonDupes2Icon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="2" y="4" width="8" height="16" rx="1.5" />
+    <rect x="14" y="4" width="8" height="16" rx="1.5" />
+    <path d="M10.5 10.5 L13.5 13.5" />
+    <path d="M13.5 10.5 L10.5 13.5" />
+  </svg>
+)
+
+const SplitEvenlyIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="4" y="3" width="16" height="8" rx="1.5" />
+    <rect x="4" y="13" width="16" height="8" rx="1.5" />
+  </svg>
+)
+
+const SplitByNumberIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="3" width="18" height="3" rx="0.8" />
+    <rect x="3" y="8" width="18" height="3" rx="0.8" />
+    <rect x="3" y="13" width="18" height="3" rx="0.8" />
+    <rect x="3" y="18" width="18" height="3" rx="0.8" />
+  </svg>
+)
+
+const DiceIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="16" cy="8" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="8" cy="16" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="16" cy="16" r="1.1" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
+  'find-duplicates': DuplicatesIcon,
+  'find-duplicates-2': Duplicates2Icon,
+  'remove-passwords': KeyIcon,
+  'find-non-duplicates': StarIcon,
+  'find-non-duplicates-2': NonDupes2Icon,
+  'split-evenly': SplitEvenlyIcon,
+  'split-by-n': SplitByNumberIcon,
+  'randomize': DiceIcon
+}
 
 function ToolCard({
   tool,
@@ -103,12 +192,7 @@ function ToolCard({
           color: tool.accent
         }}
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-          <rect x="3" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" />
-        </svg>
+        {(TOOL_ICONS[tool.id] ?? DuplicatesIcon)()}
       </span>
       <span className="text-[15px] font-semibold tracking-tight text-text-primary">
         {tool.title}
