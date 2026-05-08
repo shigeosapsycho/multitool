@@ -57,6 +57,18 @@ const api = {
     setFilePreview: (enabled: boolean) =>
       ipcRenderer.invoke('config:setFilePreview', enabled) as Promise<boolean>
   },
+  nav: {
+    onBack: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('nav:back', handler)
+      return () => ipcRenderer.removeListener('nav:back', handler)
+    },
+    onForward: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('nav:forward', handler)
+      return () => ipcRenderer.removeListener('nav:forward', handler)
+    }
+  },
   updater: {
     onStatus: (
       cb: (

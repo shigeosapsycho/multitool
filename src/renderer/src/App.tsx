@@ -111,25 +111,47 @@ export default function App() {
     )
   }, [])
 
-  // Mouse4 (DOM button === 3, XButton1) = back; Mouse5 (DOM button === 4, XButton2) = forward.
-  // Standard Windows mapping.
+  // Mouse4 / Mouse5 ("Back" / "Forward" thumb buttons). Listen via two paths
+  // and debounce so duplicates don't double-fire:
+  //   1. DOM mousedown/mouseup (e.button === 3 for back, === 4 for forward).
+  //      Works in most cases but Chromium may swallow X-buttons.
+  //   2. Windows APPCOMMAND messages forwarded from the main process via IPC.
+  //      Reliable on Windows when DOM events aren't surfaced.
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    let last = 0
+    const navBack = () => {
+      const now = Date.now()
+      if (now - last < 50) return
+      last = now
+      goBack()
+    }
+    const navForward = () => {
+      const now = Date.now()
+      if (now - last < 50) return
+      last = now
+      goForward()
+    }
+
+    const mouseHandler = (e: MouseEvent) => {
       if (e.button === 3) {
         e.preventDefault()
-        goBack()
+        navBack()
       } else if (e.button === 4) {
         e.preventDefault()
-        goForward()
+        navForward()
       }
     }
-    // Listen on both mousedown and mouseup — Chromium fires browser-back on
-    // mousedown by default, so blocking there prevents any unwanted default.
-    window.addEventListener('mousedown', handler)
-    window.addEventListener('mouseup', handler)
+    window.addEventListener('mousedown', mouseHandler)
+    window.addEventListener('mouseup', mouseHandler)
+
+    const offBack = window.api.nav.onBack(navBack)
+    const offForward = window.api.nav.onForward(navForward)
+
     return () => {
-      window.removeEventListener('mousedown', handler)
-      window.removeEventListener('mouseup', handler)
+      window.removeEventListener('mousedown', mouseHandler)
+      window.removeEventListener('mouseup', mouseHandler)
+      offBack()
+      offForward()
     }
   }, [goBack, goForward])
 

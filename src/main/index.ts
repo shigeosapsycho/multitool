@@ -155,6 +155,19 @@ function createWindow() {
     mainWindow = null
   })
 
+  // Side mouse buttons (XButton1 / XButton2 — "Back" / "Forward" thumb buttons)
+  // surface here as Windows APPCOMMAND messages. Forward them to the renderer
+  // so the in-app history (App.tsx) can react. This is more reliable than
+  // listening for mousedown/mouseup in the renderer, which Chromium may swallow.
+  mainWindow.on('app-command', (_event, command) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (command === 'browser-backward') {
+      mainWindow.webContents.send('nav:back')
+    } else if (command === 'browser-forward') {
+      mainWindow.webContents.send('nav:forward')
+    }
+  })
+
   // Lock zoom: no Ctrl+=, Ctrl+-, Ctrl+0, no pinch zoom, no Ctrl+wheel.
   mainWindow.webContents.setVisualZoomLevelLimits(1, 1)
   mainWindow.webContents.setZoomFactor(1)
