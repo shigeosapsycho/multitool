@@ -19,12 +19,28 @@ import { LogsPage } from './pages/Logs'
 
 type NavState = { history: Route[]; index: number }
 
+const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] = [
+  'find-duplicates',
+  'find-duplicates-2',
+  'find-non-duplicates',
+  'find-non-duplicates-2',
+  'remove-passwords',
+  'split-evenly',
+  'split-by-n',
+  'randomize'
+]
+
+function isToolRoute(r: Route): boolean {
+  return (TOOL_ROUTES as Route[]).includes(r)
+}
+
 export default function App() {
   const [nav, setNav] = useState<NavState>({ history: ['tools'], index: 0 })
   const [version, setVersion] = useState('2.0.0')
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [updateReady, setUpdateReady] = useState(false)
   const [filePreview, setFilePreview] = useState(false)
+  const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   const noopStatus = () => {}
 
   const route = nav.history[nav.index] ?? 'tools'
@@ -69,6 +85,14 @@ export default function App() {
   }, [])
 
   const navigate = useCallback((next: Route) => {
+    if (isToolRoute(next)) {
+      setVisitedTools((prev) => {
+        if (prev.has(next)) return prev
+        const out = new Set(prev)
+        out.add(next)
+        return out
+      })
+    }
     setNav((prev) => {
       const truncated = prev.history.slice(0, prev.index + 1)
       if (truncated[truncated.length - 1] === next) return prev
@@ -123,55 +147,66 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [goBack])
 
-  let content: JSX.Element
-  switch (route) {
-    case 'tools':
-      content = <ToolsPage onNavigate={navigate} />
-      break
-    case 'find-duplicates':
-      content = <FindDuplicatesPage onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'find-duplicates-2':
-      content = <FindDuplicates2Page onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'find-non-duplicates':
-      content = <FindNonDuplicatesPage onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'find-non-duplicates-2':
-      content = <FindNonDuplicates2Page onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'remove-passwords':
-      content = <RemovePasswordsPage onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'split-evenly':
-      content = <SplitEvenlyPage onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'split-by-n':
-      content = <SplitByNumberPage onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'randomize':
-      content = <RandomizePage onBack={goBack} onSetStatus={noopStatus} />
-      break
-    case 'results':
-      content = <ResultsPage filePreview={filePreview} />
-      break
-    case 'settings':
-      content = <SettingsPage filePreview={filePreview} onFilePreviewChange={setFilePreview} />
-      break
-    case 'logs':
-      content = <LogsPage logs={logs} />
-      break
-    default:
-      content = <Placeholder title="Tool" onBack={goBack} />
+  function renderTool(r: Route): JSX.Element | null {
+    const props = { onBack: goBack, onSetStatus: noopStatus }
+    switch (r) {
+      case 'find-duplicates':
+        return <FindDuplicatesPage {...props} />
+      case 'find-duplicates-2':
+        return <FindDuplicates2Page {...props} />
+      case 'find-non-duplicates':
+        return <FindNonDuplicatesPage {...props} />
+      case 'find-non-duplicates-2':
+        return <FindNonDuplicates2Page {...props} />
+      case 'remove-passwords':
+        return <RemovePasswordsPage {...props} />
+      case 'split-evenly':
+        return <SplitEvenlyPage {...props} />
+      case 'split-by-n':
+        return <SplitByNumberPage {...props} />
+      case 'randomize':
+        return <RandomizePage {...props} />
+      default:
+        return null
+    }
   }
+
+  // Non-tool page rendering (re-mounts on every visit; cheap since they hold no transient state).
+  let nonToolContent: JSX.Element | null = null
+  if (route === 'tools') nonToolContent = <ToolsPage onNavigate={navigate} />
+  else if (route === 'results') nonToolContent = <ResultsPage filePreview={filePreview} />
+  else if (route === 'settings')
+    nonToolContent = <SettingsPage filePreview={filePreview} onFilePreviewChange={setFilePreview} />
+  else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
       <TitleBar title="Beu MultiTool" version={version} />
       <div className="flex min-h-0 flex-1">
         <Sidebar current={route} onNavigate={navigate} />
-        <main key={route} className="page-enter min-w-0 flex-1 overflow-auto">
-          {content}
+        <main className="min-w-0 flex-1 overflow-auto">
+          {/* Non-tool pages: animated, re-mount on each visit. */}
+          {nonToolContent && (
+            <div key={route} className="page-enter h-full">
+              {nonToolContent}
+            </div>
+          )}
+
+          {/* Tool pages: keep mounted once visited so state survives navigation.
+              Only the active one is shown; the rest are hidden via display:none. */}
+          {(TOOL_ROUTES as Route[]).map((r) => {
+            if (!visitedTools.has(r)) return null
+            const isActive = route === r
+            return (
+              <div
+                key={r}
+                style={{ display: isActive ? 'block' : 'none' }}
+                className="h-full"
+              >
+                {renderTool(r)}
+              </div>
+            )
+          })}
         </main>
       </div>
       {updateReady && <StatusBar message="Update available restart to apply changes" />}

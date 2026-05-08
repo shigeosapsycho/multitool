@@ -34,8 +34,6 @@ const RefreshIcon = () => (
   </svg>
 )
 
-const PREVIEW_LINE_LIMIT = 1000
-
 type Props = {
   filePreview: boolean
 }
@@ -48,7 +46,6 @@ export function ResultsPage({ filePreview }: Props) {
   const [selected, setSelected] = useState<Entry | null>(null)
   const [previewText, setPreviewText] = useState<string>('')
   const [previewLoading, setPreviewLoading] = useState(false)
-  const [previewTruncated, setPreviewTruncated] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -77,7 +74,6 @@ export function ResultsPage({ filePreview }: Props) {
   useEffect(() => {
     if (!filePreview || !selected) {
       setPreviewText('')
-      setPreviewTruncated(false)
       return
     }
     let cancelled = false
@@ -86,14 +82,7 @@ export function ResultsPage({ filePreview }: Props) {
       try {
         const text = await window.api.files.read(selected.path)
         if (cancelled) return
-        const lines = text.split(/\r?\n/)
-        if (lines.length > PREVIEW_LINE_LIMIT) {
-          setPreviewText(lines.slice(0, PREVIEW_LINE_LIMIT).join('\n'))
-          setPreviewTruncated(true)
-        } else {
-          setPreviewText(text)
-          setPreviewTruncated(false)
-        }
+        setPreviewText(text)
       } catch {
         if (!cancelled) setPreviewText('(failed to read file)')
       } finally {
@@ -221,20 +210,18 @@ export function ResultsPage({ filePreview }: Props) {
                       Reveal
                     </button>
                   </div>
-                  <div className="min-h-0 flex-1 overflow-auto p-4 font-mono text-[12.5px] leading-relaxed text-text-primary">
-                    {previewLoading ? (
-                      <div className="text-text-muted">Loading…</div>
-                    ) : (
-                      <>
-                        <pre className="whitespace-pre-wrap break-all">{previewText}</pre>
-                        {previewTruncated && (
-                          <div className="mt-3 text-[11px] text-text-muted">
-                            (preview truncated to first {PREVIEW_LINE_LIMIT.toLocaleString()} lines)
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  {previewLoading ? (
+                    <div className="flex min-h-0 flex-1 items-start p-4 font-mono text-[12.5px] leading-relaxed text-text-muted">
+                      Loading…
+                    </div>
+                  ) : (
+                    <textarea
+                      readOnly
+                      value={previewText}
+                      spellCheck={false}
+                      className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-text-primary outline-none"
+                    />
+                  )}
                 </div>
               )}
             </div>

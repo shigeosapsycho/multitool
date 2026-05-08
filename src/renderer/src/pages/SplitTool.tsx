@@ -172,7 +172,10 @@ export function SplitTool(props: SplitToolProps) {
                     <span className="flex-1 truncate font-mono text-[12px] text-text-primary">
                       {o.path}
                     </span>
-                    <Button onClick={() => window.api.files.reveal(o.path)} variant="ghost">
+                    <Button
+                      onClick={() => window.api.files.openFile(o.path)}
+                      variant="ghost"
+                    >
                       <Icons.Reveal />
                     </Button>
                   </div>

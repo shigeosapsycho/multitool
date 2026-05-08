@@ -247,6 +247,10 @@ app.whenReady().then(async () => {
     shell.showItemInFolder(path)
   })
 
+  ipcMain.handle('files:openFile', async (_e, path: string) => {
+    await shell.openPath(path)
+  })
+
   ipcMain.handle('files:openOutputDir', async () => {
     const dir = await ensureOutputDir()
     shell.openPath(dir)

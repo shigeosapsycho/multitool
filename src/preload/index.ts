@@ -21,6 +21,7 @@ const api = {
     writeOutputs: (items: { name: string; content: string }[]) =>
       ipcRenderer.invoke('files:writeOutputs', items) as Promise<string[]>,
     reveal: (path: string) => ipcRenderer.invoke('files:reveal', path) as Promise<void>,
+    openFile: (path: string) => ipcRenderer.invoke('files:openFile', path) as Promise<void>,
     openOutputDir: () => ipcRenderer.invoke('files:openOutputDir') as Promise<void>,
     listOutput: () =>
       ipcRenderer.invoke('files:listOutput') as Promise<
