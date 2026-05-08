@@ -24,12 +24,17 @@ export default function App() {
   const [version, setVersion] = useState('2.0.0')
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [updateReady, setUpdateReady] = useState(false)
+  const [filePreview, setFilePreview] = useState(false)
   const noopStatus = () => {}
 
   const route = nav.history[nav.index] ?? 'tools'
 
   useEffect(() => {
     window.api.app.getVersion().then(setVersion).catch(() => {})
+    window.api.config
+      .get()
+      .then((cfg) => setFilePreview(cfg.filePreview))
+      .catch(() => {})
   }, [])
 
   // Subscribe to auto-updater status messages and accumulate them as logs.
@@ -148,10 +153,10 @@ export default function App() {
       content = <RandomizePage onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'results':
-      content = <ResultsPage />
+      content = <ResultsPage filePreview={filePreview} />
       break
     case 'settings':
-      content = <SettingsPage />
+      content = <SettingsPage filePreview={filePreview} onFilePreviewChange={setFilePreview} />
       break
     case 'logs':
       content = <LogsPage logs={logs} />

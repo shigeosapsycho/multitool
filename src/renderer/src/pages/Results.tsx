@@ -4,6 +4,8 @@ import { Icons } from '../components/ToolShell'
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
+type Entry = { path: string; name: string; size: number; mtime: number }
+
 type ConfirmConfig = {
   title: string
   message: string
@@ -11,8 +13,6 @@ type ConfirmConfig = {
   confirmLabel: string
   onConfirm: () => Promise<void> | void
 }
-
-type Entry = { path: string; name: string; size: number; mtime: number }
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -34,17 +34,29 @@ const RefreshIcon = () => (
   </svg>
 )
 
-export function ResultsPage() {
+const PREVIEW_LINE_LIMIT = 1000
+
+type Props = {
+  filePreview: boolean
+}
+
+export function ResultsPage({ filePreview }: Props) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null)
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null)
+  const [selected, setSelected] = useState<Entry | null>(null)
+  const [previewText, setPreviewText] = useState<string>('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewTruncated, setPreviewTruncated] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const list = await window.api.files.listOutput()
       setEntries(list)
+      // Drop selection if the file disappeared.
+      setSelected((prev) => (prev && list.some((e) => e.path === prev.path) ? prev : null))
     } finally {
       setLoading(false)
     }
@@ -60,6 +72,43 @@ export function ResultsPage() {
       void load()
     })
   }, [load])
+
+  // Reload preview content when selection changes (only in preview mode).
+  useEffect(() => {
+    if (!filePreview || !selected) {
+      setPreviewText('')
+      setPreviewTruncated(false)
+      return
+    }
+    let cancelled = false
+    setPreviewLoading(true)
+    void (async () => {
+      try {
+        const text = await window.api.files.read(selected.path)
+        if (cancelled) return
+        const lines = text.split(/\r?\n/)
+        if (lines.length > PREVIEW_LINE_LIMIT) {
+          setPreviewText(lines.slice(0, PREVIEW_LINE_LIMIT).join('\n'))
+          setPreviewTruncated(true)
+        } else {
+          setPreviewText(text)
+          setPreviewTruncated(false)
+        }
+      } catch {
+        if (!cancelled) setPreviewText('(failed to read file)')
+      } finally {
+        if (!cancelled) setPreviewLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [filePreview, selected])
+
+  function handleSelect(entry: Entry) {
+    if (!filePreview) return
+    setSelected((prev) => (prev?.path === entry.path ? prev : entry))
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -105,10 +154,90 @@ export function ResultsPage() {
         }
       />
 
-      <div className="px-8 pb-8">
+      <div className="min-h-0 flex-1 px-8 pb-8">
         {entries.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-surface/50 p-10 text-center text-[14px] text-text-secondary">
             Run any tool and saved output will appear here.
+          </div>
+        ) : filePreview ? (
+          <div className="grid h-full min-h-0 grid-cols-[minmax(320px,2fr)_3fr] gap-4">
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
+              <div className="h-full overflow-auto">
+                <table className="w-full text-left text-[13px]">
+                  <thead className="sticky top-0 z-10 bg-surface-2 text-[11px] uppercase tracking-wider text-text-secondary shadow-[inset_0_-1px_0_var(--tw-shadow-color)] shadow-border">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Name</th>
+                      <th className="px-4 py-3 font-semibold">Size</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((e) => {
+                      const isSelected = selected?.path === e.path
+                      return (
+                        <tr
+                          key={e.path}
+                          onClick={() => handleSelect(e)}
+                          onContextMenu={(ev) => {
+                            ev.preventDefault()
+                            setMenu({ x: ev.clientX, y: ev.clientY, entry: e })
+                          }}
+                          className={`cursor-pointer border-b border-border last:border-b-0 transition ${
+                            isSelected
+                              ? 'bg-accent-soft text-text-primary'
+                              : 'hover:bg-surface-2'
+                          }`}
+                        >
+                          <td className="px-4 py-2.5 font-mono text-text-primary">{e.name}</td>
+                          <td className="px-4 py-2.5 text-text-secondary">{formatBytes(e.size)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
+              {!selected ? (
+                <div className="flex h-full items-center justify-center p-8 text-center text-[13px] text-text-muted">
+                  Select a file to preview its contents.
+                </div>
+              ) : (
+                <div className="flex h-full min-h-0 flex-col">
+                  <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-mono text-[12.5px] text-text-primary">
+                        {selected.name}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-text-muted">
+                        {formatBytes(selected.size)} · {formatTime(selected.mtime)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => window.api.files.reveal(selected.path)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] text-text-secondary transition hover:bg-surface-2 hover:text-text-primary"
+                    >
+                      <Icons.Reveal />
+                      Reveal
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-auto p-4 font-mono text-[12.5px] leading-relaxed text-text-primary">
+                    {previewLoading ? (
+                      <div className="text-text-muted">Loading…</div>
+                    ) : (
+                      <>
+                        <pre className="whitespace-pre-wrap break-all">{previewText}</pre>
+                        {previewTruncated && (
+                          <div className="mt-3 text-[11px] text-text-muted">
+                            (preview truncated to first {PREVIEW_LINE_LIMIT.toLocaleString()} lines)
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -193,7 +322,10 @@ export function ResultsPage() {
                     confirmLabel: 'Delete',
                     onConfirm: async () => {
                       const result = await window.api.files.deleteOutput(target.path)
-                      if (result.ok) await load()
+                      if (result.ok) {
+                        if (selected?.path === target.path) setSelected(null)
+                        await load()
+                      }
                     }
                   })
                 }

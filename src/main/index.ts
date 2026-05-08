@@ -45,7 +45,8 @@ function setupAutoUpdater(): void {
   }
 }
 
-let outputDirCache = ''
+type Config = { outputDir?: string; filePreview?: boolean }
+let configCache: Config = {}
 
 function defaultOutputDir(): string {
   if (app.isPackaged) {
@@ -66,27 +67,23 @@ function configPath(): string {
 async function loadConfig(): Promise<void> {
   try {
     const text = await fs.readFile(configPath(), 'utf-8')
-    const cfg = JSON.parse(text)
-    if (typeof cfg.outputDir === 'string' && cfg.outputDir.length > 0) {
-      outputDirCache = cfg.outputDir
-    }
+    const parsed = JSON.parse(text)
+    if (parsed && typeof parsed === 'object') configCache = parsed
   } catch {
-    // missing or unreadable — fall through to default
+    configCache = {}
   }
-  if (!outputDirCache) outputDirCache = defaultOutputDir()
 }
 
-async function saveOutputDir(newPath: string): Promise<void> {
-  outputDirCache = newPath
-  await fs.writeFile(
-    configPath(),
-    JSON.stringify({ outputDir: newPath }, null, 2),
-    'utf-8'
-  )
+async function saveConfig(): Promise<void> {
+  await fs.writeFile(configPath(), JSON.stringify(configCache, null, 2), 'utf-8')
 }
 
 function getOutputDir(): string {
-  return outputDirCache || defaultOutputDir()
+  return configCache.outputDir || defaultOutputDir()
+}
+
+function getFilePreview(): boolean {
+  return configCache.filePreview ?? false
 }
 
 async function ensureOutputDir(): Promise<string> {
@@ -303,10 +300,22 @@ app.whenReady().then(async () => {
     })
     if (result.canceled || result.filePaths.length === 0) return null
     const newPath = result.filePaths[0]!
-    await saveOutputDir(newPath)
+    configCache.outputDir = newPath
+    await saveConfig()
     await fs.mkdir(newPath, { recursive: true })
     startOutputWatcher()
     return newPath
+  })
+
+  ipcMain.handle('config:get', () => ({
+    outputDir: getOutputDir(),
+    filePreview: getFilePreview()
+  }))
+
+  ipcMain.handle('config:setFilePreview', async (_e, enabled: boolean) => {
+    configCache.filePreview = !!enabled
+    await saveConfig()
+    return configCache.filePreview
   })
 
   ipcMain.handle('files:getOutputDir', () => getOutputDir())

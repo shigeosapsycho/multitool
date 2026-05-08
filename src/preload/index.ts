@@ -47,6 +47,15 @@ const api = {
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion') as Promise<string>
   },
+  config: {
+    get: () =>
+      ipcRenderer.invoke('config:get') as Promise<{
+        outputDir: string
+        filePreview: boolean
+      }>,
+    setFilePreview: (enabled: boolean) =>
+      ipcRenderer.invoke('config:setFilePreview', enabled) as Promise<boolean>
+  },
   updater: {
     onStatus: (
       cb: (

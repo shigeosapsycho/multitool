@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PageHeader, Button } from '../components/PageHeader'
 import { Card } from '../components/Card'
+import { Toggle } from '../components/Toggle'
 import { Icons } from '../components/ToolShell'
 
 const PencilIcon = () => (
@@ -10,7 +11,12 @@ const PencilIcon = () => (
   </svg>
 )
 
-export function SettingsPage() {
+type Props = {
+  filePreview: boolean
+  onFilePreviewChange: (next: boolean) => void
+}
+
+export function SettingsPage({ filePreview, onFilePreviewChange }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
   useEffect(() => {
@@ -22,18 +28,37 @@ export function SettingsPage() {
     if (next) setOutputDir(next)
   }
 
+  async function handleTogglePreview(next: boolean) {
+    await window.api.config.setFilePreview(next)
+    onFilePreviewChange(next)
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Settings" subtitle="App configuration." />
       <div className="grid grid-cols-1 gap-4 px-8 pb-8 xl:grid-cols-2">
-        <Card label="Output">
+        <Card label="Results">
           <div className="space-y-4 p-4 text-[13px]">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-                Output folder
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[14px] text-text-primary">File previews</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  When on, the Results tab splits into a list and a preview pane. Clicking a file
+                  shows its contents inline.
+                </div>
               </div>
-              <div className="mt-1.5 break-all font-mono text-text-primary">{outputDir}</div>
+              <Toggle
+                checked={filePreview}
+                onChange={handleTogglePreview}
+                ariaLabel="Toggle file previews"
+              />
             </div>
+          </div>
+        </Card>
+
+        <Card label="Output Folder">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div className="break-all font-mono text-text-primary">{outputDir}</div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={handleChangeFolder} variant="secondary">
                 <PencilIcon />
