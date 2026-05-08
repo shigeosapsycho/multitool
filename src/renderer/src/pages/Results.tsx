@@ -1,6 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
 import { PageHeader, Button } from '../components/PageHeader'
 import { Icons } from '../components/ToolShell'
+import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+
+type ConfirmConfig = {
+  title: string
+  message: string
+  detail?: string
+  confirmLabel: string
+  onConfirm: () => Promise<void> | void
+}
 
 type Entry = { path: string; name: string; size: number; mtime: number }
 
@@ -27,6 +37,8 @@ const RefreshIcon = () => (
 export function ResultsPage() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
+  const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null)
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -67,9 +79,17 @@ export function ResultsPage() {
               Refresh
             </Button>
             <Button
-              onClick={async () => {
-                const result = await window.api.files.clearOutput()
-                if (!result.canceled) await load()
+              onClick={() => {
+                setConfirm({
+                  title: 'Clear output folder',
+                  message: 'Delete all .txt files in the output folder?',
+                  detail: 'This cannot be undone.',
+                  confirmLabel: 'Delete All',
+                  onConfirm: async () => {
+                    await window.api.files.clearOutput()
+                    await load()
+                  }
+                })
               }}
               variant="ghost"
               disabled={entries.length === 0}
@@ -105,6 +125,10 @@ export function ResultsPage() {
                 {entries.map((e) => (
                   <tr
                     key={e.path}
+                    onContextMenu={(ev) => {
+                      ev.preventDefault()
+                      setMenu({ x: ev.clientX, y: ev.clientY, entry: e })
+                    }}
                     className="border-b border-border last:border-b-0 hover:bg-surface-2"
                   >
                     <td className="px-4 py-3 font-mono text-text-primary">{e.name}</td>
@@ -126,6 +150,58 @@ export function ResultsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        detail={confirm?.detail}
+        confirmLabel={confirm?.confirmLabel ?? 'Confirm'}
+        cancelLabel="Cancel"
+        danger
+        onCancel={() => setConfirm(null)}
+        onConfirm={async () => {
+          const c = confirm
+          setConfirm(null)
+          if (c) await c.onConfirm()
+        }}
+      />
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={
+            [
+              {
+                label: 'Reveal in Explorer',
+                icon: <Icons.Reveal />,
+                onClick: () => window.api.files.reveal(menu.entry.path),
+                separatorAfter: true
+              },
+              {
+                label: 'Delete',
+                icon: <Icons.Trash />,
+                danger: true,
+                onClick: () => {
+                  const target = menu.entry
+                  setConfirm({
+                    title: 'Delete file',
+                    message: `Delete ${target.name}?`,
+                    detail: 'This cannot be undone.',
+                    confirmLabel: 'Delete',
+                    onConfirm: async () => {
+                      const result = await window.api.files.deleteOutput(target.path)
+                      if (result.ok) await load()
+                    }
+                  })
+                }
+              }
+            ] as ContextMenuItem[]
+          }
+        />
+      )}
     </div>
   )
 }

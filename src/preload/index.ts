@@ -27,9 +27,11 @@ const api = {
         { path: string; name: string; size: number; mtime: number }[]
       >,
     clearOutput: () =>
-      ipcRenderer.invoke('files:clearOutput') as Promise<{
-        canceled: boolean
-        deleted: number
+      ipcRenderer.invoke('files:clearOutput') as Promise<{ deleted: number }>,
+    deleteOutput: (path: string) =>
+      ipcRenderer.invoke('files:deleteOutput', path) as Promise<{
+        ok: boolean
+        error?: string
       }>,
     pickOutputDir: () => ipcRenderer.invoke('files:pickOutputDir') as Promise<string | null>,
     // Electron 32+ removed File.path for security; use webUtils to recover the

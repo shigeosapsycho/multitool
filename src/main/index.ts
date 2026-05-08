@@ -255,19 +255,9 @@ app.whenReady().then(async () => {
     shell.openPath(dir)
   })
 
+  // Confirmation is handled by the in-app themed dialog in the renderer.
+  // These IPCs just perform the action.
   ipcMain.handle('files:clearOutput', async () => {
-    if (!mainWindow) return { canceled: true, deleted: 0 }
-    const choice = await dialog.showMessageBox(mainWindow, {
-      type: 'warning',
-      buttons: ['Cancel', 'Delete All'],
-      defaultId: 0,
-      cancelId: 0,
-      title: 'Clear output folder',
-      message: 'Delete all .txt files in the output folder?',
-      detail: 'This cannot be undone.',
-      noLink: true
-    })
-    if (choice.response !== 1) return { canceled: true, deleted: 0 }
     const dir = await ensureOutputDir()
     const entries = await fs.readdir(dir, { withFileTypes: true })
     let deleted = 0
@@ -277,7 +267,16 @@ app.whenReady().then(async () => {
       await fs.unlink(join(dir, entry.name))
       deleted++
     }
-    return { canceled: false, deleted }
+    return { deleted }
+  })
+
+  ipcMain.handle('files:deleteOutput', async (_e, path: string) => {
+    try {
+      await fs.unlink(path)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: String(err) }
+    }
   })
 
   ipcMain.handle('files:listOutput', async () => {
