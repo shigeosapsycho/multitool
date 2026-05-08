@@ -79,7 +79,7 @@ export function ResultsPage() {
       />
 
       <div className="px-8 pb-8">
-        {entries.length === 0 && !loading ? (
+        {entries.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-surface/50 p-10 text-center text-[14px] text-text-secondary">
             Run any tool and saved output will appear here.
           </div>
