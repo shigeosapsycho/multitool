@@ -41,14 +41,14 @@ export default function App() {
           message = `Fetching updates (${status.currentVersion})...`
           break
         case 'no-update':
-          message = 'No updates found'
+          message = 'No updates found.'
           kind = 'success'
           break
         case 'available':
           message = `Updating to new version (v${status.version})...`
           break
         case 'downloaded':
-          message = 'Update files finished installing restart app for the update'
+          message = 'Update files finished installing! Restart the app to apply the update.'
           kind = 'success'
           break
         case 'error':

@@ -1,6 +1,6 @@
 {
   "name": "beu-multitool",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Beu MultiTool - desktop edition",
   "main": "./out/main/index.js",
   "author": "beu",
@@ -8,7 +8,8 @@
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "build": "electron-vite build",
-    "build:win": "electron-vite build && electron-builder --win",
+    "build:win": "electron-vite build && electron-builder --win --publish never",
+    "release:win": "electron-vite build && electron-builder --win --publish always",
     "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
