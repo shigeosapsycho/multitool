@@ -3,12 +3,24 @@ import { PageHeader, Button } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { Icons } from '../components/ToolShell'
 
+const PencilIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+  </svg>
+)
+
 export function SettingsPage() {
   const [outputDir, setOutputDir] = useState('—')
 
   useEffect(() => {
     void window.api.files.getOutputDir().then(setOutputDir)
   }, [])
+
+  async function handleChangeFolder() {
+    const next = await window.api.files.pickOutputDir()
+    if (next) setOutputDir(next)
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -22,10 +34,16 @@ export function SettingsPage() {
               </div>
               <div className="mt-1.5 break-all font-mono text-text-primary">{outputDir}</div>
             </div>
-            <Button onClick={() => window.api.files.openOutputDir()} variant="secondary">
-              <Icons.Folder />
-              Open output folder
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleChangeFolder} variant="secondary">
+                <PencilIcon />
+                Change folder
+              </Button>
+              <Button onClick={() => window.api.files.openOutputDir()} variant="ghost">
+                <Icons.Folder />
+                Open
+              </Button>
+            </div>
           </div>
         </Card>
       </div>

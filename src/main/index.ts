@@ -2,11 +2,43 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
 import { promises as fs } from 'fs'
 
-function getOutputDir(): string {
+let outputDirCache = ''
+
+function defaultOutputDir(): string {
   if (app.isPackaged) {
     return join(app.getPath('exe'), '..', 'output')
   }
   return join(__dirname, '..', '..', 'output')
+}
+
+function configPath(): string {
+  return join(app.getPath('userData'), 'config.json')
+}
+
+async function loadConfig(): Promise<void> {
+  try {
+    const text = await fs.readFile(configPath(), 'utf-8')
+    const cfg = JSON.parse(text)
+    if (typeof cfg.outputDir === 'string' && cfg.outputDir.length > 0) {
+      outputDirCache = cfg.outputDir
+    }
+  } catch {
+    // missing or unreadable — fall through to default
+  }
+  if (!outputDirCache) outputDirCache = defaultOutputDir()
+}
+
+async function saveOutputDir(newPath: string): Promise<void> {
+  outputDirCache = newPath
+  await fs.writeFile(
+    configPath(),
+    JSON.stringify({ outputDir: newPath }, null, 2),
+    'utf-8'
+  )
+}
+
+function getOutputDir(): string {
+  return outputDirCache || defaultOutputDir()
 }
 
 async function ensureOutputDir(): Promise<string> {
@@ -73,7 +105,8 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await loadConfig()
   createWindow()
 
   app.on('activate', () => {
@@ -148,7 +181,7 @@ app.whenReady().then(() => {
       defaultId: 0,
       cancelId: 0,
       title: 'Clear output folder',
-      message: 'Delete all files in the output folder?',
+      message: 'Delete all .txt files in the output folder?',
       detail: 'This cannot be undone.',
       noLink: true
     })
@@ -158,6 +191,7 @@ app.whenReady().then(() => {
     let deleted = 0
     for (const entry of entries) {
       if (!entry.isFile()) continue
+      if (!entry.name.toLowerCase().endsWith('.txt')) continue
       await fs.unlink(join(dir, entry.name))
       deleted++
     }
@@ -170,12 +204,27 @@ app.whenReady().then(() => {
     const out: { path: string; name: string; size: number; mtime: number }[] = []
     for (const entry of entries) {
       if (!entry.isFile()) continue
+      if (!entry.name.toLowerCase().endsWith('.txt')) continue
       const full = join(dir, entry.name)
       const stat = await fs.stat(full)
       out.push({ path: full, name: entry.name, size: stat.size, mtime: stat.mtimeMs })
     }
     out.sort((a, b) => b.mtime - a.mtime)
     return out
+  })
+
+  ipcMain.handle('files:pickOutputDir', async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose output folder',
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: getOutputDir()
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const newPath = result.filePaths[0]!
+    await saveOutputDir(newPath)
+    await fs.mkdir(newPath, { recursive: true })
+    return newPath
   })
 
   ipcMain.handle('files:getOutputDir', () => getOutputDir())
