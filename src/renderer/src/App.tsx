@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Route } from './types'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
@@ -15,22 +15,59 @@ import { RandomizePage } from './pages/Randomize'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 
+type NavState = { history: Route[]; index: number }
+
 export default function App() {
-  const [route, setRoute] = useState<Route>('tools')
+  const [nav, setNav] = useState<NavState>({ history: ['tools'], index: 0 })
   const [version, setVersion] = useState('2.0.0')
   const noopStatus = () => {}
+
+  const route = nav.history[nav.index] ?? 'tools'
 
   useEffect(() => {
     window.api.app.getVersion().then(setVersion).catch(() => {})
   }, [])
 
-  function navigate(next: Route) {
-    setRoute(next)
-  }
+  const navigate = useCallback((next: Route) => {
+    setNav((prev) => {
+      const truncated = prev.history.slice(0, prev.index + 1)
+      if (truncated[truncated.length - 1] === next) return prev
+      const history = [...truncated, next]
+      return { history, index: history.length - 1 }
+    })
+  }, [])
 
-  function back() {
-    navigate('tools')
-  }
+  const goBack = useCallback(() => {
+    setNav((prev) => (prev.index > 0 ? { ...prev, index: prev.index - 1 } : prev))
+  }, [])
+
+  const goForward = useCallback(() => {
+    setNav((prev) =>
+      prev.index < prev.history.length - 1 ? { ...prev, index: prev.index + 1 } : prev
+    )
+  }, [])
+
+  // Mouse4 (DOM button === 3, XButton1) = back; Mouse5 (DOM button === 4, XButton2) = forward.
+  // Standard Windows mapping.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (e.button === 3) {
+        e.preventDefault()
+        goBack()
+      } else if (e.button === 4) {
+        e.preventDefault()
+        goForward()
+      }
+    }
+    // Listen on both mousedown and mouseup — Chromium fires browser-back on
+    // mousedown by default, so blocking there prevents any unwanted default.
+    window.addEventListener('mousedown', handler)
+    window.addEventListener('mouseup', handler)
+    return () => {
+      window.removeEventListener('mousedown', handler)
+      window.removeEventListener('mouseup', handler)
+    }
+  }, [goBack, goForward])
 
   let content: JSX.Element
   switch (route) {
@@ -38,28 +75,28 @@ export default function App() {
       content = <ToolsPage onNavigate={navigate} />
       break
     case 'find-duplicates':
-      content = <FindDuplicatesPage onBack={back} onSetStatus={noopStatus} />
+      content = <FindDuplicatesPage onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'find-duplicates-2':
-      content = <FindDuplicates2Page onBack={back} onSetStatus={noopStatus} />
+      content = <FindDuplicates2Page onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'find-non-duplicates':
-      content = <FindNonDuplicatesPage onBack={back} onSetStatus={noopStatus} />
+      content = <FindNonDuplicatesPage onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'find-non-duplicates-2':
-      content = <FindNonDuplicates2Page onBack={back} onSetStatus={noopStatus} />
+      content = <FindNonDuplicates2Page onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'remove-passwords':
-      content = <RemovePasswordsPage onBack={back} onSetStatus={noopStatus} />
+      content = <RemovePasswordsPage onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'split-evenly':
-      content = <SplitEvenlyPage onBack={back} onSetStatus={noopStatus} />
+      content = <SplitEvenlyPage onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'split-by-n':
-      content = <SplitByNumberPage onBack={back} onSetStatus={noopStatus} />
+      content = <SplitByNumberPage onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'randomize':
-      content = <RandomizePage onBack={back} onSetStatus={noopStatus} />
+      content = <RandomizePage onBack={goBack} onSetStatus={noopStatus} />
       break
     case 'results':
       content = <ResultsPage />
@@ -68,7 +105,7 @@ export default function App() {
       content = <SettingsPage />
       break
     default:
-      content = <Placeholder title="Tool" onBack={back} />
+      content = <Placeholder title="Tool" onBack={goBack} />
   }
 
   return (
