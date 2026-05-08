@@ -63,6 +63,7 @@ export function SplitTool(props: SplitToolProps) {
 
   async function handleRun() {
     if (!content) return
+    const start = Date.now()
     setRunning(true)
     setError(null)
     try {
@@ -84,6 +85,9 @@ export function SplitTool(props: SplitToolProps) {
       setOutputs(out)
       onSetStatus(`Wrote ${paths.length} files to output/`)
     } finally {
+      const elapsed = Date.now() - start
+      const min = 500
+      if (elapsed < min) await new Promise((r) => setTimeout(r, min - elapsed))
       setRunning(false)
     }
   }
@@ -93,6 +97,7 @@ export function SplitTool(props: SplitToolProps) {
       title={title}
       onBack={onBack}
       onRun={handleRun}
+      running={running}
       banner={
         content ? (
           <>

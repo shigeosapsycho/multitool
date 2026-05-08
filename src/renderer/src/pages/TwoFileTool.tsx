@@ -155,6 +155,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
 
   async function handleRun() {
     if (!content1 || !content2) return
+    const start = Date.now()
     setRunning(true)
     try {
       const out = transform(content1, content2)
@@ -164,6 +165,9 @@ export function TwoFileTool(props: TwoFileToolProps) {
         out.length === 0 ? emptyResultMessage : `${out.length.toLocaleString()} ${resultUnit}`
       )
     } finally {
+      const elapsed = Date.now() - start
+      const min = 500
+      if (elapsed < min) await new Promise((r) => setTimeout(r, min - elapsed))
       setRunning(false)
     }
   }
@@ -175,6 +179,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
       title={title}
       onBack={onBack}
       onRun={handleRun}
+      running={running}
       banner={
         content1 || content2 ? (
           <>

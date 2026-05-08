@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 type Props = {
   children: ReactNode
   icon?: ReactNode
+  spinning?: boolean
 }
 
 const DefaultIcon = () => (
@@ -14,10 +15,16 @@ const DefaultIcon = () => (
   </svg>
 )
 
-export function StatusBanner({ children, icon }: Props) {
+export function StatusBanner({ children, icon, spinning }: Props) {
   return (
     <div className="mx-8 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-[13px] text-text-secondary">
-      <span className="text-accent">{icon ?? <DefaultIcon />}</span>
+      <span
+        className={`flex h-4 w-4 items-center justify-center text-accent transition ${
+          spinning ? 'animate-spin' : ''
+        }`}
+      >
+        {icon ?? <DefaultIcon />}
+      </span>
       <div className="flex-1">{children}</div>
     </div>
   )

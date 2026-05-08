@@ -80,6 +80,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
 
   async function handleRun() {
     if (!content) return
+    const start = Date.now()
     setRunning(true)
     try {
       const out = transform(content)
@@ -91,6 +92,9 @@ export function SingleFileTool(props: SingleFileToolProps) {
         onSetStatus(`${out.length.toLocaleString()} ${resultUnit}`)
       }
     } finally {
+      const elapsed = Date.now() - start
+      const min = 500
+      if (elapsed < min) await new Promise((r) => setTimeout(r, min - elapsed))
       setRunning(false)
     }
   }
@@ -100,6 +104,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
       title={title}
       onBack={onBack}
       onRun={handleRun}
+      running={running}
       banner={
         content ? (
           <>

@@ -203,11 +203,12 @@ type ToolLayoutProps = {
   banner?: ReactNode
   onBack: () => void
   onRun?: () => void
+  running?: boolean
   actions: ReactNode
   children: ReactNode
 }
 
-export function ToolLayout({ title, hint, banner, onBack, onRun, actions, children }: ToolLayoutProps) {
+export function ToolLayout({ title, hint, banner, onBack, onRun, running, actions, children }: ToolLayoutProps) {
   useEffect(() => {
     if (!onRun) return
     const handler = (e: KeyboardEvent) => {
@@ -223,7 +224,7 @@ export function ToolLayout({ title, hint, banner, onBack, onRun, actions, childr
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={title} onBack={onBack} actions={actions} />
-      <StatusBanner>{banner ?? hint}</StatusBanner>
+      <StatusBanner spinning={running}>{banner ?? hint}</StatusBanner>
       <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-1 gap-4 px-8 pb-8 pt-4">{children}</div>
     </div>
   )
