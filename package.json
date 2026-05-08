@@ -1,6 +1,6 @@
 {
   "name": "beu-multitool",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Beu MultiTool - desktop edition",
   "main": "./out/main/index.js",
   "author": "beu",

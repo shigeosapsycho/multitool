@@ -26,6 +26,11 @@ const api = {
       ipcRenderer.invoke('files:listOutput') as Promise<
         { path: string; name: string; size: number; mtime: number }[]
       >,
+    clearOutput: () =>
+      ipcRenderer.invoke('files:clearOutput') as Promise<{
+        canceled: boolean
+        deleted: number
+      }>,
     getOutputDir: () => ipcRenderer.invoke('files:getOutputDir') as Promise<string>
   },
   app: {

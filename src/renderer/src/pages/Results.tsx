@@ -59,6 +59,17 @@ export function ResultsPage() {
               <RefreshIcon />
               Refresh
             </Button>
+            <Button
+              onClick={async () => {
+                const result = await window.api.files.clearOutput()
+                if (!result.canceled) await load()
+              }}
+              variant="ghost"
+              disabled={entries.length === 0}
+            >
+              <Icons.Trash />
+              Clear
+            </Button>
             <Button onClick={() => window.api.files.openOutputDir()} variant="secondary">
               <Icons.Folder />
               Open Folder
