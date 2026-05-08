@@ -40,14 +40,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # On regular commits / PRs: build only (--publish never so CI skips upload).
-      - name: Build (no publish)
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+      # PRs build only (no publish — never push artifacts from a fork's branch).
+      - name: Build (PR check, no publish)
+        if: github.event_name == 'pull_request'
         run: npm run build:win
 
-      # On v* tag pushes: build AND publish to GitHub Release with auto-updater metadata.
-      - name: Build & publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+      # Pushes to main and v* tags both publish. electron-builder uploads to a
+      # release tagged with package.json's `version` (creating it if missing).
+      - name: Build & publish
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
