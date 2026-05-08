@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LogEntry, Route } from './types'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
+import { StatusBar } from './components/StatusBar'
 import { ToolsPage } from './pages/Tools'
 import { Placeholder } from './pages/Placeholder'
 import { FindDuplicatesPage } from './pages/FindDuplicates'
@@ -22,6 +23,7 @@ export default function App() {
   const [nav, setNav] = useState<NavState>({ history: ['tools'], index: 0 })
   const [version, setVersion] = useState('2.0.0')
   const [logs, setLogs] = useState<LogEntry[]>([])
+  const [updateReady, setUpdateReady] = useState(false)
   const noopStatus = () => {}
 
   const route = nav.history[nav.index] ?? 'tools'
@@ -50,6 +52,7 @@ export default function App() {
         case 'downloaded':
           message = 'Update files finished installing! Restart the app to apply the update.'
           kind = 'success'
+          setUpdateReady(true)
           break
         case 'error':
           message = `Update error: ${status.message}`
@@ -166,6 +169,7 @@ export default function App() {
           {content}
         </main>
       </div>
+      {updateReady && <StatusBar message="Update available restart to apply changes" />}
     </div>
   )
 }
