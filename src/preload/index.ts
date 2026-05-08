@@ -41,6 +41,22 @@ const api = {
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion') as Promise<string>
+  },
+  updater: {
+    onStatus: (
+      cb: (
+        status:
+          | { type: 'checking'; currentVersion: string }
+          | { type: 'no-update'; currentVersion: string }
+          | { type: 'available'; version: string }
+          | { type: 'downloaded'; version: string }
+          | { type: 'error'; message: string }
+      ) => void
+    ) => {
+      const handler = (_e: unknown, status: Parameters<typeof cb>[0]) => cb(status)
+      ipcRenderer.on('updater:status', handler)
+      return () => ipcRenderer.removeListener('updater:status', handler)
+    }
   }
 }
 

@@ -29,7 +29,14 @@ All output lands in a single `output/` folder with timestamped filenames, config
 
 ## Install
 
-Grab the latest `BeuMultiTool.exe` from the [Releases](../../releases) page and double-click. It's a portable single-file build — no installer, no admin required. Output files land next to the `.exe` (or wherever you point Settings → Output folder).
+Two builds are produced for every release:
+
+| File | What it is |
+|---|---|
+| `BeuMultiTool-Setup-x.y.z.exe` | NSIS installer with shortcuts. Output defaults to `Documents\BeuMultiTool\output`. |
+| `BeuMultiTool.exe` | Portable single-file. Just double-click. Output lands next to the `.exe`. |
+
+Either way you can change the output folder from **Settings**.
 
 ## Build from source
 

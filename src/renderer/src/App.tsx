@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Route } from './types'
+import type { LogEntry, Route } from './types'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
 import { ToolsPage } from './pages/Tools'
@@ -14,18 +14,50 @@ import { SplitByNumberPage } from './pages/SplitByNumber'
 import { RandomizePage } from './pages/Randomize'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
+import { LogsPage } from './pages/Logs'
 
 type NavState = { history: Route[]; index: number }
 
 export default function App() {
   const [nav, setNav] = useState<NavState>({ history: ['tools'], index: 0 })
   const [version, setVersion] = useState('2.0.0')
+  const [logs, setLogs] = useState<LogEntry[]>([])
   const noopStatus = () => {}
 
   const route = nav.history[nav.index] ?? 'tools'
 
   useEffect(() => {
     window.api.app.getVersion().then(setVersion).catch(() => {})
+  }, [])
+
+  // Subscribe to auto-updater status messages and accumulate them as logs.
+  // App is always mounted, so we never miss events even if Logs page isn't open.
+  useEffect(() => {
+    return window.api.updater.onStatus((status) => {
+      let message = ''
+      let kind: LogEntry['kind'] = 'info'
+      switch (status.type) {
+        case 'checking':
+          message = `Fetching updates (${status.currentVersion})...`
+          break
+        case 'no-update':
+          message = 'No updates found'
+          kind = 'success'
+          break
+        case 'available':
+          message = `Updating to new version (v${status.version})...`
+          break
+        case 'downloaded':
+          message = 'Update files finished installing restart app for the update'
+          kind = 'success'
+          break
+        case 'error':
+          message = `Update error: ${status.message}`
+          kind = 'error'
+          break
+      }
+      setLogs((prev) => [...prev, { time: Date.now(), message, kind }])
+    })
   }, [])
 
   const navigate = useCallback((next: Route) => {
@@ -117,6 +149,9 @@ export default function App() {
       break
     case 'settings':
       content = <SettingsPage />
+      break
+    case 'logs':
+      content = <LogsPage logs={logs} />
       break
     default:
       content = <Placeholder title="Tool" onBack={goBack} />

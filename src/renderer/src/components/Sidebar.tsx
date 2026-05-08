@@ -1,7 +1,7 @@
 import type { Route } from '../types'
 
 type SidebarItem = {
-  id: 'tools' | 'results' | 'settings'
+  id: 'tools' | 'results' | 'settings' | 'logs'
   label: string
   icon: JSX.Element
 }
@@ -28,10 +28,18 @@ const SettingsIcon = () => (
   </svg>
 )
 
+const LogsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+    <polyline points="6 9 11 14 6 19" />
+    <line x1="14" y1="19" x2="20" y2="19" />
+  </svg>
+)
+
 const items: SidebarItem[] = [
   { id: 'tools', label: 'Tools', icon: <ToolsIcon /> },
   { id: 'results', label: 'Results', icon: <ResultsIcon /> },
-  { id: 'settings', label: 'Settings', icon: <SettingsIcon /> }
+  { id: 'settings', label: 'Settings', icon: <SettingsIcon /> },
+  { id: 'logs', label: 'Logs', icon: <LogsIcon /> }
 ]
 
 const TOOL_ROUTES = new Set<Route>([

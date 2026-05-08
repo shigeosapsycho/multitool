@@ -1,13 +1,60 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
 import { promises as fs, watch as fsWatch, type FSWatcher } from 'fs'
+import { autoUpdater } from 'electron-updater'
 import iconPath from '../../resources/icon.ico?asset'
+
+type UpdaterStatus =
+  | { type: 'checking'; currentVersion: string }
+  | { type: 'no-update'; currentVersion: string }
+  | { type: 'available'; version: string }
+  | { type: 'downloaded'; version: string }
+  | { type: 'error'; message: string }
+
+function broadcastUpdaterStatus(status: UpdaterStatus): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('updater:status', status)
+  }
+}
+
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('checking-for-update', () => {
+    broadcastUpdaterStatus({ type: 'checking', currentVersion: app.getVersion() })
+  })
+  autoUpdater.on('update-not-available', () => {
+    broadcastUpdaterStatus({ type: 'no-update', currentVersion: app.getVersion() })
+  })
+  autoUpdater.on('update-available', (info) => {
+    broadcastUpdaterStatus({ type: 'available', version: info.version })
+  })
+  autoUpdater.on('update-downloaded', (info) => {
+    broadcastUpdaterStatus({ type: 'downloaded', version: info.version })
+  })
+  autoUpdater.on('error', (err) => {
+    broadcastUpdaterStatus({ type: 'error', message: err?.message ?? String(err) })
+  })
+
+  // Only check when the app is packaged (electron-updater needs a real install).
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdates().catch(() => {
+      // Errors already surfaced via the 'error' event above
+    })
+  }
+}
 
 let outputDirCache = ''
 
 function defaultOutputDir(): string {
   if (app.isPackaged) {
-    return join(app.getPath('exe'), '..', 'output')
+    // Portable build sets PORTABLE_EXECUTABLE_DIR; write next to the .exe.
+    // Installed (NSIS) build runs from Program Files which is read-only —
+    // fall back to a writable location under the user's Documents folder.
+    const portableDir = process.env['PORTABLE_EXECUTABLE_DIR']
+    if (portableDir) return join(portableDir, 'output')
+    return join(app.getPath('documents'), 'BeuMultiTool', 'output')
   }
   return join(__dirname, '..', '..', 'output')
 }
@@ -266,6 +313,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('files:getOutputDir', () => getOutputDir())
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // Auto-updater (GitHub Releases). No-op in dev (app.isPackaged is false).
+  setupAutoUpdater()
 })
 
 app.on('window-all-closed', () => {

@@ -1,6 +1,6 @@
 {
   "name": "beu-multitool",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Beu MultiTool - desktop edition",
   "main": "./out/main/index.js",
   "author": "beu",
@@ -12,6 +12,7 @@
     "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -37,13 +38,45 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "shigeosapsycho",
+        "repo": "multitool",
+        "releaseType": "release"
+      }
+    ],
     "files": [
       "out/**/*",
       "package.json"
     ],
     "win": {
-      "target": "portable",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "tool_icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Beu MultiTool",
+      "artifactName": "BeuMultiTool-Setup-${version}.exe",
+      "uninstallDisplayName": "Beu MultiTool"
     },
     "portable": {
       "artifactName": "BeuMultiTool.exe"

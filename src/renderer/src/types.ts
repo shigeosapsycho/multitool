@@ -10,10 +10,13 @@ export type Route =
   | 'randomize'
   | 'results'
   | 'settings'
+  | 'logs'
 
 export type ToolMeta = {
-  id: Exclude<Route, 'tools' | 'results' | 'settings'>
+  id: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>
   title: string
   description: string
   accent: string
 }
+
+export type LogEntry = { time: number; message: string; kind: 'info' | 'success' | 'error' }
