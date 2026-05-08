@@ -69,6 +69,20 @@ export default function App() {
     }
   }, [goBack, goForward])
 
+  // Esc goes back, mirroring mouse4. Skip when an input/textarea is focused
+  // so users editing content can press Esc to deselect natively.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      goBack()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [goBack])
+
   let content: JSX.Element
   switch (route) {
     case 'tools':

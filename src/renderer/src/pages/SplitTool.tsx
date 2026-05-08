@@ -31,16 +31,19 @@ export function SplitTool(props: SplitToolProps) {
 
   const lineCount = useMemo(() => nonEmptyLines(content).length, [content])
 
-  async function handlePick() {
-    const paths = await window.api.files.open({ title: 'Select a text file' })
-    if (paths.length === 0) return
-    const path = paths[0]!
+  async function loadFromPath(path: string) {
     const text = await window.api.files.read(path)
     setFilePath(path)
     setContent(text)
     setOutputs(null)
     setError(null)
     onSetStatus(`Loaded ${path}`)
+  }
+
+  async function handlePick() {
+    const paths = await window.api.files.open({ title: 'Select a text file' })
+    if (paths.length === 0) return
+    await loadFromPath(paths[0]!)
   }
 
   function handleClear() {
@@ -83,7 +86,7 @@ export function SplitTool(props: SplitToolProps) {
       title={title}
       onBack={onBack}
       banner={
-        filePath ? (
+        content ? (
           <>
             <Stat value={lineCount.toLocaleString()} label="lines loaded" />
             <Stat
@@ -119,6 +122,7 @@ export function SplitTool(props: SplitToolProps) {
           setError(null)
         }}
         onPick={handlePick}
+        onDropPath={loadFromPath}
       />
 
       <div className="flex min-h-0 flex-col gap-4">

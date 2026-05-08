@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode, type DragEvent } from 'react'
 import { PageHeader, Button } from './PageHeader'
 import { StatusBanner, Stat } from './StatusBanner'
 import { Card } from './Card'
@@ -54,20 +54,59 @@ type FilePanelProps = {
   content: string
   onContentChange: (s: string) => void
   onPick: () => void
+  onDropPath?: (path: string) => void
   placeholder?: string
+  className?: string
 }
 
-export function FilePanel({ label, filePath, content, onContentChange, onPick, placeholder }: FilePanelProps) {
+export function FilePanel({
+  label,
+  filePath,
+  content,
+  onContentChange,
+  onPick,
+  onDropPath,
+  placeholder,
+  className
+}: FilePanelProps) {
+  const [dragOver, setDragOver] = useState(false)
   const lineCount = content
     ? content.split(/\r?\n/).filter((l) => l.trim().length > 0).length
     : 0
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (!file) return
+    const p = (file as unknown as { path?: string }).path
+    if (p && onDropPath) onDropPath(p)
+  }
+
   return (
-    <Card label={label} badge={lineCount.toLocaleString()}>
-      <div className="flex h-full min-h-0 flex-col">
+    <Card label={label} badge={lineCount.toLocaleString()} className={className}>
+      <div
+        className={`relative flex h-full min-h-0 flex-col transition ${
+          dragOver ? 'bg-accent-soft' : ''
+        }`}
+        onDragOver={(e) => {
+          if (!onDropPath) return
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
+        {dragOver && (
+          <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-accent" />
+        )}
         <textarea
           value={content}
           onChange={(e) => onContentChange(e.target.value)}
-          placeholder={placeholder ?? 'No file loaded.\n\nClick "Choose File" or paste content here.'}
+          placeholder={
+            placeholder ??
+            'No file loaded.\n\nDrop a file, click "Choose File", or paste content here.'
+          }
           className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-text-primary outline-none placeholder:text-text-muted"
           spellCheck={false}
         />
@@ -172,7 +211,7 @@ export function ToolLayout({ title, hint, banner, onBack, actions, children }: T
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={title} onBack={onBack} actions={actions} />
       <StatusBanner>{banner ?? hint}</StatusBanner>
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-4 px-8 pb-8 pt-4">{children}</div>
+      <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-1 gap-4 px-8 pb-8 pt-4">{children}</div>
     </div>
   )
 }

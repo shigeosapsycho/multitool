@@ -86,7 +86,7 @@ export function ResultsPage() {
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-surface">
             <table className="w-full text-left text-[13px]">
-              <thead className="border-b border-border bg-surface-2 text-[11px] uppercase tracking-wider text-text-secondary">
+              <thead className="sticky top-0 z-10 bg-surface-2 text-[11px] uppercase tracking-wider text-text-secondary shadow-[inset_0_-1px_0_var(--tw-shadow-color)] shadow-border">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Name</th>
                   <th className="px-4 py-3 font-semibold">Size</th>

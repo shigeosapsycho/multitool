@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type DragEvent } from 'react'
 import {
   ToolLayout,
   ResultPanel,
@@ -26,24 +26,50 @@ function FileBox({
   filePath,
   content,
   onPick,
-  onChange
+  onChange,
+  onDropPath
 }: {
   index: 1 | 2
   filePath: string | null
   content: string
   onPick: () => void
   onChange: (s: string) => void
+  onDropPath: (path: string) => void
 }) {
+  const [dragOver, setDragOver] = useState(false)
   const lineCount = content
     ? content.split(/\r?\n/).filter((l) => l.trim().length > 0).length
     : 0
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (!file) return
+    const p = (file as unknown as { path?: string }).path
+    if (p) onDropPath(p)
+  }
+
   return (
-    <Card label={`File ${index}`} badge={lineCount.toLocaleString()}>
-      <div className="flex h-full min-h-0 flex-col">
+    <Card label={`File ${index}`} badge={lineCount.toLocaleString()} className="min-h-0 flex-1">
+      <div
+        className={`relative flex h-full min-h-0 flex-col transition ${
+          dragOver ? 'bg-accent-soft' : ''
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
+        {dragOver && (
+          <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-accent" />
+        )}
         <textarea
           value={content}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={`No file ${index} loaded.\n\nClick "Choose" or paste content here.`}
+          placeholder={`No file ${index} loaded.\n\nDrop a file, click "Choose", or paste content here.`}
           className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-text-primary outline-none placeholder:text-text-muted"
           spellCheck={false}
         />
@@ -90,10 +116,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
     [content1, content2]
   )
 
-  async function pick(which: 1 | 2) {
-    const paths = await window.api.files.open({ title: `Select file ${which}` })
-    if (paths.length === 0) return
-    const path = paths[0]!
+  async function loadInto(which: 1 | 2, path: string) {
     const text = await window.api.files.read(path)
     if (which === 1) {
       setPath1(path)
@@ -105,6 +128,12 @@ export function TwoFileTool(props: TwoFileToolProps) {
     setResults(null)
     setSavedTo(null)
     onSetStatus(`Loaded file ${which}: ${path}`)
+  }
+
+  async function pick(which: 1 | 2) {
+    const paths = await window.api.files.open({ title: `Select file ${which}` })
+    if (paths.length === 0) return
+    await loadInto(which, paths[0]!)
   }
 
   function handleClear() {
@@ -139,7 +168,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
       title={title}
       onBack={onBack}
       banner={
-        path1 || path2 ? (
+        content1 || content2 ? (
           <>
             <Stat value={totalLines.toLocaleString()} label="lines loaded" />
             <Stat
@@ -171,6 +200,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
           filePath={path1}
           content={content1}
           onPick={() => pick(1)}
+          onDropPath={(p) => loadInto(1, p)}
           onChange={(s) => {
             setContent1(s)
             setResults(null)
@@ -182,6 +212,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
           filePath={path2}
           content={content2}
           onPick={() => pick(2)}
+          onDropPath={(p) => loadInto(2, p)}
           onChange={(s) => {
             setContent2(s)
             setResults(null)

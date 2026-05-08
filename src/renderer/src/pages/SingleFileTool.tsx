@@ -48,16 +48,19 @@ export function SingleFileTool(props: SingleFileToolProps) {
     [content]
   )
 
-  async function handlePick() {
-    const paths = await window.api.files.open({ title: 'Select a text file' })
-    if (paths.length === 0) return
-    const path = paths[0]!
+  async function loadFromPath(path: string) {
     const text = await window.api.files.read(path)
     setFilePath(path)
     setContent(text)
     setResults(null)
     setSavedTo(null)
     onSetStatus(`Loaded ${path}`)
+  }
+
+  async function handlePick() {
+    const paths = await window.api.files.open({ title: 'Select a text file' })
+    if (paths.length === 0) return
+    await loadFromPath(paths[0]!)
   }
 
   function handleClear() {
@@ -90,7 +93,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
       title={title}
       onBack={onBack}
       banner={
-        filePath ? (
+        content ? (
           <>
             <Stat value={lineCount.toLocaleString()} label="lines loaded" />
             <Stat
@@ -130,6 +133,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
           setSavedTo(null)
         }}
         onPick={handlePick}
+        onDropPath={loadFromPath}
       />
       <ResultPanel
         label={resultLabel}
