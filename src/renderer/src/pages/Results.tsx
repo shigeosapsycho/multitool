@@ -102,7 +102,7 @@ export function ResultsPage({ filePreview }: Props) {
   return (
     <div className="flex h-full flex-col">
       <PageHeader
-        title="Results"
+        title="Output"
         subtitle={
           loading
             ? 'Loading…'

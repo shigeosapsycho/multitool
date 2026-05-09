@@ -13,6 +13,7 @@ import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { SplitEvenlyPage } from './pages/SplitEvenly'
 import { SplitByNumberPage } from './pages/SplitByNumber'
 import { RandomizePage } from './pages/Randomize'
+import { SearchMasterPage } from './pages/SearchMaster'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 import { LogsPage } from './pages/Logs'
@@ -27,7 +28,8 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'remove-passwords',
   'split-evenly',
   'split-by-n',
-  'randomize'
+  'randomize',
+  'search-master'
 ]
 
 function isToolRoute(r: Route): boolean {
@@ -176,8 +178,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [goBack])
 
-  function renderTool(r: Route): JSX.Element | null {
-    const props = { onBack: goBack, onSetStatus: noopStatus }
+  function renderTool(r: Route, active: boolean): JSX.Element | null {
+    const props = { onBack: goBack, onSetStatus: noopStatus, active }
     switch (r) {
       case 'find-duplicates':
         return <FindDuplicatesPage {...props} />
@@ -195,6 +197,8 @@ export default function App() {
         return <SplitByNumberPage {...props} />
       case 'randomize':
         return <RandomizePage {...props} />
+      case 'search-master':
+        return <SearchMasterPage {...props} />
       default:
         return null
     }
@@ -232,7 +236,7 @@ export default function App() {
                 style={{ display: isActive ? 'block' : 'none' }}
                 className="h-full"
               >
-                {renderTool(r)}
+                {renderTool(r, isActive)}
               </div>
             )
           })}

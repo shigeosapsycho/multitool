@@ -17,12 +17,23 @@ export type SplitToolProps = {
   controls?: ReactNode
   getChunks: (lines: string[]) => string[][] | { error: string }
   partName: (baseName: string, index: number) => string
+  active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
 }
 
 export function SplitTool(props: SplitToolProps) {
-  const { title, hint, runLabel, controls, getChunks, partName, onBack, onSetStatus } = props
+  const {
+    title,
+    hint,
+    runLabel,
+    controls,
+    getChunks,
+    partName,
+    active = true,
+    onBack,
+    onSetStatus
+  } = props
 
   const [filePath, setFilePath] = useState<string | null>(null)
   const [content, setContent] = useState<string>('')
@@ -41,11 +52,12 @@ export function SplitTool(props: SplitToolProps) {
     onSetStatus(`Loaded ${path}`)
   }
 
-  // Pick up a file dropped on the Tools landing page.
+  // Pick up a file dropped on the Tools landing page. Re-runs on active.
   useEffect(() => {
+    if (!active) return
     const pending = consumePendingFile()
     if (pending) void loadFromPath(pending)
-  }, [])
+  }, [active])
 
   async function handlePick() {
     const paths = await window.api.files.open({ title: 'Select a text file' })

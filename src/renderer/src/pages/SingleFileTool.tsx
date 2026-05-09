@@ -19,6 +19,7 @@ export type SingleFileToolProps = {
   emptyResultMessage: string
   runLabel: string
   transform: (text: string) => string[]
+  active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
 }
@@ -34,6 +35,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
     emptyResultMessage,
     runLabel,
     transform,
+    active = true,
     onBack,
     onSetStatus
   } = props
@@ -58,11 +60,13 @@ export function SingleFileTool(props: SingleFileToolProps) {
     onSetStatus(`Loaded ${path}`)
   }
 
-  // Pick up a file dropped on the Tools landing page.
+  // Pick up a file dropped on the Tools landing page. Re-runs when the tool
+  // becomes active so revisits via drop-on-card still work after first mount.
   useEffect(() => {
+    if (!active) return
     const pending = consumePendingFile()
     if (pending) void loadFromPath(pending)
-  }, [])
+  }, [active])
 
   async function handlePick() {
     const paths = await window.api.files.open({ title: 'Select a text file' })

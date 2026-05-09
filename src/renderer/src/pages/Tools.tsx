@@ -51,6 +51,12 @@ const tools: ToolMeta[] = [
     title: 'Randomize List',
     description: 'Shuffle the lines in random order.',
     accent: '#f472b6'
+  },
+  {
+    id: 'search-master',
+    title: 'Search Master',
+    description: 'Find items from a search list that also appear in a master list.',
+    accent: '#34d399'
   }
 ]
 
@@ -138,6 +144,13 @@ const DiceIcon = () => (
   </svg>
 )
 
+const SearchIcon = () => (
+  <svg {...SVG_PROPS}>
+    <circle cx="11" cy="11" r="6.5" />
+    <line x1="20" y1="20" x2="16" y2="16" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
   'find-duplicates-2': Duplicates2Icon,
@@ -146,7 +159,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-non-duplicates-2': NonDupes2Icon,
   'split-evenly': SplitEvenlyIcon,
   'split-by-n': SplitByNumberIcon,
-  'randomize': DiceIcon
+  'randomize': DiceIcon,
+  'search-master': SearchIcon
 }
 
 function ToolCard({
@@ -223,7 +237,7 @@ export function ToolsPage({ onNavigate }: Props) {
         title="Tools"
         subtitle="Pick a utility to get started — or drop a file onto one."
       />
-      <div className="grid grid-cols-2 gap-4 px-8 pb-8 xl:grid-cols-3">
+      <div className="grid auto-rows-fr grid-cols-2 gap-4 px-8 pb-8 xl:grid-cols-3">
         {tools.map((t) => (
           <ToolCard key={t.id} tool={t} onNavigate={onNavigate} />
         ))}

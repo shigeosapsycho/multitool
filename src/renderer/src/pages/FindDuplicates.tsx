@@ -1,9 +1,9 @@
 import { SingleFileTool } from './SingleFileTool'
 import { duplicatesFromText } from '../lib/transforms'
 
-type Props = { onBack: () => void; onSetStatus: (msg: string) => void }
+type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-export function FindDuplicatesPage({ onBack, onSetStatus }: Props) {
+export function FindDuplicatesPage({ onBack, onSetStatus, active }: Props) {
   return (
     <SingleFileTool
       title="Find Duplicates"
@@ -14,6 +14,7 @@ export function FindDuplicatesPage({ onBack, onSetStatus }: Props) {
       emptyResultMessage="No duplicates found."
       runLabel="Find Duplicates"
       transform={duplicatesFromText}
+      active={active}
       onBack={onBack}
       onSetStatus={onSetStatus}
     />

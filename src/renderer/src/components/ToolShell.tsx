@@ -112,7 +112,7 @@ export function FilePanel({
         />
         <div className="flex items-center gap-2 border-t border-border p-3">
           <span className="flex-1 truncate text-[12px] text-text-muted">
-            {filePath ?? 'No file selected'}
+            {filePath ?? ''}
           </span>
           <Button onClick={onPick} variant="ghost">
             <FolderIcon />
@@ -184,10 +184,13 @@ export function ResultPanel({
                 </Button>
               </>
             ) : (
-              <Button onClick={handleSave} variant="secondary">
-                <SaveIcon />
-                Save to output/
-              </Button>
+              <>
+                <span className="flex-1" />
+                <Button onClick={handleSave} variant="secondary">
+                  <SaveIcon />
+                  Save to Output
+                </Button>
+              </>
             )}
           </div>
         </div>

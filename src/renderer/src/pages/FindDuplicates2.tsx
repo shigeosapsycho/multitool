@@ -1,9 +1,9 @@
 import { TwoFileTool } from './TwoFileTool'
 import { duplicatesFromTwoTexts } from '../lib/transforms'
 
-type Props = { onBack: () => void; onSetStatus: (msg: string) => void }
+type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-export function FindDuplicates2Page({ onBack, onSetStatus }: Props) {
+export function FindDuplicates2Page({ onBack, onSetStatus, active }: Props) {
   return (
     <TwoFileTool
       title="Duplicates Across 2 Files"
@@ -14,6 +14,7 @@ export function FindDuplicates2Page({ onBack, onSetStatus }: Props) {
       emptyResultMessage="No duplicates across the two files."
       runLabel="Find Duplicates"
       transform={duplicatesFromTwoTexts}
+      active={active}
       onBack={onBack}
       onSetStatus={onSetStatus}
     />

@@ -1,9 +1,9 @@
 import { TwoFileTool } from './TwoFileTool'
 import { nonDuplicatesFromTwoTexts } from '../lib/transforms'
 
-type Props = { onBack: () => void; onSetStatus: (msg: string) => void }
+type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-export function FindNonDuplicates2Page({ onBack, onSetStatus }: Props) {
+export function FindNonDuplicates2Page({ onBack, onSetStatus, active }: Props) {
   return (
     <TwoFileTool
       title="Non-Duplicates Across 2 Files"
@@ -14,6 +14,7 @@ export function FindNonDuplicates2Page({ onBack, onSetStatus }: Props) {
       emptyResultMessage="No non-duplicates in the union."
       runLabel="Find Non-Duplicates"
       transform={nonDuplicatesFromTwoTexts}
+      active={active}
       onBack={onBack}
       onSetStatus={onSetStatus}
     />

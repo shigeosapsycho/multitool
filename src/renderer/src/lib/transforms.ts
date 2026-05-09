@@ -27,6 +27,22 @@ export function stripPasswordsFromText(text: string): string[] {
   return out
 }
 
+// Items from `searchText` that also exist in `masterText`, deduplicated.
+// Order matches first appearance in the search list (not master).
+export function searchInMaster(masterText: string, searchText: string): string[] {
+  const master = new Set(extractContent(masterText))
+  const search = extractContent(searchText)
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of search) {
+    if (master.has(item) && !seen.has(item)) {
+      out.push(item)
+      seen.add(item)
+    }
+  }
+  return out
+}
+
 export function shuffleLines(text: string): string[] {
   const lines = text
     .split(/\r?\n/)

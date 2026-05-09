@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { SplitTool } from './SplitTool'
 
-type Props = { onBack: () => void; onSetStatus: (msg: string) => void }
+type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-export function SplitByNumberPage({ onBack, onSetStatus }: Props) {
+export function SplitByNumberPage({ onBack, onSetStatus, active }: Props) {
   const [nInput, setNInput] = useState<string>('5')
 
   return (
     <SplitTool
+      active={active}
       title="Split by Number"
       hint="Split a file into N evenly-sized parts. Remainder is distributed across the first chunks."
       runLabel="Split"

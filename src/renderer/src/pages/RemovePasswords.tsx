@@ -1,9 +1,9 @@
 import { SingleFileTool } from './SingleFileTool'
 import { stripPasswordsFromText } from '../lib/transforms'
 
-type Props = { onBack: () => void; onSetStatus: (msg: string) => void }
+type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-export function RemovePasswordsPage({ onBack, onSetStatus }: Props) {
+export function RemovePasswordsPage({ onBack, onSetStatus, active }: Props) {
   return (
     <SingleFileTool
       title="Remove Passwords"
@@ -14,6 +14,7 @@ export function RemovePasswordsPage({ onBack, onSetStatus }: Props) {
       emptyResultMessage="No usernames extracted."
       runLabel="Strip Passwords"
       transform={stripPasswordsFromText}
+      active={active}
       onBack={onBack}
       onSetStatus={onSetStatus}
     />

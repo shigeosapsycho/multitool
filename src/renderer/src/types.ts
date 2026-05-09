@@ -8,6 +8,7 @@ export type Route =
   | 'split-evenly'
   | 'split-by-n'
   | 'randomize'
+  | 'search-master'
   | 'results'
   | 'settings'
   | 'logs'

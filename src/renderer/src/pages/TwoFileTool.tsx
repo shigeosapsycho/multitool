@@ -18,12 +18,16 @@ export type TwoFileToolProps = {
   emptyResultMessage: string
   runLabel: string
   transform: (text1: string, text2: string) => string[]
+  file1Label?: string
+  file2Label?: string
+  active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
 }
 
 function FileBox({
   index,
+  label,
   filePath,
   content,
   onPick,
@@ -31,6 +35,7 @@ function FileBox({
   onDropPath
 }: {
   index: 1 | 2
+  label: string
   filePath: string | null
   content: string
   onPick: () => void
@@ -52,7 +57,7 @@ function FileBox({
   }
 
   return (
-    <Card label={`File ${index}`} badge={lineCount.toLocaleString()} className="min-h-0 flex-1">
+    <Card label={label} badge={lineCount.toLocaleString()} className="min-h-0 flex-1">
       <div
         className={`relative flex h-full min-h-0 flex-col transition ${
           dragOver ? 'bg-accent-soft' : ''
@@ -70,13 +75,13 @@ function FileBox({
         <textarea
           value={content}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={`No file ${index} loaded.\n\nDrop a file, click "Choose", or paste content here.`}
+          placeholder={`No ${label.toLowerCase()} loaded.\n\nDrop a file, click "Choose", or paste content here.`}
           className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-text-primary outline-none placeholder:text-text-muted"
           spellCheck={false}
         />
         <div className="flex items-center gap-2 border-t border-border p-3">
           <span className="flex-1 truncate text-[12px] text-text-muted">
-            {filePath ?? 'No file selected'}
+            {filePath ?? ''}
           </span>
           <Button onClick={onPick} variant="ghost">
             <Icons.Folder />
@@ -98,6 +103,9 @@ export function TwoFileTool(props: TwoFileToolProps) {
     emptyResultMessage,
     runLabel,
     transform,
+    file1Label = 'File 1',
+    file2Label = 'File 2',
+    active = true,
     onBack,
     onSetStatus
   } = props
@@ -132,16 +140,19 @@ export function TwoFileTool(props: TwoFileToolProps) {
   }
 
   async function pick(which: 1 | 2) {
-    const paths = await window.api.files.open({ title: `Select file ${which}` })
+    const title = which === 1 ? file1Label : file2Label
+    const paths = await window.api.files.open({ title: `Select ${title}` })
     if (paths.length === 0) return
     await loadInto(which, paths[0]!)
   }
 
-  // A file dropped on the Tools landing page lands in slot 1.
+  // A file dropped on the Tools landing page lands in slot 1. Re-runs when
+  // active toggles so a drop on a card you've already opened still loads.
   useEffect(() => {
+    if (!active) return
     const pending = consumePendingFile()
     if (pending) void loadInto(1, pending)
-  }, [])
+  }, [active])
 
   function handleClear() {
     setPath1(null)
@@ -210,6 +221,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
       <div className="flex min-h-0 flex-col gap-4">
         <FileBox
           index={1}
+          label={file1Label}
           filePath={path1}
           content={content1}
           onPick={() => pick(1)}
@@ -222,6 +234,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
         />
         <FileBox
           index={2}
+          label={file2Label}
           filePath={path2}
           content={content2}
           onPick={() => pick(2)}

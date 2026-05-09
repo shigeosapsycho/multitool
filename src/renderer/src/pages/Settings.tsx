@@ -37,13 +37,13 @@ export function SettingsPage({ filePreview, onFilePreviewChange }: Props) {
     <div className="flex h-full flex-col">
       <PageHeader title="Settings" subtitle="App configuration." />
       <div className="grid grid-cols-1 gap-4 px-8 pb-8 xl:grid-cols-2">
-        <Card label="Results">
+        <Card label="Preview">
           <div className="space-y-4 p-4 text-[13px]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-[14px] text-text-primary">File previews</div>
                 <div className="mt-0.5 text-[12.5px] text-text-secondary">
-                  When on, the Results tab splits into a list and a preview pane. Clicking a file
+                  When on, the Output tab splits into a list and a preview pane. Clicking a file
                   shows its contents inline.
                 </div>
               </div>

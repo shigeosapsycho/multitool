@@ -1,8 +1,8 @@
 import { SplitTool } from './SplitTool'
 
-type Props = { onBack: () => void; onSetStatus: (msg: string) => void }
+type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-export function SplitEvenlyPage({ onBack, onSetStatus }: Props) {
+export function SplitEvenlyPage({ onBack, onSetStatus, active }: Props) {
   return (
     <SplitTool
       title="Split File Evenly"
@@ -15,6 +15,7 @@ export function SplitEvenlyPage({ onBack, onSetStatus }: Props) {
         return [lines.slice(0, mid), lines.slice(mid)]
       }}
       partName={(base, i) => `${base}_part${i + 1}`}
+      active={active}
       onBack={onBack}
       onSetStatus={onSetStatus}
     />

@@ -1,9 +1,9 @@
 import { SingleFileTool } from './SingleFileTool'
 import { shuffleLines } from '../lib/transforms'
 
-type Props = { onBack: () => void; onSetStatus: (msg: string) => void }
+type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-export function RandomizePage({ onBack, onSetStatus }: Props) {
+export function RandomizePage({ onBack, onSetStatus, active }: Props) {
   return (
     <SingleFileTool
       title="Randomize List"
@@ -14,6 +14,7 @@ export function RandomizePage({ onBack, onSetStatus }: Props) {
       emptyResultMessage="File has no content to shuffle."
       runLabel="Randomize"
       transform={shuffleLines}
+      active={active}
       onBack={onBack}
       onSetStatus={onSetStatus}
     />

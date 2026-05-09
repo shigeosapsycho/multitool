@@ -37,7 +37,7 @@ const LogsIcon = () => (
 
 const items: SidebarItem[] = [
   { id: 'tools', label: 'Tools', icon: <ToolsIcon /> },
-  { id: 'results', label: 'Results', icon: <ResultsIcon /> },
+  { id: 'results', label: 'Output', icon: <ResultsIcon /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon /> },
   { id: 'logs', label: 'Logs', icon: <LogsIcon /> }
 ]
