@@ -36,9 +36,10 @@ const RefreshIcon = () => (
 
 type Props = {
   filePreview: boolean
+  deleteToTrash: boolean
 }
 
-export function ResultsPage({ filePreview }: Props) {
+export function ResultsPage({ filePreview, deleteToTrash }: Props) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null)
@@ -121,7 +122,9 @@ export function ResultsPage({ filePreview }: Props) {
                 setConfirm({
                   title: 'Clear output folder',
                   message: 'Delete all .txt files in the output folder?',
-                  detail: 'This cannot be undone.',
+                  detail: deleteToTrash
+                    ? 'Files will be moved to the Recycle Bin.'
+                    : 'This cannot be undone.',
                   confirmLabel: 'Delete All',
                   onConfirm: async () => {
                     await window.api.files.clearOutput()
@@ -305,7 +308,9 @@ export function ResultsPage({ filePreview }: Props) {
                   setConfirm({
                     title: 'Delete file',
                     message: `Delete ${target.name}?`,
-                    detail: 'This cannot be undone.',
+                    detail: deleteToTrash
+                      ? 'The file will be moved to the Recycle Bin.'
+                      : 'This cannot be undone.',
                     confirmLabel: 'Delete',
                     onConfirm: async () => {
                       const result = await window.api.files.deleteOutput(target.path)

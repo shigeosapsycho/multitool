@@ -45,7 +45,7 @@ function setupAutoUpdater(): void {
   }
 }
 
-type Config = { outputDir?: string; filePreview?: boolean }
+type Config = { outputDir?: string; filePreview?: boolean; deleteToTrash?: boolean }
 let configCache: Config = {}
 
 function defaultOutputDir(): string {
@@ -84,6 +84,19 @@ function getOutputDir(): string {
 
 function getFilePreview(): boolean {
   return configCache.filePreview ?? false
+}
+
+function getDeleteToTrash(): boolean {
+  // Default to true so accidental deletes are recoverable from the Recycle Bin.
+  return configCache.deleteToTrash ?? true
+}
+
+async function deleteOrTrash(path: string): Promise<void> {
+  if (getDeleteToTrash()) {
+    await shell.trashItem(path)
+  } else {
+    await fs.unlink(path)
+  }
 }
 
 async function ensureOutputDir(): Promise<string> {
@@ -270,7 +283,8 @@ app.whenReady().then(async () => {
   })
 
   // Confirmation is handled by the in-app themed dialog in the renderer.
-  // These IPCs just perform the action.
+  // These IPCs just perform the action — routed through shell.trashItem when
+  // the user has the "Send to Recycle Bin" setting on (default), else fs.unlink.
   ipcMain.handle('files:clearOutput', async () => {
     const dir = await ensureOutputDir()
     const entries = await fs.readdir(dir, { withFileTypes: true })
@@ -278,7 +292,7 @@ app.whenReady().then(async () => {
     for (const entry of entries) {
       if (!entry.isFile()) continue
       if (!entry.name.toLowerCase().endsWith('.txt')) continue
-      await fs.unlink(join(dir, entry.name))
+      await deleteOrTrash(join(dir, entry.name))
       deleted++
     }
     return { deleted }
@@ -286,7 +300,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('files:deleteOutput', async (_e, path: string) => {
     try {
-      await fs.unlink(path)
+      await deleteOrTrash(path)
       return { ok: true }
     } catch (err) {
       return { ok: false, error: String(err) }
@@ -326,13 +340,20 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('config:get', () => ({
     outputDir: getOutputDir(),
-    filePreview: getFilePreview()
+    filePreview: getFilePreview(),
+    deleteToTrash: getDeleteToTrash()
   }))
 
   ipcMain.handle('config:setFilePreview', async (_e, enabled: boolean) => {
     configCache.filePreview = !!enabled
     await saveConfig()
     return configCache.filePreview
+  })
+
+  ipcMain.handle('config:setDeleteToTrash', async (_e, enabled: boolean) => {
+    configCache.deleteToTrash = !!enabled
+    await saveConfig()
+    return configCache.deleteToTrash
   })
 
   ipcMain.handle('files:getOutputDir', () => getOutputDir())

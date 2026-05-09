@@ -14,9 +14,16 @@ const PencilIcon = () => (
 type Props = {
   filePreview: boolean
   onFilePreviewChange: (next: boolean) => void
+  deleteToTrash: boolean
+  onDeleteToTrashChange: (next: boolean) => void
 }
 
-export function SettingsPage({ filePreview, onFilePreviewChange }: Props) {
+export function SettingsPage({
+  filePreview,
+  onFilePreviewChange,
+  deleteToTrash,
+  onDeleteToTrashChange
+}: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
   useEffect(() => {
@@ -31,6 +38,11 @@ export function SettingsPage({ filePreview, onFilePreviewChange }: Props) {
   async function handleTogglePreview(next: boolean) {
     await window.api.config.setFilePreview(next)
     onFilePreviewChange(next)
+  }
+
+  async function handleToggleTrash(next: boolean) {
+    await window.api.config.setDeleteToTrash(next)
+    onDeleteToTrashChange(next)
   }
 
   return (
@@ -68,6 +80,25 @@ export function SettingsPage({ filePreview, onFilePreviewChange }: Props) {
                 <Icons.Folder />
                 Open
               </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card label="Deletion">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Send to Recycle Bin</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  When on, deleted files are moved to the Windows Recycle Bin and can be
+                  restored. When off, files are permanently deleted and cannot be recovered.
+                </div>
+              </div>
+              <Toggle
+                checked={deleteToTrash}
+                onChange={handleToggleTrash}
+                ariaLabel="Toggle send to Recycle Bin"
+              />
             </div>
           </div>
         </Card>

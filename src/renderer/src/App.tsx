@@ -42,6 +42,7 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [updateReady, setUpdateReady] = useState(false)
   const [filePreview, setFilePreview] = useState(false)
+  const [deleteToTrash, setDeleteToTrash] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   const noopStatus = () => {}
 
@@ -51,7 +52,10 @@ export default function App() {
     window.api.app.getVersion().then(setVersion).catch(() => {})
     window.api.config
       .get()
-      .then((cfg) => setFilePreview(cfg.filePreview))
+      .then((cfg) => {
+        setFilePreview(cfg.filePreview)
+        setDeleteToTrash(cfg.deleteToTrash)
+      })
       .catch(() => {})
   }, [])
 
@@ -207,9 +211,17 @@ export default function App() {
   // Non-tool page rendering (re-mounts on every visit; cheap since they hold no transient state).
   let nonToolContent: JSX.Element | null = null
   if (route === 'tools') nonToolContent = <ToolsPage onNavigate={navigate} />
-  else if (route === 'results') nonToolContent = <ResultsPage filePreview={filePreview} />
+  else if (route === 'results')
+    nonToolContent = <ResultsPage filePreview={filePreview} deleteToTrash={deleteToTrash} />
   else if (route === 'settings')
-    nonToolContent = <SettingsPage filePreview={filePreview} onFilePreviewChange={setFilePreview} />
+    nonToolContent = (
+      <SettingsPage
+        filePreview={filePreview}
+        onFilePreviewChange={setFilePreview}
+        deleteToTrash={deleteToTrash}
+        onDeleteToTrashChange={setDeleteToTrash}
+      />
+    )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />
 
   return (

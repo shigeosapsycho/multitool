@@ -53,9 +53,12 @@ const api = {
       ipcRenderer.invoke('config:get') as Promise<{
         outputDir: string
         filePreview: boolean
+        deleteToTrash: boolean
       }>,
     setFilePreview: (enabled: boolean) =>
-      ipcRenderer.invoke('config:setFilePreview', enabled) as Promise<boolean>
+      ipcRenderer.invoke('config:setFilePreview', enabled) as Promise<boolean>,
+    setDeleteToTrash: (enabled: boolean) =>
+      ipcRenderer.invoke('config:setDeleteToTrash', enabled) as Promise<boolean>
   },
   nav: {
     onBack: (cb: () => void) => {
