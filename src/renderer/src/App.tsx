@@ -213,7 +213,7 @@ export default function App() {
       <TitleBar title="Beu MultiTool" version={version} />
       <div className="flex min-h-0 flex-1">
         <Sidebar current={route} onNavigate={navigate} />
-        <main className="min-w-0 flex-1 overflow-auto">
+        <main className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
           {/* Non-tool pages: animated, re-mount on each visit. */}
           {nonToolContent && (
             <div key={route} className="page-enter h-full">
