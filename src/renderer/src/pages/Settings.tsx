@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { PageHeader, Button } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { Toggle } from '../components/Toggle'
+import { Select } from '../components/Select'
 import { Icons } from '../components/ToolShell'
 
 const PencilIcon = () => (
@@ -11,18 +12,24 @@ const PencilIcon = () => (
   </svg>
 )
 
+type ThemePref = 'system' | 'light' | 'dark'
+
 type Props = {
   filePreview: boolean
   onFilePreviewChange: (next: boolean) => void
   deleteToTrash: boolean
   onDeleteToTrashChange: (next: boolean) => void
+  theme: ThemePref
+  onThemeChange: (next: ThemePref) => void
 }
 
 export function SettingsPage({
   filePreview,
   onFilePreviewChange,
   deleteToTrash,
-  onDeleteToTrashChange
+  onDeleteToTrashChange,
+  theme,
+  onThemeChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -45,10 +52,38 @@ export function SettingsPage({
     onDeleteToTrashChange(next)
   }
 
+  async function handleChangeTheme(next: ThemePref) {
+    await window.api.config.setTheme(next)
+    onThemeChange(next)
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Settings" subtitle="App configuration." />
       <div className="grid grid-cols-1 gap-4 px-8 pb-8 xl:grid-cols-2">
+        <Card label="Theme">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Color theme</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  Match your system, or pick light or dark explicitly.
+                </div>
+              </div>
+              <Select
+                value={theme}
+                options={[
+                  { value: 'system', label: 'System' },
+                  { value: 'light', label: 'Light' },
+                  { value: 'dark', label: 'Dark' }
+                ]}
+                onChange={handleChangeTheme}
+                ariaLabel="Color theme"
+              />
+            </div>
+          </div>
+        </Card>
+
         <Card label="Preview">
           <div className="space-y-4 p-4 text-[13px]">
             <div className="flex items-start justify-between gap-4">

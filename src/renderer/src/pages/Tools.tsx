@@ -57,6 +57,12 @@ const tools: ToolMeta[] = [
     title: 'Search Master',
     description: 'Find items from a search list that also appear in a master list.',
     accent: '#34d399'
+  },
+  {
+    id: 'email-filter',
+    title: 'Email Filter',
+    description: 'Remove emails from a master list that already appear in a success list.',
+    accent: '#2dd4bf'
   }
 ]
 
@@ -151,6 +157,12 @@ const SearchIcon = () => (
   </svg>
 )
 
+const FunnelIcon = () => (
+  <svg {...SVG_PROPS}>
+    <polygon points="3 4 21 4 14 13 14 20 10 18 10 13" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
   'find-duplicates-2': Duplicates2Icon,
@@ -160,7 +172,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'split-evenly': SplitEvenlyIcon,
   'split-by-n': SplitByNumberIcon,
   'randomize': DiceIcon,
-  'search-master': SearchIcon
+  'search-master': SearchIcon,
+  'email-filter': FunnelIcon
 }
 
 function ToolCard({
@@ -193,7 +206,7 @@ function ToolCard({
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      className={`group relative flex flex-col items-start gap-2 rounded-xl border bg-surface p-5 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
+      className={`group relative flex flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
         dragOver
           ? 'border-accent shadow-glow-accent'
           : 'border-border hover:border-border-strong'
@@ -208,13 +221,13 @@ function ToolCard({
       >
         {(TOOL_ICONS[tool.id] ?? DuplicatesIcon)()}
       </span>
-      <span className="text-[15px] font-semibold tracking-tight text-text-primary">
+      <span className="text-[14px] font-semibold tracking-tight text-text-primary">
         {tool.title}
       </span>
-      <span className="text-[12.5px] leading-relaxed text-text-secondary">
+      <span className="text-[12px] leading-snug text-text-secondary">
         {tool.description}
       </span>
-      <span className="absolute right-4 top-5 text-text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
+      <span className="absolute right-3 top-4 text-text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
         <ChevronIcon />
       </span>
       {dragOver && (
@@ -237,7 +250,7 @@ export function ToolsPage({ onNavigate }: Props) {
         title="Tools"
         subtitle="Pick a utility to get started — or drop a file onto one."
       />
-      <div className="grid auto-rows-fr grid-cols-2 gap-4 px-8 pb-8 xl:grid-cols-3">
+      <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8">
         {tools.map((t) => (
           <ToolCard key={t.id} tool={t} onNavigate={onNavigate} />
         ))}

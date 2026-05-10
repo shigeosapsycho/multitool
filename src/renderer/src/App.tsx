@@ -14,6 +14,7 @@ import { SplitEvenlyPage } from './pages/SplitEvenly'
 import { SplitByNumberPage } from './pages/SplitByNumber'
 import { RandomizePage } from './pages/Randomize'
 import { SearchMasterPage } from './pages/SearchMaster'
+import { EmailFilterPage } from './pages/EmailFilter'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 import { LogsPage } from './pages/Logs'
@@ -29,7 +30,8 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'split-evenly',
   'split-by-n',
   'randomize',
-  'search-master'
+  'search-master',
+  'email-filter'
 ]
 
 function isToolRoute(r: Route): boolean {
@@ -43,6 +45,8 @@ export default function App() {
   const [updateReady, setUpdateReady] = useState(false)
   const [filePreview, setFilePreview] = useState(false)
   const [deleteToTrash, setDeleteToTrash] = useState(true)
+  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
+  const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   const noopStatus = () => {}
 
@@ -55,9 +59,27 @@ export default function App() {
       .then((cfg) => {
         setFilePreview(cfg.filePreview)
         setDeleteToTrash(cfg.deleteToTrash)
+        setTheme(cfg.theme)
       })
       .catch(() => {})
   }, [])
+
+  // Track the OS color preference. Used when theme === 'system'.
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    setSystemDark(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  // Apply the resolved theme to <html>. CSS variables in globals.css swap on .light.
+  useEffect(() => {
+    const effectiveLight = theme === 'light' || (theme === 'system' && !systemDark)
+    const root = document.documentElement
+    if (effectiveLight) root.classList.add('light')
+    else root.classList.remove('light')
+  }, [theme, systemDark])
 
   // Subscribe to auto-updater status messages and accumulate them as logs.
   // App is always mounted, so we never miss events even if Logs page isn't open.
@@ -203,6 +225,8 @@ export default function App() {
         return <RandomizePage {...props} />
       case 'search-master':
         return <SearchMasterPage {...props} />
+      case 'email-filter':
+        return <EmailFilterPage {...props} />
       default:
         return null
     }
@@ -220,6 +244,8 @@ export default function App() {
         onFilePreviewChange={setFilePreview}
         deleteToTrash={deleteToTrash}
         onDeleteToTrashChange={setDeleteToTrash}
+        theme={theme}
+        onThemeChange={setTheme}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />

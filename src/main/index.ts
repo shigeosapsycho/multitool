@@ -17,6 +17,9 @@ function broadcastUpdaterStatus(status: UpdaterStatus): void {
   }
 }
 
+const UPDATE_POLL_INTERVAL_MS = 5 * 60 * 1000
+let updatePollTimer: NodeJS.Timeout | null = null
+
 function setupAutoUpdater(): void {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
@@ -32,20 +35,46 @@ function setupAutoUpdater(): void {
   })
   autoUpdater.on('update-downloaded', (info) => {
     broadcastUpdaterStatus({ type: 'downloaded', version: info.version })
+    // Once an update is staged, no need to keep polling.
+    if (updatePollTimer) {
+      clearInterval(updatePollTimer)
+      updatePollTimer = null
+    }
   })
   autoUpdater.on('error', (err) => {
     broadcastUpdaterStatus({ type: 'error', message: err?.message ?? String(err) })
   })
 
-  // Only check when the app is packaged (electron-updater needs a real install).
-  if (app.isPackaged) {
+  // Only run the updater when the app is packaged (electron-updater needs a real install).
+  if (!app.isPackaged) return
+
+  const check = () => {
     autoUpdater.checkForUpdates().catch(() => {
-      // Errors already surfaced via the 'error' event above
+      // Errors already surfaced via the 'error' event above.
     })
   }
+  // Initial check on launch, then every 5 minutes.
+  check()
+  updatePollTimer = setInterval(check, UPDATE_POLL_INTERVAL_MS)
 }
 
-type Config = { outputDir?: string; filePreview?: boolean; deleteToTrash?: boolean }
+app.on('before-quit', () => {
+  if (updatePollTimer) {
+    clearInterval(updatePollTimer)
+    updatePollTimer = null
+  }
+})
+
+type ThemePref = 'system' | 'light' | 'dark'
+
+type Config = {
+  outputDir?: string
+  filePreview?: boolean
+  deleteToTrash?: boolean
+  theme?: ThemePref
+  /** @deprecated migrated to `theme` */
+  light?: boolean
+}
 let configCache: Config = {}
 
 function defaultOutputDir(): string {
@@ -89,6 +118,17 @@ function getFilePreview(): boolean {
 function getDeleteToTrash(): boolean {
   // Default to true so accidental deletes are recoverable from the Recycle Bin.
   return configCache.deleteToTrash ?? true
+}
+
+function getTheme(): ThemePref {
+  if (configCache.theme === 'system' || configCache.theme === 'light' || configCache.theme === 'dark') {
+    return configCache.theme
+  }
+  // Migrate the v2.5.3 boolean field if present.
+  if (typeof configCache.light === 'boolean') {
+    return configCache.light ? 'light' : 'dark'
+  }
+  return 'system'
 }
 
 async function deleteOrTrash(path: string): Promise<void> {
@@ -341,7 +381,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('config:get', () => ({
     outputDir: getOutputDir(),
     filePreview: getFilePreview(),
-    deleteToTrash: getDeleteToTrash()
+    deleteToTrash: getDeleteToTrash(),
+    theme: getTheme()
   }))
 
   ipcMain.handle('config:setFilePreview', async (_e, enabled: boolean) => {
@@ -354,6 +395,14 @@ app.whenReady().then(async () => {
     configCache.deleteToTrash = !!enabled
     await saveConfig()
     return configCache.deleteToTrash
+  })
+
+  ipcMain.handle('config:setTheme', async (_e, theme: ThemePref) => {
+    if (theme !== 'system' && theme !== 'light' && theme !== 'dark') return getTheme()
+    configCache.theme = theme
+    delete configCache.light
+    await saveConfig()
+    return theme
   })
 
   ipcMain.handle('files:getOutputDir', () => getOutputDir())

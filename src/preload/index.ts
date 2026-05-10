@@ -54,11 +54,14 @@ const api = {
         outputDir: string
         filePreview: boolean
         deleteToTrash: boolean
+        theme: 'system' | 'light' | 'dark'
       }>,
     setFilePreview: (enabled: boolean) =>
       ipcRenderer.invoke('config:setFilePreview', enabled) as Promise<boolean>,
     setDeleteToTrash: (enabled: boolean) =>
-      ipcRenderer.invoke('config:setDeleteToTrash', enabled) as Promise<boolean>
+      ipcRenderer.invoke('config:setDeleteToTrash', enabled) as Promise<boolean>,
+    setTheme: (theme: 'system' | 'light' | 'dark') =>
+      ipcRenderer.invoke('config:setTheme', theme) as Promise<'system' | 'light' | 'dark'>
   },
   nav: {
     onBack: (cb: () => void) => {

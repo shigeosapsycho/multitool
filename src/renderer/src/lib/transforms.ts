@@ -43,6 +43,26 @@ export function searchInMaster(masterText: string, searchText: string): string[]
   return out
 }
 
+// Remove emails from `masterText` that also appear in `successText`
+// (which is `email:password` format — we take just the email portion).
+// Case-insensitive comparison; preserves the master list's original casing.
+export function filterEmailsBySuccess(successText: string, masterText: string): string[] {
+  const successEmails = new Set<string>()
+  for (const line of successText.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const email = trimmed.split(':')[0]!.toLowerCase()
+    if (email) successEmails.add(email)
+  }
+  const out: string[] = []
+  for (const line of masterText.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    if (!successEmails.has(trimmed.toLowerCase())) out.push(trimmed)
+  }
+  return out
+}
+
 export function shuffleLines(text: string): string[] {
   const lines = text
     .split(/\r?\n/)

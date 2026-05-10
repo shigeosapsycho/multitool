@@ -4,7 +4,43 @@
 
 @layer base {
   :root {
+    /* Dark theme — default. Values are RGB triplets so Tailwind's
+       `<alpha-value>` modifier (e.g. bg-surface/50) keeps working. */
+    --bg: 10 10 16;
+    --surface: 19 19 28;
+    --surface-2: 26 26 38;
+    --surface-3: 34 34 46;
+    --border: 37 37 49;
+    --border-strong: 51 51 63;
+    --text-primary: 232 232 238;
+    --text-secondary: 156 156 170;
+    --text-muted: 107 107 120;
+    --accent: 124 92 255;
+    --accent-hover: 141 112 255;
+    --accent-soft: rgba(124, 92, 255, 0.12);
+    --success: 52 211 153;
+    --warning: 251 191 36;
+    --danger: 248 113 113;
     color-scheme: dark;
+  }
+
+  :root.light {
+    --bg: 245 245 247;
+    --surface: 255 255 255;
+    --surface-2: 240 240 243;
+    --surface-3: 226 226 234;
+    --border: 220 220 226;
+    --border-strong: 195 195 204;
+    --text-primary: 26 26 38;
+    --text-secondary: 82 82 96;
+    --text-muted: 130 130 142;
+    --accent: 100 64 240;
+    --accent-hover: 80 50 215;
+    --accent-soft: rgba(100, 64, 240, 0.1);
+    --success: 16 145 95;
+    --warning: 195 130 0;
+    --danger: 211 47 47;
+    color-scheme: light;
   }
 
   html,
@@ -20,7 +56,6 @@
     overflow: hidden;
   }
 
-  /* Custom scrollbar to match the dark theme */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -29,13 +64,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2a2a36;
+    background: rgb(var(--surface-3));
     border-radius: 8px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a3a48;
+    background: rgb(var(--border-strong));
     background-clip: padding-box;
     border: 2px solid transparent;
   }

@@ -9,6 +9,7 @@ export type Route =
   | 'split-by-n'
   | 'randomize'
   | 'search-master'
+  | 'email-filter'
   | 'results'
   | 'settings'
   | 'logs'

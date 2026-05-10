@@ -6,7 +6,12 @@ type Props = {
 }
 
 const Logo = () => (
-  <img src="./tool_icon.ico" alt="" className="h-4 w-4" draggable={false} />
+  <svg viewBox="0 0 24 24" className="h-4 w-4 text-accent" fill="currentColor">
+    <rect x="3" y="3" width="8" height="8" rx="1.6" opacity="0.4" />
+    <rect x="13" y="3" width="8" height="8" rx="1.6" opacity="0.6" />
+    <rect x="3" y="13" width="8" height="8" rx="1.6" opacity="0.75" />
+    <rect x="13" y="13" width="8" height="8" rx="1.6" />
+  </svg>
 )
 
 const MinIcon = () => (
