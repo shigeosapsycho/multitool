@@ -1,7 +1,7 @@
 # Beu MultiTool
 
 A Windows desktop utility for batch text-file operations — find duplicates, split files, strip passwords from `user:pass` lists, randomize lines, and more.
-![Main Screen](https://beu.evaded.tax/i/44j7cxadby56z1u.png)
+![Main Screen](https://beu.evaded.tax/i/2vu2cj1x5ow184.png)
 > **Windows-only.** Not built or tested for macOS / Linux.
 
 ## Features
