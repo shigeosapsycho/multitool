@@ -67,11 +67,14 @@ app.on('before-quit', () => {
 
 type ThemePref = 'system' | 'light' | 'dark'
 
+type OutputSort = 'name' | 'size' | 'modified'
+
 type Config = {
   outputDir?: string
   filePreview?: boolean
   deleteToTrash?: boolean
   theme?: ThemePref
+  outputSort?: OutputSort
   /** @deprecated migrated to `theme` */
   light?: boolean
 }
@@ -118,6 +121,12 @@ function getFilePreview(): boolean {
 function getDeleteToTrash(): boolean {
   // Default to true so accidental deletes are recoverable from the Recycle Bin.
   return configCache.deleteToTrash ?? true
+}
+
+function getOutputSort(): OutputSort {
+  const v = configCache.outputSort
+  if (v === 'name' || v === 'size' || v === 'modified') return v
+  return 'name'
 }
 
 function getTheme(): ThemePref {
@@ -347,7 +356,26 @@ app.whenReady().then(async () => {
     }
   })
 
-  ipcMain.handle('files:listOutput', async () => {
+  // In-place Fisher-Yates shuffle of non-empty lines. Overwrites the file.
+  ipcMain.handle('files:shuffleOutput', async (_e, path: string) => {
+    try {
+      const text = await fs.readFile(path, 'utf-8')
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.trimEnd())
+        .filter((l) => l.length > 0)
+      for (let i = lines.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[lines[i], lines[j]] = [lines[j]!, lines[i]!]
+      }
+      await fs.writeFile(path, lines.join('\n') + '\n', 'utf-8')
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: String(err) }
+    }
+  })
+
+  ipcMain.handle('files:listOutput', async (_e, sortArg?: OutputSort) => {
     const dir = await ensureOutputDir()
     const entries = await fs.readdir(dir, { withFileTypes: true })
     const out: { path: string; name: string; size: number; mtime: number }[] = []
@@ -358,7 +386,22 @@ app.whenReady().then(async () => {
       const stat = await fs.stat(full)
       out.push({ path: full, name: entry.name, size: stat.size, mtime: stat.mtimeMs })
     }
-    out.sort((a, b) => b.mtime - a.mtime)
+    const sort: OutputSort =
+      sortArg === 'name' || sortArg === 'size' || sortArg === 'modified' ? sortArg : getOutputSort()
+    switch (sort) {
+      case 'size':
+        // Largest first.
+        out.sort((a, b) => b.size - a.size)
+        break
+      case 'modified':
+        // Newest first.
+        out.sort((a, b) => b.mtime - a.mtime)
+        break
+      case 'name':
+      default:
+        // A → Z, numeric-aware so proxies_part2 sorts before proxies_part10.
+        out.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    }
     return out
   })
 
@@ -382,7 +425,8 @@ app.whenReady().then(async () => {
     outputDir: getOutputDir(),
     filePreview: getFilePreview(),
     deleteToTrash: getDeleteToTrash(),
-    theme: getTheme()
+    theme: getTheme(),
+    outputSort: getOutputSort()
   }))
 
   ipcMain.handle('config:setFilePreview', async (_e, enabled: boolean) => {
@@ -403,6 +447,13 @@ app.whenReady().then(async () => {
     delete configCache.light
     await saveConfig()
     return theme
+  })
+
+  ipcMain.handle('config:setOutputSort', async (_e, sort: OutputSort) => {
+    if (sort !== 'name' && sort !== 'size' && sort !== 'modified') return getOutputSort()
+    configCache.outputSort = sort
+    await saveConfig()
+    return sort
   })
 
   ipcMain.handle('files:getOutputDir', () => getOutputDir())

@@ -34,12 +34,23 @@ const RefreshIcon = () => (
   </svg>
 )
 
+const ShuffleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <polyline points="16 3 21 3 21 8" />
+    <line x1="4" y1="20" x2="21" y2="3" />
+    <polyline points="21 16 21 21 16 21" />
+    <line x1="15" y1="15" x2="21" y2="21" />
+    <line x1="4" y1="4" x2="9" y2="9" />
+  </svg>
+)
+
 type Props = {
   filePreview: boolean
   deleteToTrash: boolean
+  outputSort: 'name' | 'size' | 'modified'
 }
 
-export function ResultsPage({ filePreview, deleteToTrash }: Props) {
+export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null)
@@ -51,14 +62,17 @@ export function ResultsPage({ filePreview, deleteToTrash }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const list = await window.api.files.listOutput()
+      const list = await window.api.files.listOutput(outputSort)
       setEntries(list)
-      // Drop selection if the file disappeared.
-      setSelected((prev) => (prev && list.some((e) => e.path === prev.path) ? prev : null))
+      // Refresh the selection to the fresh Entry from the new list — keeps
+      // selection if path still exists, drops it if not. Using the new object
+      // reference also triggers the preview useEffect so the pane re-reads
+      // when the file's content changed (e.g. after a shuffle).
+      setSelected((prev) => (prev ? (list.find((e) => e.path === prev.path) ?? null) : null))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [outputSort])
 
   useEffect(() => {
     void load()
@@ -296,7 +310,18 @@ export function ResultsPage({ filePreview, deleteToTrash }: Props) {
               {
                 label: 'Reveal in Explorer',
                 icon: <Icons.Reveal />,
-                onClick: () => window.api.files.reveal(menu.entry.path),
+                onClick: () => window.api.files.reveal(menu.entry.path)
+              },
+              {
+                label: 'Randomize',
+                icon: <ShuffleIcon />,
+                onClick: async () => {
+                  await window.api.files.shuffleOutput(menu.entry.path)
+                  // The file watcher will trigger a reload; if the shuffled
+                  // file is currently selected, the preview re-reads via the
+                  // selection effect (mtime changed → list re-sorted → still
+                  // selected, content reloads on next render).
+                },
                 separatorAfter: true
               },
               {

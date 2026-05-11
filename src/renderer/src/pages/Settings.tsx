@@ -13,6 +13,7 @@ const PencilIcon = () => (
 )
 
 type ThemePref = 'system' | 'light' | 'dark'
+type OutputSort = 'name' | 'size' | 'modified'
 
 type Props = {
   filePreview: boolean
@@ -21,6 +22,8 @@ type Props = {
   onDeleteToTrashChange: (next: boolean) => void
   theme: ThemePref
   onThemeChange: (next: ThemePref) => void
+  outputSort: OutputSort
+  onOutputSortChange: (next: OutputSort) => void
 }
 
 export function SettingsPage({
@@ -29,7 +32,9 @@ export function SettingsPage({
   deleteToTrash,
   onDeleteToTrashChange,
   theme,
-  onThemeChange
+  onThemeChange,
+  outputSort,
+  onOutputSortChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -57,10 +62,15 @@ export function SettingsPage({
     onThemeChange(next)
   }
 
+  async function handleChangeOutputSort(next: OutputSort) {
+    await window.api.config.setOutputSort(next)
+    onOutputSortChange(next)
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Settings" subtitle="App configuration." />
-      <div className="grid grid-cols-1 gap-4 px-8 pb-8 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 px-8 pb-8 xl:grid-cols-2">
         <Card label="Theme">
           <div className="space-y-4 p-4 text-[13px]">
             <div className="flex items-start justify-between gap-4">
@@ -84,7 +94,26 @@ export function SettingsPage({
           </div>
         </Card>
 
-        <Card label="Preview">
+        <Card label="Deletion">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Send to Recycle Bin</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  When on, deleted files are moved to the Windows Recycle Bin and can be
+                  restored. When off, files are permanently deleted and cannot be recovered.
+                </div>
+              </div>
+              <Toggle
+                checked={deleteToTrash}
+                onChange={handleToggleTrash}
+                ariaLabel="Toggle send to Recycle Bin"
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Card label="Output">
           <div className="space-y-4 p-4 text-[13px]">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -98,6 +127,24 @@ export function SettingsPage({
                 checked={filePreview}
                 onChange={handleTogglePreview}
                 ariaLabel="Toggle file previews"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Sort by</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  Order of files in the Output tab.
+                </div>
+              </div>
+              <Select
+                value={outputSort}
+                options={[
+                  { value: 'name', label: 'Name' },
+                  { value: 'size', label: 'Size' },
+                  { value: 'modified', label: 'Modified' }
+                ]}
+                onChange={handleChangeOutputSort}
+                ariaLabel="Output sort order"
               />
             </div>
           </div>
@@ -115,25 +162,6 @@ export function SettingsPage({
                 <Icons.Folder />
                 Open
               </Button>
-            </div>
-          </div>
-        </Card>
-
-        <Card label="Deletion">
-          <div className="space-y-4 p-4 text-[13px]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[14px] text-text-primary">Send to Recycle Bin</div>
-                <div className="mt-0.5 text-[12.5px] text-text-secondary">
-                  When on, deleted files are moved to the Windows Recycle Bin and can be
-                  restored. When off, files are permanently deleted and cannot be recovered.
-                </div>
-              </div>
-              <Toggle
-                checked={deleteToTrash}
-                onChange={handleToggleTrash}
-                ariaLabel="Toggle send to Recycle Bin"
-              />
             </div>
           </div>
         </Card>

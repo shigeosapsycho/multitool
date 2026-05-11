@@ -44,6 +44,7 @@ export default function App() {
   const [filePreview, setFilePreview] = useState(false)
   const [deleteToTrash, setDeleteToTrash] = useState(true)
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
+  const [outputSort, setOutputSort] = useState<'name' | 'size' | 'modified'>('name')
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   const noopStatus = () => {}
@@ -58,6 +59,7 @@ export default function App() {
         setFilePreview(cfg.filePreview)
         setDeleteToTrash(cfg.deleteToTrash)
         setTheme(cfg.theme)
+        setOutputSort(cfg.outputSort)
       })
       .catch(() => {})
   }, [])
@@ -232,7 +234,13 @@ export default function App() {
   let nonToolContent: JSX.Element | null = null
   if (route === 'tools') nonToolContent = <ToolsPage onNavigate={navigate} />
   else if (route === 'results')
-    nonToolContent = <ResultsPage filePreview={filePreview} deleteToTrash={deleteToTrash} />
+    nonToolContent = (
+      <ResultsPage
+        filePreview={filePreview}
+        deleteToTrash={deleteToTrash}
+        outputSort={outputSort}
+      />
+    )
   else if (route === 'settings')
     nonToolContent = (
       <SettingsPage
@@ -242,6 +250,8 @@ export default function App() {
         onDeleteToTrashChange={setDeleteToTrash}
         theme={theme}
         onThemeChange={setTheme}
+        outputSort={outputSort}
+        onOutputSortChange={setOutputSort}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />

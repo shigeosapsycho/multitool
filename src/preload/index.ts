@@ -23,14 +23,19 @@ const api = {
     reveal: (path: string) => ipcRenderer.invoke('files:reveal', path) as Promise<void>,
     openFile: (path: string) => ipcRenderer.invoke('files:openFile', path) as Promise<void>,
     openOutputDir: () => ipcRenderer.invoke('files:openOutputDir') as Promise<void>,
-    listOutput: () =>
-      ipcRenderer.invoke('files:listOutput') as Promise<
+    listOutput: (sort?: 'name' | 'size' | 'modified') =>
+      ipcRenderer.invoke('files:listOutput', sort) as Promise<
         { path: string; name: string; size: number; mtime: number }[]
       >,
     clearOutput: () =>
       ipcRenderer.invoke('files:clearOutput') as Promise<{ deleted: number }>,
     deleteOutput: (path: string) =>
       ipcRenderer.invoke('files:deleteOutput', path) as Promise<{
+        ok: boolean
+        error?: string
+      }>,
+    shuffleOutput: (path: string) =>
+      ipcRenderer.invoke('files:shuffleOutput', path) as Promise<{
         ok: boolean
         error?: string
       }>,
@@ -55,13 +60,16 @@ const api = {
         filePreview: boolean
         deleteToTrash: boolean
         theme: 'system' | 'light' | 'dark'
+        outputSort: 'name' | 'size' | 'modified'
       }>,
     setFilePreview: (enabled: boolean) =>
       ipcRenderer.invoke('config:setFilePreview', enabled) as Promise<boolean>,
     setDeleteToTrash: (enabled: boolean) =>
       ipcRenderer.invoke('config:setDeleteToTrash', enabled) as Promise<boolean>,
     setTheme: (theme: 'system' | 'light' | 'dark') =>
-      ipcRenderer.invoke('config:setTheme', theme) as Promise<'system' | 'light' | 'dark'>
+      ipcRenderer.invoke('config:setTheme', theme) as Promise<'system' | 'light' | 'dark'>,
+    setOutputSort: (sort: 'name' | 'size' | 'modified') =>
+      ipcRenderer.invoke('config:setOutputSort', sort) as Promise<'name' | 'size' | 'modified'>
   },
   nav: {
     onBack: (cb: () => void) => {
