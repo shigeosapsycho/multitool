@@ -12,6 +12,15 @@ const PencilIcon = () => (
   </svg>
 )
 
+const UpdateCheckIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" />
+    <path d="M3 21v-5h5" />
+  </svg>
+)
+
 type ThemePref = 'system' | 'light' | 'dark'
 type OutputSort = 'name' | 'size' | 'modified'
 
@@ -67,9 +76,31 @@ export function SettingsPage({
     onOutputSortChange(next)
   }
 
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  async function handleCheckForUpdates() {
+    if (checkingUpdate) return
+    setCheckingUpdate(true)
+    try {
+      await window.api.updater.check()
+    } finally {
+      // Brief visual feedback. Real result lands in the Logs tab via the
+      // updater:status events, which App.tsx already subscribes to.
+      setTimeout(() => setCheckingUpdate(false), 800)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Settings" subtitle="App configuration." />
+      <PageHeader
+        title="Settings"
+        subtitle="App configuration."
+        actions={
+          <Button onClick={handleCheckForUpdates} variant="secondary" disabled={checkingUpdate}>
+            <UpdateCheckIcon />
+            {checkingUpdate ? 'Checking…' : 'Check for updates'}
+          </Button>
+        }
+      />
       <div className="grid grid-cols-1 items-start gap-4 px-8 pb-8 xl:grid-cols-2">
         <Card label="Theme">
           <div className="space-y-4 p-4 text-[13px]">

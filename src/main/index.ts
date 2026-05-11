@@ -460,6 +460,21 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
+  // Manual "Check for updates" trigger from the Settings page.
+  ipcMain.handle('updater:check', async () => {
+    if (!app.isPackaged) {
+      // No real updater in dev — surface a no-update status so the UI feels alive.
+      broadcastUpdaterStatus({ type: 'no-update', currentVersion: app.getVersion() })
+      return { ok: false, error: 'Updater disabled in development mode.' }
+    }
+    try {
+      await autoUpdater.checkForUpdates()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   // Auto-updater (GitHub Releases). No-op in dev (app.isPackaged is false).
   setupAutoUpdater()
 })

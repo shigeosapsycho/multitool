@@ -97,7 +97,9 @@ const api = {
       const handler = (_e: unknown, status: Parameters<typeof cb>[0]) => cb(status)
       ipcRenderer.on('updater:status', handler)
       return () => ipcRenderer.removeListener('updater:status', handler)
-    }
+    },
+    check: () =>
+      ipcRenderer.invoke('updater:check') as Promise<{ ok: boolean; error?: string }>
   }
 }
 
