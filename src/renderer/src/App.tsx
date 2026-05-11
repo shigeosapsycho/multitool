@@ -10,7 +10,6 @@ import { FindDuplicates2Page } from './pages/FindDuplicates2'
 import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
 import { FindNonDuplicates2Page } from './pages/FindNonDuplicates2'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
-import { SplitEvenlyPage } from './pages/SplitEvenly'
 import { SplitByNumberPage } from './pages/SplitByNumber'
 import { RandomizePage } from './pages/Randomize'
 import { SearchMasterPage } from './pages/SearchMaster'
@@ -27,7 +26,6 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'find-non-duplicates',
   'find-non-duplicates-2',
   'remove-passwords',
-  'split-evenly',
   'split-by-n',
   'randomize',
   'search-master',
@@ -217,8 +215,6 @@ export default function App() {
         return <FindNonDuplicates2Page {...props} />
       case 'remove-passwords':
         return <RemovePasswordsPage {...props} />
-      case 'split-evenly':
-        return <SplitEvenlyPage {...props} />
       case 'split-by-n':
         return <SplitByNumberPage {...props} />
       case 'randomize':

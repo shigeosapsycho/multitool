@@ -5,7 +5,6 @@ export type Route =
   | 'remove-passwords'
   | 'find-non-duplicates'
   | 'find-non-duplicates-2'
-  | 'split-evenly'
   | 'split-by-n'
   | 'randomize'
   | 'search-master'

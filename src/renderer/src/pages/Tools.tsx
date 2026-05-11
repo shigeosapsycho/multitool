@@ -35,12 +35,6 @@ const tools: ToolMeta[] = [
     accent: '#fbbf24'
   },
   {
-    id: 'split-evenly',
-    title: 'Split File Evenly',
-    description: 'Halve a file into two parts, line-aligned.',
-    accent: '#60a5fa'
-  },
-  {
     id: 'split-by-n',
     title: 'Split by Number',
     description: 'Split a file into N evenly-sized parts.',
@@ -123,13 +117,6 @@ const NonDupes2Icon = () => (
   </svg>
 )
 
-const SplitEvenlyIcon = () => (
-  <svg {...SVG_PROPS}>
-    <rect x="4" y="3" width="16" height="8" rx="1.5" />
-    <rect x="4" y="13" width="16" height="8" rx="1.5" />
-  </svg>
-)
-
 const SplitByNumberIcon = () => (
   <svg {...SVG_PROPS}>
     <rect x="3" y="3" width="18" height="3" rx="0.8" />
@@ -169,7 +156,6 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'remove-passwords': KeyIcon,
   'find-non-duplicates': StarIcon,
   'find-non-duplicates-2': NonDupes2Icon,
-  'split-evenly': SplitEvenlyIcon,
   'split-by-n': SplitByNumberIcon,
   'randomize': DiceIcon,
   'search-master': SearchIcon,

@@ -13,8 +13,7 @@ A Windows desktop utility for batch text-file operations — find duplicates, sp
 | **Duplicates Across 2 Files** | Combine two files and report lines that overlap |
 | **Non-Dupes Across 2 Files** | Combine two files and report lines unique to the union |
 | **Remove Passwords** | Strip `:password` from each line of a `user:pass` list |
-| **Split File Evenly** | Halve a file into two parts, line-aligned |
-| **Split by Number** | Split a file into `N` evenly-sized parts |
+| **Split by Number** | Split a file into `N` evenly-sized parts (use N=2 to halve) |
 | **Randomize List** | Shuffle lines into random order |
 
 All output lands in a single `output/` folder with timestamped filenames, configurable from the **Settings** tab.
