@@ -14,6 +14,7 @@ import { SplitByNumberPage } from './pages/SplitByNumber'
 import { RandomizePage } from './pages/Randomize'
 import { SearchMasterPage } from './pages/SearchMaster'
 import { EmailFilterPage } from './pages/EmailFilter'
+import { CsvEmailPassPage } from './pages/CsvEmailPass'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 import { LogsPage } from './pages/Logs'
@@ -29,7 +30,8 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'split-by-n',
   'randomize',
   'search-master',
-  'email-filter'
+  'email-filter',
+  'csv-email-pass'
 ]
 
 function isToolRoute(r: Route): boolean {
@@ -225,6 +227,8 @@ export default function App() {
         return <SearchMasterPage {...props} />
       case 'email-filter':
         return <EmailFilterPage {...props} />
+      case 'csv-email-pass':
+        return <CsvEmailPassPage {...props} />
       default:
         return null
     }

@@ -57,6 +57,12 @@ const tools: ToolMeta[] = [
     title: 'Email Filter',
     description: 'Remove emails from a master list that already appear in a success list.',
     accent: '#2dd4bf'
+  },
+  {
+    id: 'csv-email-pass',
+    title: 'CSV → Email:Password',
+    description: 'Pull email & password columns from a CSV into an email:password list.',
+    accent: '#60a5fa'
   }
 ]
 
@@ -150,6 +156,14 @@ const FunnelIcon = () => (
   </svg>
 )
 
+const CsvEmailPassIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="3" width="14" height="18" rx="2" />
+    <path d="M7 8h6M7 12h6M7 16h4" />
+    <path d="M15 14l4 0M19 12l2 2-2 2" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
   'find-duplicates-2': Duplicates2Icon,
@@ -159,7 +173,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'split-by-n': SplitByNumberIcon,
   'randomize': DiceIcon,
   'search-master': SearchIcon,
-  'email-filter': FunnelIcon
+  'email-filter': FunnelIcon,
+  'csv-email-pass': CsvEmailPassIcon
 }
 
 function ToolCard({

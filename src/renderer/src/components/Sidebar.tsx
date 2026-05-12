@@ -50,7 +50,8 @@ const TOOL_ROUTES = new Set<Route>([
   'find-non-duplicates-2',
   'split-evenly',
   'split-by-n',
-  'randomize'
+  'randomize',
+  'csv-email-pass'
 ])
 
 function topLevelOf(route: Route): SidebarItem['id'] {

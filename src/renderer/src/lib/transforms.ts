@@ -63,6 +63,87 @@ export function filterEmailsBySuccess(successText: string, masterText: string): 
   return out
 }
 
+// Parse one CSV row into fields, honoring RFC 4180-style double-quoted fields
+// where "" inside a quoted field is a literal quote. Trailing \r is stripped.
+function parseCsvRow(row: string): string[] {
+  const out: string[] = []
+  let field = ''
+  let inQuotes = false
+  for (let i = 0; i < row.length; i++) {
+    const c = row[i]!
+    if (inQuotes) {
+      if (c === '"') {
+        if (row[i + 1] === '"') {
+          field += '"'
+          i++
+        } else {
+          inQuotes = false
+        }
+      } else {
+        field += c
+      }
+    } else {
+      if (c === ',') {
+        out.push(field)
+        field = ''
+      } else if (c === '"' && field.length === 0) {
+        inQuotes = true
+      } else if (c === '\r') {
+        // skip
+      } else {
+        field += c
+      }
+    }
+  }
+  out.push(field)
+  return out
+}
+
+export type CsvEmailPassResult = {
+  lines: string[]
+  emailHeader: string | null
+  passwordHeader: string | null
+}
+
+// Pull `email:password` pairs out of a CSV. Header match is case-insensitive
+// and accepts common variants (e.g. "e-mail", "pass", "pwd"). Rows missing
+// either value are skipped.
+export function csvToEmailPass(text: string): CsvEmailPassResult {
+  const rows = text.split(/\n/).filter((r) => r.length > 0 || r === '')
+  // Find first non-empty row as header.
+  let headerIdx = -1
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i]!.trim().length > 0) {
+      headerIdx = i
+      break
+    }
+  }
+  if (headerIdx === -1) return { lines: [], emailHeader: null, passwordHeader: null }
+
+  const header = parseCsvRow(rows[headerIdx]!).map((h) => h.trim())
+  const norm = header.map((h) => h.toLowerCase().replace(/[\s_-]+/g, ''))
+  const emailNames = new Set(['email', 'emailaddress', 'mail', 'username', 'user', 'login'])
+  const passwordNames = new Set(['password', 'pass', 'pwd', 'passcode'])
+
+  const emailIdx = norm.findIndex((h) => emailNames.has(h))
+  const passwordIdx = norm.findIndex((h) => passwordNames.has(h))
+  if (emailIdx === -1 || passwordIdx === -1) {
+    return { lines: [], emailHeader: null, passwordHeader: null }
+  }
+
+  const out: string[] = []
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i]!
+    if (!row.trim()) continue
+    const cells = parseCsvRow(row)
+    const email = (cells[emailIdx] ?? '').trim()
+    const password = (cells[passwordIdx] ?? '').trim()
+    if (!email || !password) continue
+    out.push(`${email}:${password}`)
+  }
+  return { lines: out, emailHeader: header[emailIdx]!, passwordHeader: header[passwordIdx]! }
+}
+
 export function shuffleLines(text: string): string[] {
   const lines = text
     .split(/\r?\n/)
