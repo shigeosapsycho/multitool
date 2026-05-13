@@ -13,8 +13,11 @@ const api = {
     }
   },
   files: {
-    open: (opts?: { multiple?: boolean; title?: string }) =>
-      ipcRenderer.invoke('files:open', opts) as Promise<string[]>,
+    open: (opts?: {
+      multiple?: boolean
+      title?: string
+      filters?: { name: string; extensions: string[] }[]
+    }) => ipcRenderer.invoke('files:open', opts) as Promise<string[]>,
     read: (path: string) => ipcRenderer.invoke('files:read', path) as Promise<string>,
     writeOutput: (name: string, content: string) =>
       ipcRenderer.invoke('files:writeOutput', name, content) as Promise<string>,

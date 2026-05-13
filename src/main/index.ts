@@ -277,19 +277,29 @@ app.whenReady().then(async () => {
   ipcMain.handle('window:close', () => mainWindow?.close())
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false)
 
-  ipcMain.handle('files:open', async (_e, opts?: { multiple?: boolean; title?: string }) => {
-    if (!mainWindow) return []
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: opts?.title ?? 'Select a text file',
-      properties: opts?.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
-      filters: [
-        { name: 'Text files', extensions: ['txt'] },
-        { name: 'All files', extensions: ['*'] }
-      ]
-    })
-    if (result.canceled) return []
-    return result.filePaths
-  })
+  ipcMain.handle(
+    'files:open',
+    async (
+      _e,
+      opts?: {
+        multiple?: boolean
+        title?: string
+        filters?: { name: string; extensions: string[] }[]
+      }
+    ) => {
+      if (!mainWindow) return []
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: opts?.title ?? 'Select a text file',
+        properties: opts?.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+        filters: opts?.filters ?? [
+          { name: 'Text files', extensions: ['txt'] },
+          { name: 'All files', extensions: ['*'] }
+        ]
+      })
+      if (result.canceled) return []
+      return result.filePaths
+    }
+  )
 
   ipcMain.handle('files:read', async (_e, path: string) => {
     return fs.readFile(path, 'utf-8')

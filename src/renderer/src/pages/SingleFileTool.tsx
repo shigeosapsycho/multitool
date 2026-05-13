@@ -19,6 +19,8 @@ export type SingleFileToolProps = {
   emptyResultMessage: string
   runLabel: string
   transform: (text: string) => string[]
+  pickerTitle?: string
+  pickerFilters?: { name: string; extensions: string[] }[]
   active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
@@ -35,6 +37,8 @@ export function SingleFileTool(props: SingleFileToolProps) {
     emptyResultMessage,
     runLabel,
     transform,
+    pickerTitle,
+    pickerFilters,
     active = true,
     onBack,
     onSetStatus
@@ -69,7 +73,10 @@ export function SingleFileTool(props: SingleFileToolProps) {
   }, [active])
 
   async function handlePick() {
-    const paths = await window.api.files.open({ title: 'Select a text file' })
+    const paths = await window.api.files.open({
+      title: pickerTitle ?? 'Select a text file',
+      filters: pickerFilters
+    })
     if (paths.length === 0) return
     await loadFromPath(paths[0]!)
   }

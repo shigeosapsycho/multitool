@@ -15,6 +15,11 @@ export function CsvEmailPassPage({ onBack, onSetStatus, active }: Props) {
       emptyResultMessage="No email/password columns found, or no rows had values in both."
       runLabel="Extract Pairs"
       transform={(text) => csvToEmailPass(text).lines}
+      pickerTitle="Select a CSV file"
+      pickerFilters={[
+        { name: 'CSV files', extensions: ['csv'] },
+        { name: 'All files', extensions: ['*'] }
+      ]}
       active={active}
       onBack={onBack}
       onSetStatus={onSetStatus}
