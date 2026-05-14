@@ -1,0 +1,8 @@
+version: 3.0.0
+files:
+  - url: BeuMultiTool_3.0.0_x64-setup.exe
+    sha512: UV5ofSWHyst8jOyh9XeWh8r/h4L47OooJHQb0jQIOk392ysWvpLufw1b7NfHrkmYoSEygEr61GCQ6T0RU8TB5Q==
+    size: 2248146
+path: BeuMultiTool_3.0.0_x64-setup.exe
+sha512: UV5ofSWHyst8jOyh9XeWh8r/h4L47OooJHQb0jQIOk392ysWvpLufw1b7NfHrkmYoSEygEr61GCQ6T0RU8TB5Q==
+releaseDate: '2026-05-14T17:34:08.000Z'
