@@ -48,7 +48,6 @@ const TOOL_ROUTES = new Set<Route>([
   'remove-passwords',
   'find-non-duplicates',
   'find-non-duplicates-2',
-  'split-evenly',
   'split-by-n',
   'randomize',
   'csv-email-pass'

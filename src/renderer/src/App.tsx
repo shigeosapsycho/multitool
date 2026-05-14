@@ -43,6 +43,8 @@ export default function App() {
   const [version, setVersion] = useState('2.0.0')
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [updateReady, setUpdateReady] = useState(false)
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+  const [restarting, setRestarting] = useState(false)
   const [filePreview, setFilePreview] = useState(false)
   const [deleteToTrash, setDeleteToTrash] = useState(true)
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
@@ -64,6 +66,8 @@ export default function App() {
         setOutputSort(cfg.outputSort)
       })
       .catch(() => {})
+    // Check for updates once on launch (the Rust side no longer polls).
+    window.api.updater.check().catch(() => {})
   }, [])
 
   // Track the OS color preference. Used when theme === 'system'.
@@ -86,23 +90,24 @@ export default function App() {
   // Subscribe to auto-updater status messages and accumulate them as logs.
   // App is always mounted, so we never miss events even if Logs page isn't open.
   useEffect(() => {
-    return window.api.updater.onStatus((status) => {
+    const offStatus = window.api.updater.onStatus((status) => {
       let message = ''
       let kind: LogEntry['kind'] = 'info'
       switch (status.type) {
         case 'checking':
-          message = `Fetching updates (${status.currentVersion})...`
+          message = `Checking for updates (v${status.currentVersion})...`
           break
         case 'no-update':
           message = 'No updates found.'
           kind = 'success'
           break
         case 'available':
-          message = `Updating to new version (v${status.version})...`
+          message = `Update v${status.version} found — downloading...`
           break
         case 'downloaded':
-          message = 'Update files finished installing! Restart the app to apply the update.'
+          message = `Update v${status.version} downloaded. Restart to apply.`
           kind = 'success'
+          setUpdateVersion(status.version)
           setUpdateReady(true)
           break
         case 'error':
@@ -112,6 +117,19 @@ export default function App() {
       }
       setLogs((prev) => [...prev, { time: Date.now(), message, kind }])
     })
+    // Fires on the launch right after a successful self-update.
+    const offUpgrade = window.api.updater.onUpgradeApplied((version) => {
+      setUpdateReady(false)
+      setUpdateVersion(null)
+      setLogs((prev) => [
+        ...prev,
+        { time: Date.now(), message: `Updated to v${version}.`, kind: 'success' }
+      ])
+    })
+    return () => {
+      offStatus()
+      offUpgrade()
+    }
   }, [])
 
   const navigate = useCallback((next: Route) => {
@@ -290,7 +308,23 @@ export default function App() {
           })}
         </main>
       </div>
-      {updateReady && <StatusBar message="Update available restart to apply changes" />}
+      {updateReady && (
+        <StatusBar
+          message={
+            updateVersion
+              ? `Update v${updateVersion} downloaded — restart to apply.`
+              : 'Update downloaded — restart to apply.'
+          }
+          actionLabel={restarting ? 'Restarting…' : 'Restart now'}
+          actionDisabled={restarting}
+          onAction={() => {
+            setRestarting(true)
+            // On success the process exits before this resolves; only a
+            // failure path comes back, so re-enable the button if it does.
+            window.api.updater.applyAndRestart().catch(() => setRestarting(false))
+          }}
+        />
+      )}
     </div>
   )
 }

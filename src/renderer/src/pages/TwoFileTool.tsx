@@ -1,10 +1,18 @@
-import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState
+} from 'react'
 import {
   ToolLayout,
   ResultPanel,
   Button,
   Icons,
-  Stat
+  Stat,
+  type FilePanelHandle
 } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { consumePendingFile } from '../lib/pending'
@@ -25,56 +33,100 @@ export type TwoFileToolProps = {
   onSetStatus: (msg: string) => void
 }
 
-function FileBox({
-  index,
-  label,
-  filePath,
-  content,
-  onPick,
-  onChange,
-  onDropPath
-}: {
-  index: 1 | 2
+/**
+ * Counts non-whitespace lines in a single pass. Duplicated from ToolShell's
+ * FilePanel so this internal FileBox doesn't have to import the helper —
+ * the two implementations are kept in sync intentionally.
+ */
+function countNonEmptyLines(s: string): number {
+  let count = 0
+  let seenNonWS = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c === 10 || c === 13) {
+      if (seenNonWS) count++
+      seenNonWS = false
+    } else if (c !== 32 && c !== 9) {
+      seenNonWS = true
+    }
+  }
+  if (seenNonWS) count++
+  return count
+}
+
+type FileBoxProps = {
   label: string
   filePath: string | null
-  content: string
+  initialContent?: string
   onPick: () => void
-  onChange: (s: string) => void
   onDropPath: (path: string) => void
-}) {
-  const [dragOver, setDragOver] = useState(false)
-  const lineCount = content
-    ? content.split(/\r?\n/).filter((l) => l.trim().length > 0).length
-    : 0
+  onUserEdit?: () => void
+  onLineCountChange?: (n: number) => void
+}
 
-  const handleDrop = (e: DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (!file) return
-    const p = window.api.files.pathForFile(file)
-    if (p) onDropPath(p)
-  }
+const FileBox = forwardRef<FilePanelHandle, FileBoxProps>(function FileBox(
+  { label, filePath, initialContent = '', onPick, onDropPath, onUserEdit, onLineCountChange },
+  ref
+) {
+  const [dragOver, setDragOver] = useState(false)
+  const [lineCount, setLineCount] = useState(() => countNonEmptyLines(initialContent))
+  const dropRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const updateLineCount = useCallback(
+    (value: string) => {
+      const n = countNonEmptyLines(value)
+      setLineCount(n)
+      onLineCountChange?.(n)
+    },
+    [onLineCountChange]
+  )
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getValue: () => textareaRef.current?.value ?? '',
+      setValue: (s: string) => {
+        if (textareaRef.current) {
+          textareaRef.current.value = s
+          updateLineCount(s)
+        }
+      }
+    }),
+    [updateLineCount]
+  )
+
+  useEffect(() => {
+    const el = dropRef.current
+    if (!el) return
+    return window.api.files.registerDropZone(el, {
+      onDrop: (paths) => {
+        setDragOver(false)
+        if (paths[0]) onDropPath(paths[0])
+      },
+      onEnter: () => setDragOver(true),
+      onLeave: () => setDragOver(false)
+    })
+  }, [onDropPath])
 
   return (
     <Card label={label} badge={lineCount.toLocaleString()} className="min-h-0 flex-1">
       <div
+        ref={dropRef}
         className={`relative flex h-full min-h-0 flex-col transition ${
           dragOver ? 'bg-accent-soft' : ''
         }`}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
       >
         {dragOver && (
           <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-accent" />
         )}
         <textarea
-          value={content}
-          onChange={(e) => onChange(e.target.value)}
+          ref={textareaRef}
+          defaultValue={initialContent}
+          onChange={(e) => {
+            onUserEdit?.()
+            updateLineCount(e.target.value)
+          }}
           placeholder={`No ${label.toLowerCase()} loaded.\n\nDrop a file, click "Choose", or paste content here.`}
           className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-text-primary outline-none placeholder:text-text-muted"
           spellCheck={false}
@@ -91,7 +143,7 @@ function FileBox({
       </div>
     </Card>
   )
-}
+})
 
 export function TwoFileTool(props: TwoFileToolProps) {
   const {
@@ -111,28 +163,26 @@ export function TwoFileTool(props: TwoFileToolProps) {
   } = props
 
   const [path1, setPath1] = useState<string | null>(null)
-  const [content1, setContent1] = useState<string>('')
+  const [count1, setCount1] = useState(0)
   const [path2, setPath2] = useState<string | null>(null)
-  const [content2, setContent2] = useState<string>('')
+  const [count2, setCount2] = useState(0)
   const [results, setResults] = useState<string[] | null>(null)
   const [savedTo, setSavedTo] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
 
-  const totalLines = useMemo(
-    () =>
-      (content1 ? content1.split(/\r?\n/).filter((l) => l.trim().length > 0).length : 0) +
-      (content2 ? content2.split(/\r?\n/).filter((l) => l.trim().length > 0).length : 0),
-    [content1, content2]
-  )
+  const ref1 = useRef<FilePanelHandle>(null)
+  const ref2 = useRef<FilePanelHandle>(null)
+
+  const totalLines = count1 + count2
 
   async function loadInto(which: 1 | 2, path: string) {
     const text = await window.api.files.read(path)
     if (which === 1) {
       setPath1(path)
-      setContent1(text)
+      ref1.current?.setValue(text)
     } else {
       setPath2(path)
-      setContent2(text)
+      ref2.current?.setValue(text)
     }
     setResults(null)
     setSavedTo(null)
@@ -156,15 +206,17 @@ export function TwoFileTool(props: TwoFileToolProps) {
 
   function handleClear() {
     setPath1(null)
-    setContent1('')
     setPath2(null)
-    setContent2('')
+    ref1.current?.setValue('')
+    ref2.current?.setValue('')
     setResults(null)
     setSavedTo(null)
     onSetStatus('Ready')
   }
 
   async function handleRun() {
+    const content1 = ref1.current?.getValue() ?? ''
+    const content2 = ref2.current?.getValue() ?? ''
     if (!content1 || !content2) return
     const start = Date.now()
     setRunning(true)
@@ -183,7 +235,13 @@ export function TwoFileTool(props: TwoFileToolProps) {
     }
   }
 
-  const canRun = !!content1 && !!content2 && !running
+  const canRun = count1 > 0 && count2 > 0 && !running
+  const hasAny = count1 > 0 || count2 > 0
+
+  const invalidateResults = () => {
+    setResults(null)
+    setSavedTo(null)
+  }
 
   return (
     <ToolLayout
@@ -192,7 +250,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
       onRun={handleRun}
       running={running}
       banner={
-        content1 || content2 ? (
+        hasAny ? (
           <>
             <Stat value={totalLines.toLocaleString()} label="lines loaded" />
             <Stat
@@ -220,30 +278,22 @@ export function TwoFileTool(props: TwoFileToolProps) {
     >
       <div className="flex min-h-0 flex-col gap-4">
         <FileBox
-          index={1}
+          ref={ref1}
           label={file1Label}
           filePath={path1}
-          content={content1}
           onPick={() => pick(1)}
           onDropPath={(p) => loadInto(1, p)}
-          onChange={(s) => {
-            setContent1(s)
-            setResults(null)
-            setSavedTo(null)
-          }}
+          onLineCountChange={setCount1}
+          onUserEdit={invalidateResults}
         />
         <FileBox
-          index={2}
+          ref={ref2}
           label={file2Label}
           filePath={path2}
-          content={content2}
           onPick={() => pick(2)}
           onDropPath={(p) => loadInto(2, p)}
-          onChange={(s) => {
-            setContent2(s)
-            setResults(null)
-            setSavedTo(null)
-          }}
+          onLineCountChange={setCount2}
+          onUserEdit={invalidateResults}
         />
       </div>
       <ResultPanel

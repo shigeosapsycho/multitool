@@ -39,15 +39,18 @@ export function TitleBar({ title, version }: Props) {
   }, [])
 
   return (
-    <div className="titlebar flex h-9 items-center justify-between border-b border-border bg-bg select-none">
-      <div className="flex items-center gap-2 pl-3">
+    <div
+      data-tauri-drag-region
+      className="titlebar flex h-9 items-center justify-between border-b border-border bg-bg select-none"
+    >
+      <div data-tauri-drag-region className="flex items-center gap-2 pl-3">
         <Logo />
-        <span className="text-[13px] font-semibold tracking-tight text-text-primary">
+        <span data-tauri-drag-region className="text-[13px] font-semibold tracking-tight text-text-primary">
           {title}
         </span>
-        <span className="text-[11px] text-text-muted">v{version}</span>
+        <span data-tauri-drag-region className="text-[11px] text-text-muted">v{version}</span>
       </div>
-      <div className="no-drag flex h-full items-center">
+      <div data-tauri-drag-region="false" className="no-drag flex h-full items-center">
         <button
           aria-label="Minimize"
           className="flex h-9 w-11 items-center justify-center text-text-secondary transition hover:bg-surface-2 hover:text-text-primary"

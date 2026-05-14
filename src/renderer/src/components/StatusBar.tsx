@@ -1,5 +1,9 @@
 type Props = {
   message: string
+  /** When provided, renders a trailing action button (e.g. "Restart now"). */
+  actionLabel?: string
+  onAction?: () => void
+  actionDisabled?: boolean
 }
 
 const UpdateIcon = () => (
@@ -11,11 +15,21 @@ const UpdateIcon = () => (
   </svg>
 )
 
-export function StatusBar({ message }: Props) {
+export function StatusBar({ message, actionLabel, onAction, actionDisabled }: Props) {
   return (
     <div className="flex h-8 shrink-0 items-center gap-2 border-t border-accent/30 bg-accent-soft px-4 text-[12px] font-medium text-accent">
       <UpdateIcon />
-      {message}
+      <span className="flex-1">{message}</span>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          disabled={actionDisabled}
+          className="rounded-md bg-accent px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-accent-hover disabled:opacity-60"
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   )
 }

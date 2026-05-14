@@ -1,86 +1,37 @@
 {
   "name": "beu-multitool",
-  "version": "2.6.8",
+  "version": "3.0.0",
   "description": "Beu MultiTool - desktop edition",
-  "main": "./out/main/index.js",
   "author": "beu",
+  "private": true,
   "scripts": {
-    "dev": "electron-vite dev",
-    "start": "electron-vite preview",
-    "build": "electron-vite build",
-    "build:win": "electron-vite build && electron-builder --win --publish never",
-    "release:win": "electron-vite build && electron-builder --win --publish always",
-    "icon": "node scripts/make-icon.mjs"
+    "vite:dev": "vite",
+    "vite:build": "vite build",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:win": "tauri build",
+    "icon": "node scripts/make-icon.mjs",
+    "tauri": "tauri"
   },
   "dependencies": {
-    "electron-updater": "^6.8.3",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-opener": "^2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
-    "electron-vite": "^2.3.0",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.2",
     "vite": "^5.4.11"
-  },
-  "build": {
-    "appId": "com.beu.multitool",
-    "productName": "BeuMultiTool",
-    "directories": {
-      "output": "release"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "shigeosapsycho",
-        "repo": "multitool",
-        "releaseType": "release"
-      }
-    ],
-    "files": [
-      "out/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "tool_icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowElevation": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Beu MultiTool",
-      "artifactName": "BeuMultiTool-Setup-${version}.exe",
-      "uninstallDisplayName": "Beu MultiTool"
-    },
-    "portable": {
-      "artifactName": "BeuMultiTool.exe"
-    }
   }
 }

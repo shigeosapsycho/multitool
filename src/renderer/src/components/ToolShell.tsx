@@ -1,4 +1,12 @@
-import { useEffect, useState, type ReactNode, type DragEvent } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react'
 import { PageHeader, Button } from './PageHeader'
 import { StatusBanner, Stat } from './StatusBanner'
 import { Card } from './Card'
@@ -40,69 +48,141 @@ const RevealIcon = () => (
   </svg>
 )
 
+const CopyIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+)
+
 export const Icons = {
   Folder: FolderIcon,
   Play: PlayIcon,
   Trash: TrashIcon,
   Save: SaveIcon,
-  Reveal: RevealIcon
+  Reveal: RevealIcon,
+  Copy: CopyIcon
+}
+
+export type FilePanelHandle = {
+  getValue: () => string
+  setValue: (s: string) => void
 }
 
 type FilePanelProps = {
   label: string
   filePath: string | null
-  content: string
-  onContentChange: (s: string) => void
+  /**
+   * Initial textarea content. Read once; subsequent updates go through the
+   * imperative ref (parents call `setValue` after pick/drop/clear). The
+   * textarea itself is uncontrolled so 20k-line pastes don't re-render
+   * the parent on every keystroke.
+   */
+  initialContent?: string
   onPick: () => void
   onDropPath?: (path: string) => void
+  /** Called once per user edit (typing, paste). Use to invalidate stale results. */
+  onUserEdit?: () => void
+  /** Called whenever the line count changes. Used for banner stats and Run-button gating. */
+  onLineCountChange?: (n: number) => void
   placeholder?: string
   className?: string
 }
 
-export function FilePanel({
-  label,
-  filePath,
-  content,
-  onContentChange,
-  onPick,
-  onDropPath,
-  placeholder,
-  className
-}: FilePanelProps) {
-  const [dragOver, setDragOver] = useState(false)
-  const lineCount = content
-    ? content.split(/\r?\n/).filter((l) => l.trim().length > 0).length
-    : 0
-
-  const handleDrop = (e: DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (!file) return
-    const p = window.api.files.pathForFile(file)
-    if (p && onDropPath) onDropPath(p)
+/**
+ * Counts non-whitespace lines in `s` in a single pass. ~10x faster than
+ * `s.split(/\r?\n/).filter(...)` on multi-MB inputs because it avoids the
+ * intermediate array allocation.
+ */
+function countNonEmptyLines(s: string): number {
+  let count = 0
+  let seenNonWS = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c === 10 || c === 13) {
+      if (seenNonWS) count++
+      seenNonWS = false
+    } else if (c !== 32 && c !== 9) {
+      seenNonWS = true
+    }
   }
+  if (seenNonWS) count++
+  return count
+}
+
+export const FilePanel = forwardRef<FilePanelHandle, FilePanelProps>(function FilePanel(
+  {
+    label,
+    filePath,
+    initialContent = '',
+    onPick,
+    onDropPath,
+    onUserEdit,
+    onLineCountChange,
+    placeholder,
+    className
+  },
+  ref
+) {
+  const [dragOver, setDragOver] = useState(false)
+  const [lineCount, setLineCount] = useState(() => countNonEmptyLines(initialContent))
+  const dropRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const updateLineCount = useCallback(
+    (value: string) => {
+      const n = countNonEmptyLines(value)
+      setLineCount(n)
+      onLineCountChange?.(n)
+    },
+    [onLineCountChange]
+  )
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getValue: () => textareaRef.current?.value ?? '',
+      setValue: (s: string) => {
+        if (textareaRef.current) {
+          textareaRef.current.value = s
+          updateLineCount(s)
+        }
+      }
+    }),
+    [updateLineCount]
+  )
+
+  useEffect(() => {
+    const el = dropRef.current
+    if (!el || !onDropPath) return
+    return window.api.files.registerDropZone(el, {
+      onDrop: (paths) => {
+        setDragOver(false)
+        if (paths[0]) onDropPath(paths[0])
+      },
+      onEnter: () => setDragOver(true),
+      onLeave: () => setDragOver(false)
+    })
+  }, [onDropPath])
 
   return (
     <Card label={label} badge={lineCount.toLocaleString()} className={className}>
       <div
+        ref={dropRef}
         className={`relative flex h-full min-h-0 flex-col transition ${
           dragOver ? 'bg-accent-soft' : ''
         }`}
-        onDragOver={(e) => {
-          if (!onDropPath) return
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
       >
         {dragOver && (
           <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-accent" />
         )}
         <textarea
-          value={content}
-          onChange={(e) => onContentChange(e.target.value)}
+          ref={textareaRef}
+          defaultValue={initialContent}
+          onChange={(e) => {
+            onUserEdit?.()
+            updateLineCount(e.target.value)
+          }}
           placeholder={
             placeholder ??
             'No file loaded.\n\nDrop a file, click "Choose File", or paste content here.'
@@ -122,7 +202,7 @@ export function FilePanel({
       </div>
     </Card>
   )
-}
+})
 
 type ResultPanelProps = {
   label: string
@@ -145,10 +225,23 @@ export function ResultPanel({
   savedTo,
   onSaved
 }: ResultPanelProps) {
+  const [copied, setCopied] = useState(false)
+
   async function handleSave() {
     if (!results || results.length === 0) return
     const path = await window.api.files.writeOutput(taskName, results.join('\n') + '\n')
     onSaved(path)
+  }
+
+  async function handleCopy() {
+    if (!results || results.length === 0) return
+    try {
+      await navigator.clipboard.writeText(results.join('\n'))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard can reject if the window isn't focused; the user can retry.
+    }
   }
 
   return (
@@ -174,23 +267,26 @@ export function ResultPanel({
           />
           <div className="flex items-center gap-2 border-t border-border p-3">
             {savedTo ? (
-              <>
-                <span className="flex-1 truncate text-[12px] text-text-secondary">
-                  Saved to <span className="text-text-primary">{savedTo}</span>
-                </span>
-                <Button onClick={() => window.api.files.reveal(savedTo)} variant="ghost">
-                  <RevealIcon />
-                  Reveal
-                </Button>
-              </>
+              <span className="flex-1 truncate text-[12px] text-text-secondary">
+                Saved to <span className="text-text-primary">{savedTo}</span>
+              </span>
             ) : (
-              <>
-                <span className="flex-1" />
-                <Button onClick={handleSave} variant="secondary">
-                  <SaveIcon />
-                  Save to Output
-                </Button>
-              </>
+              <span className="flex-1" />
+            )}
+            <Button onClick={handleCopy} variant="ghost">
+              <CopyIcon />
+              {copied ? 'Copied!' : 'Copy all'}
+            </Button>
+            {savedTo ? (
+              <Button onClick={() => window.api.files.reveal(savedTo)} variant="ghost">
+                <RevealIcon />
+                Reveal
+              </Button>
+            ) : (
+              <Button onClick={handleSave} variant="secondary">
+                <SaveIcon />
+                Save to Output
+              </Button>
             )}
           </div>
         </div>

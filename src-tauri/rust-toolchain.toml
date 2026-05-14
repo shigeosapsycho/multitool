@@ -1,0 +1,6 @@
+[toolchain]
+# Pin to MSVC host: Tauri's symbol table exceeds the mingw linker's 65k
+# export-ordinal limit, so building under stable-x86_64-pc-windows-gnu fails
+# at link time. MSVC linker handles binaries this size.
+channel = "stable-x86_64-pc-windows-msvc"
+profile = "default"

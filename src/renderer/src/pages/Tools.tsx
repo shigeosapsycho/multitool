@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
 import { setPendingFile } from '../lib/pending'
@@ -185,28 +185,28 @@ function ToolCard({
   onNavigate: (route: Route) => void
 }) {
   const [dragOver, setDragOver] = useState(false)
+  const dropRef = useRef<HTMLButtonElement>(null)
 
-  const handleDrop = (e: DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (!file) return
-    const p = window.api.files.pathForFile(file)
-    if (p) {
-      setPendingFile(p)
-      onNavigate(tool.id)
-    }
-  }
+  useEffect(() => {
+    const el = dropRef.current
+    if (!el) return
+    return window.api.files.registerDropZone(el, {
+      onDrop: (paths) => {
+        setDragOver(false)
+        if (paths[0]) {
+          setPendingFile(paths[0])
+          onNavigate(tool.id)
+        }
+      },
+      onEnter: () => setDragOver(true),
+      onLeave: () => setDragOver(false)
+    })
+  }, [onNavigate, tool.id])
 
   return (
     <button
+      ref={dropRef}
       onClick={() => onNavigate(tool.id)}
-      onDragOver={(e) => {
-        e.preventDefault()
-        setDragOver(true)
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
       className={`group relative flex flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
         dragOver
           ? 'border-accent shadow-glow-accent'

@@ -1,10 +1,11 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   ToolLayout,
   FilePanel,
   Button,
   Icons,
-  Stat
+  Stat,
+  type FilePanelHandle
 } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { basenameNoExt, nonEmptyLines } from '../lib/parse'
@@ -36,17 +37,16 @@ export function SplitTool(props: SplitToolProps) {
   } = props
 
   const [filePath, setFilePath] = useState<string | null>(null)
-  const [content, setContent] = useState<string>('')
+  const [lineCount, setLineCount] = useState(0)
   const [outputs, setOutputs] = useState<{ path: string; lines: number }[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
-
-  const lineCount = useMemo(() => nonEmptyLines(content).length, [content])
+  const panelRef = useRef<FilePanelHandle>(null)
 
   async function loadFromPath(path: string) {
     const text = await window.api.files.read(path)
     setFilePath(path)
-    setContent(text)
+    panelRef.current?.setValue(text)
     setOutputs(null)
     setError(null)
     onSetStatus(`Loaded ${path}`)
@@ -67,13 +67,14 @@ export function SplitTool(props: SplitToolProps) {
 
   function handleClear() {
     setFilePath(null)
-    setContent('')
+    panelRef.current?.setValue('')
     setOutputs(null)
     setError(null)
     onSetStatus('Ready')
   }
 
   async function handleRun() {
+    const content = panelRef.current?.getValue() ?? ''
     if (!content) return
     const start = Date.now()
     setRunning(true)
@@ -104,6 +105,8 @@ export function SplitTool(props: SplitToolProps) {
     }
   }
 
+  const hasContent = lineCount > 0
+
   return (
     <ToolLayout
       title={title}
@@ -111,7 +114,7 @@ export function SplitTool(props: SplitToolProps) {
       onRun={handleRun}
       running={running}
       banner={
-        content ? (
+        hasContent ? (
           <>
             <Stat value={lineCount.toLocaleString()} label="lines loaded" />
             <Stat
@@ -130,7 +133,7 @@ export function SplitTool(props: SplitToolProps) {
             <Icons.Trash />
             Clear
           </Button>
-          <Button onClick={handleRun} variant="primary" disabled={!content || running}>
+          <Button onClick={handleRun} variant="primary" disabled={!hasContent || running}>
             <Icons.Play />
             {running ? 'Splitting…' : runLabel}
           </Button>
@@ -138,16 +141,16 @@ export function SplitTool(props: SplitToolProps) {
       }
     >
       <FilePanel
+        ref={panelRef}
         label="Input File"
         filePath={filePath}
-        content={content}
-        onContentChange={(s) => {
-          setContent(s)
+        onPick={handlePick}
+        onDropPath={loadFromPath}
+        onLineCountChange={setLineCount}
+        onUserEdit={() => {
           setOutputs(null)
           setError(null)
         }}
-        onPick={handlePick}
-        onDropPath={loadFromPath}
       />
 
       <div className="flex min-h-0 flex-col gap-4">

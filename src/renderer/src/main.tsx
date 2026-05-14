@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import './lib/api' // side-effect: installs window.api backed by Tauri invokes
 import App from './App'
 import './styles/globals.css'
 
