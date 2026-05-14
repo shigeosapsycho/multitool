@@ -1,5 +1,19 @@
 name: build
 
+# Builds the Tauri app on Windows.
+#  - PRs and pushes to main  -> build only, artifacts uploaded for download
+#  - pushing a v* tag        -> build + create a DRAFT GitHub release
+#
+# The release is a DRAFT on purpose: review the attached files, then click
+# Publish. The in-app self-updater only sees PUBLISHED releases (it queries
+# releases/latest), so a draft ships nothing until you publish it.
+#
+# To cut a release:
+#   1. Bump the version in package.json, src-tauri/Cargo.toml and
+#      src-tauri/tauri.conf.json (all three must match).
+#   2. Commit, then: git tag v3.0.0 && git push origin v3.0.0
+#   3. Wait for this workflow, review the draft release, click Publish.
+
 on:
   push:
     branches:
@@ -29,41 +43,44 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Cache electron-builder downloads
-        uses: actions/cache@v4
+      # The MSVC toolchain is the default on windows-latest runners, and
+      # src-tauri/rust-toolchain.toml pins stable-x86_64-pc-windows-msvc —
+      # rustup auto-installs it on the first cargo invocation.
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/AppData/Local/electron-builder/Cache
-          key: ${{ runner.os }}-electron-builder
-          restore-keys: |
-            ${{ runner.os }}-electron-builder
+          workspaces: src-tauri
 
       - name: Install dependencies
         run: npm ci
 
-      # PRs build only (no publish — never push artifacts from a fork's branch).
-      - name: Build (PR check, no publish)
-        if: github.event_name == 'pull_request'
+      - name: Build (vite + tauri)
         run: npm run build:win
-
-      # Pushes to main and v* tags both publish. electron-builder uploads to a
-      # release tagged with package.json's `version` (creating it if missing).
-      - name: Build & publish
-        if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run release:win
-
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: BeuMultiTool-Installer
-          path: release/BeuMultiTool-Setup-*.exe
-          if-no-files-found: error
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: BeuMultiTool-Portable
-          path: release/BeuMultiTool.exe
+          path: src-tauri/target/release/beu-multitool.exe
           if-no-files-found: error
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BeuMultiTool-Installer
+          path: src-tauri/target/release/bundle/nsis/BeuMultiTool_*_x64-setup.exe
+          if-no-files-found: error
+
+      # Only tag pushes create a release. beu-multitool.exe MUST keep this
+      # exact filename — it's the asset the in-app self-updater downloads
+      # (ASSET_NAME in src-tauri/src/update.rs).
+      - name: Publish draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            src-tauri/target/release/beu-multitool.exe
+            src-tauri/target/release/bundle/nsis/BeuMultiTool_*_x64-setup.exe
