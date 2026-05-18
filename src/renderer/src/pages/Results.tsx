@@ -25,15 +25,6 @@ function formatTime(ms: number): string {
   return d.toLocaleString()
 }
 
-const RefreshIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-    <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" />
-    <path d="M21 3v5h-5" />
-    <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" />
-    <path d="M3 21v-5h5" />
-  </svg>
-)
-
 const ShuffleIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
     <polyline points="16 3 21 3 21 8" />
@@ -58,6 +49,7 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
   const [selected, setSelected] = useState<Entry | null>(null)
   const [previewText, setPreviewText] = useState<string>('')
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewCopied, setPreviewCopied] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -87,6 +79,7 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
 
   // Reload preview content when selection changes (only in preview mode).
   useEffect(() => {
+    setPreviewCopied(false)
     if (!filePreview || !selected) {
       setPreviewText('')
       return
@@ -127,10 +120,6 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
         }
         actions={
           <>
-            <Button onClick={() => void load()} variant="ghost">
-              <RefreshIcon />
-              Refresh
-            </Button>
             <Button
               onClick={() => {
                 setConfirm({
@@ -219,13 +208,49 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
                         {formatBytes(selected.size)} · {formatTime(selected.mtime)}
                       </div>
                     </div>
-                    <button
-                      onClick={() => window.api.files.reveal(selected.path)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] text-text-secondary transition hover:bg-surface-2 hover:text-text-primary"
-                    >
-                      <Icons.Reveal />
-                      Reveal
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={async () => {
+                          if (!previewText) return
+                          try {
+                            await navigator.clipboard.writeText(previewText)
+                            setPreviewCopied(true)
+                            setTimeout(() => setPreviewCopied(false), 1500)
+                          } catch {
+                            // Clipboard can reject if window isn't focused
+                          }
+                        }}
+                        disabled={!previewText || previewLoading}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] text-text-secondary transition hover:bg-surface-2 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Icons.Copy />
+                        {previewCopied ? 'Copied!' : 'Copy all'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const target = selected
+                          setConfirm({
+                            title: 'Delete file',
+                            message: `Delete ${target.name}?`,
+                            detail: deleteToTrash
+                              ? 'The file will be moved to the Recycle Bin.'
+                              : 'This cannot be undone.',
+                            confirmLabel: 'Delete',
+                            onConfirm: async () => {
+                              const result = await window.api.files.deleteOutput(target.path)
+                              if (result.ok) {
+                                if (selected?.path === target.path) setSelected(null)
+                                await load()
+                              }
+                            }
+                          })
+                        }}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] text-danger transition hover:bg-danger/10"
+                      >
+                        <Icons.Trash />
+                        Delete
+                      </button>
+                    </div>
                   </div>
                   {previewLoading ? (
                     <div className="flex min-h-0 flex-1 items-start p-4 font-mono text-[12.5px] leading-relaxed text-text-muted">
