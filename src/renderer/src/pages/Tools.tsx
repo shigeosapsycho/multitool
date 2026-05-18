@@ -63,6 +63,12 @@ const tools: ToolMeta[] = [
     title: 'CSV → Email:Password',
     description: 'Pull email & password columns from a CSV into an email:password list.',
     accent: '#60a5fa'
+  },
+  {
+    id: 'proxy-tester',
+    title: 'Proxy Tester',
+    description: 'Ping a URL and report latency. Optional proxy.',
+    accent: '#38bdf8'
   }
 ]
 
@@ -164,6 +170,15 @@ const CsvEmailPassIcon = () => (
   </svg>
 )
 
+const ProxyTesterIcon = () => (
+  <svg {...SVG_PROPS}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3a14 14 0 0 1 0 18" />
+    <path d="M12 3a14 14 0 0 0 0 18" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
   'find-duplicates-2': Duplicates2Icon,
@@ -174,7 +189,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'randomize': DiceIcon,
   'search-master': SearchIcon,
   'email-filter': FunnelIcon,
-  'csv-email-pass': CsvEmailPassIcon
+  'csv-email-pass': CsvEmailPassIcon,
+  'proxy-tester': ProxyTesterIcon
 }
 
 function ToolCard({

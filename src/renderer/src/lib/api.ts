@@ -14,6 +14,14 @@ type OpenOpts = { multiple?: boolean; title?: string; filters?: DialogFilter[] }
 
 type OutputEntry = { path: string; name: string; size: number; mtime: number }
 
+export type ProxyTestEntry = {
+  raw: string
+  normalized: string | null
+  latencyMs: number | null
+  status: number | null
+  error: string | null
+}
+
 type UpdaterStatus =
   | { type: 'checking'; currentVersion: string }
   | { type: 'no-update'; currentVersion: string }
@@ -175,6 +183,10 @@ export const api = {
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),
     onForward: (cb: () => void) => onEvent<unknown>('nav:forward', () => cb())
+  },
+  net: {
+    testProxies: (args: { url: string; proxies: string[]; concurrency?: number }) =>
+      invoke<ProxyTestEntry[]>('net_test_proxies', { args })
   },
   updater: {
     onStatus: (cb: (status: UpdaterStatus) => void) =>

@@ -1,6 +1,6 @@
 [package]
 name = "beu-multitool"
-version = "3.0.0"
+version = "3.1.0"
 description = "Beu MultiTool - desktop edition"
 authors = ["beu"]
 edition = "2021"
@@ -26,7 +26,7 @@ chrono = "0.4"
 rand = "0.8"
 anyhow = "1"
 # Self-updater HTTP client (GitHub Releases API + asset download).
-ureq = { version = "2", features = ["json"] }
+ureq = { version = "2", features = ["json", "socks-proxy"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.59", features = [

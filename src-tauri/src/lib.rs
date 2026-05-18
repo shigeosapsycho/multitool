@@ -95,6 +95,7 @@ pub fn run() {
             commands::config_set_theme,
             commands::config_set_output_sort,
             commands::app_get_version,
+            commands::net_test_proxies,
             update::updater_check,
             update::updater_apply_and_restart,
         ])

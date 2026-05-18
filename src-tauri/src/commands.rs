@@ -551,6 +551,210 @@ pub async fn app_get_version(app: AppHandle) -> String {
 // The updater lives in `update.rs` — a self-contained GitHub-Releases
 // self-updater (no code signing, no latest.json) modeled on wally-gen.
 
+// ---------- network ----------
+
+#[derive(Deserialize, Debug)]
+pub struct ProxyTestArgs {
+    pub url: String,
+    pub proxies: Vec<String>,
+    pub concurrency: Option<usize>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyTestEntry {
+    pub raw: String,
+    pub normalized: Option<String>,
+    pub latency_ms: Option<u128>,
+    pub status: Option<u16>,
+    pub error: Option<String>,
+}
+
+/// Parse a single proxy line. Accepts:
+///   - `hostname:port`
+///   - `hostname:port:username:password`
+///   - `username:password@hostname:port`
+///   - `username:password:hostname:port`
+///   - Any of the above prefixed with `http://`, `https://`, `socks5://`
+///
+/// Returns the normalized ureq proxy URL or None if the line is unparseable.
+fn parse_proxy_line(line: &str) -> Option<String> {
+    let line = line.trim();
+    if line.is_empty() || line.starts_with('#') {
+        return None;
+    }
+
+    let (scheme, rest) = match line.find("://") {
+        Some(idx) => (&line[..idx], &line[idx + 3..]),
+        None => ("http", line),
+    };
+
+    // username:password@hostname:port
+    if let Some((auth, host_port)) = rest.split_once('@') {
+        if auth.contains(':') && host_port.contains(':') {
+            return Some(format!("{scheme}://{auth}@{host_port}"));
+        }
+        return None;
+    }
+
+    let parts: Vec<&str> = rest.split(':').collect();
+    match parts.len() {
+        2 => Some(format!("{}://{}:{}", scheme, parts[0], parts[1])),
+        4 => {
+            let p1_num = !parts[1].is_empty() && parts[1].chars().all(|c| c.is_ascii_digit());
+            let p3_num = !parts[3].is_empty() && parts[3].chars().all(|c| c.is_ascii_digit());
+            // Disambiguate host:port:user:pass vs user:pass:host:port by which
+            // side has a numeric port. Default to host:port:user:pass when
+            // both or neither are numeric.
+            if p3_num && !p1_num {
+                Some(format!(
+                    "{}://{}:{}@{}:{}",
+                    scheme, parts[0], parts[1], parts[2], parts[3]
+                ))
+            } else {
+                Some(format!(
+                    "{}://{}:{}@{}:{}",
+                    scheme, parts[2], parts[3], parts[0], parts[1]
+                ))
+            }
+        }
+        _ => None,
+    }
+}
+
+fn test_one(url: &str, raw: &str) -> ProxyTestEntry {
+    use std::time::{Duration, Instant};
+
+    let normalized = match parse_proxy_line(raw) {
+        Some(n) => n,
+        None => {
+            return ProxyTestEntry {
+                raw: raw.to_string(),
+                normalized: None,
+                latency_ms: None,
+                status: None,
+                error: Some("Unparseable proxy format".into()),
+            };
+        }
+    };
+
+    let proxy = match ureq::Proxy::new(&normalized) {
+        Ok(p) => p,
+        Err(e) => {
+            return ProxyTestEntry {
+                raw: raw.to_string(),
+                normalized: Some(normalized),
+                latency_ms: None,
+                status: None,
+                error: Some(format!("Invalid proxy: {e}")),
+            };
+        }
+    };
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(5))
+        .timeout_read(Duration::from_secs(10))
+        .proxy(proxy)
+        .build();
+
+    let start = Instant::now();
+    let result = agent
+        .request("HEAD", url)
+        .set("User-Agent", "BeuMultiTool/3 (proxy-tester)")
+        .call();
+    let elapsed = start.elapsed().as_millis();
+
+    match result {
+        Ok(resp) => ProxyTestEntry {
+            raw: raw.to_string(),
+            normalized: Some(normalized),
+            latency_ms: Some(elapsed),
+            status: Some(resp.status()),
+            error: None,
+        },
+        Err(ureq::Error::Status(code, _)) => ProxyTestEntry {
+            raw: raw.to_string(),
+            normalized: Some(normalized),
+            latency_ms: Some(elapsed),
+            status: Some(code),
+            error: None,
+        },
+        Err(e) => ProxyTestEntry {
+            raw: raw.to_string(),
+            normalized: Some(normalized),
+            latency_ms: Some(elapsed),
+            status: None,
+            error: Some(e.to_string()),
+        },
+    }
+}
+
+#[tauri::command]
+pub async fn net_test_proxies(args: ProxyTestArgs) -> Result<Vec<ProxyTestEntry>, String> {
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+
+    let url = args.url.trim().to_string();
+    if url.is_empty() {
+        return Err("URL is empty".into());
+    }
+    let proxies: Vec<String> = args
+        .proxies
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && !s.starts_with('#'))
+        .collect();
+
+    if proxies.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let total = proxies.len();
+    let concurrency = args.concurrency.unwrap_or(10).clamp(1, 64).min(total);
+
+    let queue: Vec<(usize, String)> = proxies.into_iter().enumerate().collect();
+    let queue = Arc::new(Mutex::new(queue));
+    let results: Arc<Mutex<Vec<Option<ProxyTestEntry>>>> =
+        Arc::new(Mutex::new(vec![None; total]));
+
+    let handles: Vec<_> = (0..concurrency)
+        .map(|_| {
+            let q = queue.clone();
+            let r = results.clone();
+            let url = url.clone();
+            thread::spawn(move || loop {
+                let next = { q.lock().unwrap().pop() };
+                match next {
+                    Some((idx, raw)) => {
+                        let entry = test_one(&url, &raw);
+                        r.lock().unwrap()[idx] = Some(entry);
+                    }
+                    None => return,
+                }
+            })
+        })
+        .collect();
+
+    for h in handles {
+        let _ = h.join();
+    }
+
+    let out = Arc::try_unwrap(results)
+        .map_err(|_| "result lock leak".to_string())?
+        .into_inner()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|o| o.unwrap_or(ProxyTestEntry {
+            raw: String::new(),
+            normalized: None,
+            latency_ms: None,
+            status: None,
+            error: Some("missing result".into()),
+        }))
+        .collect();
+    Ok(out)
+}
+
 // ---------- Windows APPCOMMAND hook (Mouse4/Mouse5) ----------
 
 #[cfg(target_os = "windows")]

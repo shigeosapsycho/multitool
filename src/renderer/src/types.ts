@@ -10,6 +10,7 @@ export type Route =
   | 'search-master'
   | 'email-filter'
   | 'csv-email-pass'
+  | 'proxy-tester'
   | 'results'
   | 'settings'
   | 'logs'
