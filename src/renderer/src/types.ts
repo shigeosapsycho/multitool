@@ -11,6 +11,7 @@ export type Route =
   | 'email-filter'
   | 'csv-email-pass'
   | 'proxy-tester'
+  | 'reverse-list'
   | 'results'
   | 'settings'
   | 'logs'

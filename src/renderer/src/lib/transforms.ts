@@ -144,6 +144,14 @@ export function csvToEmailPass(text: string): CsvEmailPassResult {
   return { lines: out, emailHeader: header[emailIdx]!, passwordHeader: header[passwordIdx]! }
 }
 
+export function reverseLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trimEnd())
+    .filter((l) => l.length > 0)
+    .reverse()
+}
+
 export function shuffleLines(text: string): string[] {
   const lines = text
     .split(/\r?\n/)

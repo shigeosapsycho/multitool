@@ -69,6 +69,12 @@ const tools: ToolMeta[] = [
     title: 'Proxy Tester',
     description: 'Ping a URL and report latency. Optional proxy.',
     accent: '#38bdf8'
+  },
+  {
+    id: 'reverse-list',
+    title: 'Reverse List',
+    description: 'Reverse the order of lines in a file.',
+    accent: '#c084fc'
   }
 ]
 
@@ -179,6 +185,15 @@ const ProxyTesterIcon = () => (
   </svg>
 )
 
+const ReverseListIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M7 4v16" />
+    <polyline points="3 8 7 4 11 8" />
+    <path d="M17 20V4" />
+    <polyline points="13 16 17 20 21 16" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
   'find-duplicates-2': Duplicates2Icon,
@@ -190,7 +205,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'search-master': SearchIcon,
   'email-filter': FunnelIcon,
   'csv-email-pass': CsvEmailPassIcon,
-  'proxy-tester': ProxyTesterIcon
+  'proxy-tester': ProxyTesterIcon,
+  'reverse-list': ReverseListIcon
 }
 
 function ToolCard({

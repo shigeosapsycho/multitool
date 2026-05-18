@@ -1,8 +1,14 @@
 name: build
 
 # Builds the Tauri app on Windows.
-#  - PRs and pushes to main  -> build only, artifacts uploaded for download
-#  - pushing a v* tag        -> build + create a DRAFT GitHub release
+#  - PRs to main         -> build only (verify main still compiles)
+#  - pushing a v* tag    -> build + create a DRAFT GitHub release
+#  - workflow_dispatch   -> manual run from the Actions tab
+#
+# Plain pushes to main are NOT built — when you tag a release, pushing main
+# and pushing the tag would otherwise fire two duplicate runs. Only the tag
+# run produces the release the in-app self-updater needs, so the main-push
+# trigger is omitted.
 #
 # The release is a DRAFT on purpose: review the attached files, then click
 # Publish. The in-app self-updater only sees PUBLISHED releases (it queries
@@ -11,13 +17,11 @@ name: build
 # To cut a release:
 #   1. Bump the version in package.json, src-tauri/Cargo.toml and
 #      src-tauri/tauri.conf.json (all three must match).
-#   2. Commit, then: git tag v3.0.0 && git push origin v3.0.0
+#   2. Commit + push, then: git tag v3.1.2 && git push origin v3.1.2
 #   3. Wait for this workflow, review the draft release, click Publish.
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   pull_request:
