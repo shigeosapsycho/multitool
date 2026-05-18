@@ -3,12 +3,14 @@ mod config;
 mod update;
 mod watcher;
 
-use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 pub struct AppState {
     pub config: Mutex<config::Config>,
     pub watcher: Mutex<Option<watcher::OutputWatcher>>,
+    pub proxy_cancel: Arc<AtomicBool>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,6 +18,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -23,6 +26,7 @@ pub fn run() {
             app.manage(AppState {
                 config: Mutex::new(cfg),
                 watcher: Mutex::new(None),
+                proxy_cancel: Arc::new(AtomicBool::new(false)),
             });
 
             if let Err(err) = commands::ensure_output_dir(&handle) {
@@ -96,6 +100,7 @@ pub fn run() {
             commands::config_set_output_sort,
             commands::app_get_version,
             commands::net_test_proxies,
+            commands::net_cancel_proxies,
             update::updater_check,
             update::updater_apply_and_restart,
         ])

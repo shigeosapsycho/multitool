@@ -570,63 +570,189 @@ pub struct ProxyTestEntry {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct ProxySpec {
+    scheme: String,
+    host: String,
+    port: u16,
+    user: Option<String>,
+    pass: Option<String>,
+}
+
+impl ProxySpec {
+    fn normalized_url(&self) -> String {
+        match (&self.user, &self.pass) {
+            (Some(u), Some(p)) => format!("{}://{}:{}@{}:{}", self.scheme, u, p, self.host, self.port),
+            _ => format!("{}://{}:{}", self.scheme, self.host, self.port),
+        }
+    }
+}
+
 /// Parse a single proxy line. Accepts:
 ///   - `hostname:port`
 ///   - `hostname:port:username:password`
 ///   - `username:password@hostname:port`
 ///   - `username:password:hostname:port`
 ///   - Any of the above prefixed with `http://`, `https://`, `socks5://`
-///
-/// Returns the normalized ureq proxy URL or None if the line is unparseable.
-fn parse_proxy_line(line: &str) -> Option<String> {
+fn parse_proxy_line(line: &str) -> Option<ProxySpec> {
     let line = line.trim();
     if line.is_empty() || line.starts_with('#') {
         return None;
     }
 
     let (scheme, rest) = match line.find("://") {
-        Some(idx) => (&line[..idx], &line[idx + 3..]),
-        None => ("http", line),
+        Some(idx) => (line[..idx].to_lowercase(), &line[idx + 3..]),
+        None => ("http".to_string(), line),
     };
 
-    // username:password@hostname:port
-    if let Some((auth, host_port)) = rest.split_once('@') {
-        if auth.contains(':') && host_port.contains(':') {
-            return Some(format!("{scheme}://{auth}@{host_port}"));
+    let (host, port, user, pass) = if let Some((auth, host_port)) = rest.split_once('@') {
+        // username:password@hostname:port
+        let (u, p) = auth.split_once(':')?;
+        let (h, port_s) = host_port.split_once(':')?;
+        (h.to_string(), port_s.parse().ok()?, Some(u.to_string()), Some(p.to_string()))
+    } else {
+        let parts: Vec<&str> = rest.split(':').collect();
+        match parts.len() {
+            2 => (parts[0].to_string(), parts[1].parse().ok()?, None, None),
+            4 => {
+                let p1_num = !parts[1].is_empty() && parts[1].chars().all(|c| c.is_ascii_digit());
+                let p3_num = !parts[3].is_empty() && parts[3].chars().all(|c| c.is_ascii_digit());
+                // host:port:user:pass when parts[1] is numeric (and parts[3] is not).
+                // user:pass:host:port when parts[3] is numeric (and parts[1] is not).
+                // Default to host:port:user:pass when both/neither are numeric.
+                if p3_num && !p1_num {
+                    (parts[2].to_string(), parts[3].parse().ok()?, Some(parts[0].to_string()), Some(parts[1].to_string()))
+                } else {
+                    (parts[0].to_string(), parts[1].parse().ok()?, Some(parts[2].to_string()), Some(parts[3].to_string()))
+                }
+            }
+            _ => return None,
         }
-        return None;
+    };
+
+    Some(ProxySpec { scheme, host, port, user, pass })
+}
+
+/// Test an HTTP/HTTPS proxy via raw TCP CONNECT. Bypasses ureq because ureq 2.x
+/// mishandles proxy auth on some residential providers (sends Basic creds but
+/// the server reports 407 anyway). Doing CONNECT by hand gives a clean signal.
+fn test_http_connect(target_url: &url::Url, spec: &ProxySpec) -> (Option<u128>, Option<u16>, Option<String>) {
+    use base64::Engine;
+    use std::io::{Read, Write};
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::{Duration, Instant};
+
+    let target_host = match target_url.host_str() {
+        Some(h) => h,
+        None => return (None, None, Some("Target URL has no host".into())),
+    };
+    let target_port = match target_url.port_or_known_default() {
+        Some(p) => p,
+        None => return (None, None, Some("Target URL has no port".into())),
+    };
+
+    let start = Instant::now();
+
+    let proxy_addr = format!("{}:{}", spec.host, spec.port);
+    let socket_addr = match proxy_addr.to_socket_addrs() {
+        Ok(mut a) => match a.next() {
+            Some(addr) => addr,
+            None => return (None, None, Some("Proxy resolves to no addresses".into())),
+        },
+        Err(e) => return (None, None, Some(format!("DNS: {e}"))),
+    };
+
+    let mut stream = match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(15)) {
+        Ok(s) => s,
+        Err(e) => return (Some(start.elapsed().as_millis()), None, Some(format!("Connect: {e}"))),
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(20)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(20)));
+
+    let mut request = format!(
+        "CONNECT {target_host}:{target_port} HTTP/1.1\r\n\
+         Host: {target_host}:{target_port}\r\n\
+         User-Agent: BeuMultiTool/3 (proxy-tester)\r\n\
+         Proxy-Connection: Keep-Alive\r\n"
+    );
+    if let (Some(u), Some(p)) = (&spec.user, &spec.pass) {
+        let creds = format!("{u}:{p}");
+        let encoded = base64::engine::general_purpose::STANDARD.encode(creds.as_bytes());
+        request.push_str(&format!("Proxy-Authorization: Basic {encoded}\r\n"));
+    }
+    request.push_str("\r\n");
+
+    if let Err(e) = stream.write_all(request.as_bytes()) {
+        return (Some(start.elapsed().as_millis()), None, Some(format!("Write: {e}")));
     }
 
-    let parts: Vec<&str> = rest.split(':').collect();
-    match parts.len() {
-        2 => Some(format!("{}://{}:{}", scheme, parts[0], parts[1])),
-        4 => {
-            let p1_num = !parts[1].is_empty() && parts[1].chars().all(|c| c.is_ascii_digit());
-            let p3_num = !parts[3].is_empty() && parts[3].chars().all(|c| c.is_ascii_digit());
-            // Disambiguate host:port:user:pass vs user:pass:host:port by which
-            // side has a numeric port. Default to host:port:user:pass when
-            // both or neither are numeric.
-            if p3_num && !p1_num {
-                Some(format!(
-                    "{}://{}:{}@{}:{}",
-                    scheme, parts[0], parts[1], parts[2], parts[3]
-                ))
+    // Read just enough to get the status line. Most proxies send headers in
+    // one packet; if not, we'll read what's available within timeout.
+    let mut buf = [0u8; 4096];
+    let n = match stream.read(&mut buf) {
+        Ok(n) => n,
+        Err(e) => return (Some(start.elapsed().as_millis()), None, Some(format!("Read: {e}"))),
+    };
+    let elapsed = start.elapsed().as_millis();
+
+    if n == 0 {
+        return (Some(elapsed), None, Some("Proxy closed connection without response".into()));
+    }
+
+    let resp = String::from_utf8_lossy(&buf[..n]);
+    let status_line = resp.lines().next().unwrap_or("");
+    let mut parts = status_line.split_whitespace();
+    let _version = parts.next();
+    let status_str = parts.next().unwrap_or("");
+    let status = status_str.parse::<u16>().ok();
+
+    match status {
+        Some(200) => (Some(elapsed), Some(200), None),
+        Some(code) => {
+            let reason: String = parts.collect::<Vec<_>>().join(" ");
+            let msg = if reason.is_empty() {
+                format!("Proxy returned {code}")
             } else {
-                Some(format!(
-                    "{}://{}:{}@{}:{}",
-                    scheme, parts[2], parts[3], parts[0], parts[1]
-                ))
-            }
+                format!("Proxy returned {code} {reason}")
+            };
+            (Some(elapsed), Some(code), Some(msg))
         }
-        _ => None,
+        None => (Some(elapsed), None, Some(format!("Bad proxy response: {status_line}"))),
     }
 }
 
-fn test_one(url: &str, raw: &str) -> ProxyTestEntry {
+/// Test a SOCKS5 proxy. Delegated to ureq since SOCKS handshake is non-trivial
+/// to roll by hand and ureq's socks support is solid (the bug is HTTP-proxy
+/// specific).
+fn test_socks(target_url_str: &str, spec: &ProxySpec) -> (Option<u128>, Option<u16>, Option<String>) {
     use std::time::{Duration, Instant};
 
-    let normalized = match parse_proxy_line(raw) {
-        Some(n) => n,
+    let proxy_url = spec.normalized_url();
+    let proxy = match ureq::Proxy::new(&proxy_url) {
+        Ok(p) => p,
+        Err(e) => return (None, None, Some(format!("Invalid SOCKS proxy: {e}"))),
+    };
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(15))
+        .timeout_read(Duration::from_secs(20))
+        .proxy(proxy)
+        .build();
+    let start = Instant::now();
+    let result = agent
+        .request("HEAD", target_url_str)
+        .set("User-Agent", "BeuMultiTool/3 (proxy-tester)")
+        .call();
+    let elapsed = start.elapsed().as_millis();
+    match result {
+        Ok(resp) => (Some(elapsed), Some(resp.status()), None),
+        Err(ureq::Error::Status(code, _)) => (Some(elapsed), Some(code), None),
+        Err(e) => (Some(elapsed), None, Some(e.to_string())),
+    }
+}
+
+fn test_one(url_str: &str, raw: &str) -> ProxyTestEntry {
+    let spec = match parse_proxy_line(raw) {
+        Some(s) => s,
         None => {
             return ProxyTestEntry {
                 raw: raw.to_string(),
@@ -637,60 +763,41 @@ fn test_one(url: &str, raw: &str) -> ProxyTestEntry {
             };
         }
     };
+    let normalized = spec.normalized_url();
 
-    let proxy = match ureq::Proxy::new(&normalized) {
-        Ok(p) => p,
+    let target_url = match url::Url::parse(url_str) {
+        Ok(u) => u,
         Err(e) => {
             return ProxyTestEntry {
                 raw: raw.to_string(),
                 normalized: Some(normalized),
                 latency_ms: None,
                 status: None,
-                error: Some(format!("Invalid proxy: {e}")),
+                error: Some(format!("Invalid target URL: {e}")),
             };
         }
     };
 
-    let agent = ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_secs(5))
-        .timeout_read(Duration::from_secs(10))
-        .proxy(proxy)
-        .build();
+    let (latency, status, error) = match spec.scheme.as_str() {
+        "socks4" | "socks5" | "socks5h" => test_socks(url_str, &spec),
+        _ => test_http_connect(&target_url, &spec),
+    };
 
-    let start = Instant::now();
-    let result = agent
-        .request("HEAD", url)
-        .set("User-Agent", "BeuMultiTool/3 (proxy-tester)")
-        .call();
-    let elapsed = start.elapsed().as_millis();
-
-    match result {
-        Ok(resp) => ProxyTestEntry {
-            raw: raw.to_string(),
-            normalized: Some(normalized),
-            latency_ms: Some(elapsed),
-            status: Some(resp.status()),
-            error: None,
-        },
-        Err(ureq::Error::Status(code, _)) => ProxyTestEntry {
-            raw: raw.to_string(),
-            normalized: Some(normalized),
-            latency_ms: Some(elapsed),
-            status: Some(code),
-            error: None,
-        },
-        Err(e) => ProxyTestEntry {
-            raw: raw.to_string(),
-            normalized: Some(normalized),
-            latency_ms: Some(elapsed),
-            status: None,
-            error: Some(e.to_string()),
-        },
+    ProxyTestEntry {
+        raw: raw.to_string(),
+        normalized: Some(normalized),
+        latency_ms: latency,
+        status,
+        error,
     }
 }
 
 #[tauri::command]
-pub async fn net_test_proxies(args: ProxyTestArgs) -> Result<Vec<ProxyTestEntry>, String> {
+pub async fn net_test_proxies(
+    app: AppHandle,
+    args: ProxyTestArgs,
+) -> Result<Vec<ProxyTestEntry>, String> {
+    use std::sync::atomic::Ordering;
     use std::sync::{Arc, Mutex};
     use std::thread;
 
@@ -709,10 +816,17 @@ pub async fn net_test_proxies(args: ProxyTestArgs) -> Result<Vec<ProxyTestEntry>
         return Ok(vec![]);
     }
 
+    let cancel = {
+        let state = app.state::<AppState>();
+        state.proxy_cancel.store(false, Ordering::Release);
+        state.proxy_cancel.clone()
+    };
+
     let total = proxies.len();
     let concurrency = args.concurrency.unwrap_or(10).clamp(1, 64).min(total);
+    let raw_lookup: Vec<String> = proxies.clone();
 
-    let queue: Vec<(usize, String)> = proxies.into_iter().enumerate().collect();
+    let queue: Vec<(usize, String)> = proxies.into_iter().enumerate().rev().collect();
     let queue = Arc::new(Mutex::new(queue));
     let results: Arc<Mutex<Vec<Option<ProxyTestEntry>>>> =
         Arc::new(Mutex::new(vec![None; total]));
@@ -722,15 +836,18 @@ pub async fn net_test_proxies(args: ProxyTestArgs) -> Result<Vec<ProxyTestEntry>
             let q = queue.clone();
             let r = results.clone();
             let url = url.clone();
+            let cancel = cancel.clone();
             thread::spawn(move || loop {
-                let next = { q.lock().unwrap().pop() };
-                match next {
-                    Some((idx, raw)) => {
-                        let entry = test_one(&url, &raw);
-                        r.lock().unwrap()[idx] = Some(entry);
-                    }
-                    None => return,
+                if cancel.load(Ordering::Acquire) {
+                    return;
                 }
+                let next = { q.lock().unwrap().pop() };
+                let Some((idx, raw)) = next else { return };
+                if cancel.load(Ordering::Acquire) {
+                    return;
+                }
+                let entry = test_one(&url, &raw);
+                r.lock().unwrap()[idx] = Some(entry);
             })
         })
         .collect();
@@ -739,20 +856,31 @@ pub async fn net_test_proxies(args: ProxyTestArgs) -> Result<Vec<ProxyTestEntry>
         let _ = h.join();
     }
 
-    let out = Arc::try_unwrap(results)
+    let arr = Arc::try_unwrap(results)
         .map_err(|_| "result lock leak".to_string())?
         .into_inner()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    let out: Vec<ProxyTestEntry> = arr
         .into_iter()
-        .map(|o| o.unwrap_or(ProxyTestEntry {
-            raw: String::new(),
-            normalized: None,
-            latency_ms: None,
-            status: None,
-            error: Some("missing result".into()),
-        }))
+        .enumerate()
+        .map(|(idx, slot)| {
+            slot.unwrap_or_else(|| ProxyTestEntry {
+                raw: raw_lookup.get(idx).cloned().unwrap_or_default(),
+                normalized: None,
+                latency_ms: None,
+                status: None,
+                error: Some("Canceled".into()),
+            })
+        })
         .collect();
     Ok(out)
+}
+
+#[tauri::command]
+pub fn net_cancel_proxies(app: AppHandle) {
+    use std::sync::atomic::Ordering;
+    let state = app.state::<AppState>();
+    state.proxy_cancel.store(true, Ordering::Release);
 }
 
 // ---------- Windows APPCOMMAND hook (Mouse4/Mouse5) ----------

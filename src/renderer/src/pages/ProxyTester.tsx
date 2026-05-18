@@ -10,10 +10,17 @@ type Props = {
   active?: boolean
 }
 
+const StopIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
+    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+  </svg>
+)
+
 export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
   const [url, setUrl] = useState('https://btcollectibles.com')
   const [filePath, setFilePath] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+  const [stopping, setStopping] = useState(false)
   const [results, setResults] = useState<ProxyTestEntry[] | null>(null)
   const [savedTo, setSavedTo] = useState<string | null>(null)
   const [lineCount, setLineCount] = useState(0)
@@ -56,6 +63,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
     if (proxies.length === 0) return
 
     setRunning(true)
+    setStopping(false)
     setResults(null)
     setSavedTo(null)
     onSetStatus(`Testing ${proxies.length.toLocaleString()} proxies against ${trimmedUrl}...`)
@@ -64,7 +72,12 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
       const res = await window.api.net.testProxies({ url: trimmedUrl, proxies, concurrency: 10 })
       setResults(res)
       const ok = res.filter((r) => r.error == null).length
-      onSetStatus(`${ok.toLocaleString()} / ${res.length.toLocaleString()} working`)
+      const canceled = res.filter((r) => r.error === 'Canceled').length
+      onSetStatus(
+        canceled > 0
+          ? `Stopped: ${ok.toLocaleString()} working, ${canceled.toLocaleString()} canceled`
+          : `${ok.toLocaleString()} / ${res.length.toLocaleString()} working`
+      )
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       onSetStatus(`Failed: ${message}`)
@@ -73,6 +86,18 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
       const min = 300
       if (elapsed < min) await new Promise((r) => setTimeout(r, min - elapsed))
       setRunning(false)
+      setStopping(false)
+    }
+  }
+
+  async function handleStop() {
+    if (!running || stopping) return
+    setStopping(true)
+    onSetStatus('Stopping... (in-flight requests will finish)')
+    try {
+      await window.api.net.cancelProxies()
+    } catch {
+      // ignore
     }
   }
 
@@ -120,14 +145,21 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
       }
       actions={
         <>
-          <Button onClick={handleClear} variant="ghost">
+          <Button onClick={handleClear} variant="ghost" disabled={running}>
             <Icons.Trash />
             Clear
           </Button>
-          <Button onClick={handleRun} variant="primary" disabled={!canRun}>
-            <Icons.Play />
-            {running ? 'Testing…' : 'Test All'}
-          </Button>
+          {running ? (
+            <Button onClick={handleStop} variant="secondary" disabled={stopping}>
+              <StopIcon />
+              {stopping ? 'Stopping…' : 'Stop'}
+            </Button>
+          ) : (
+            <Button onClick={handleRun} variant="primary" disabled={!canRun}>
+              <Icons.Play />
+              Test All
+            </Button>
+          )}
         </>
       }
     >

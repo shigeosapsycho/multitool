@@ -1,6 +1,6 @@
 [package]
 name = "beu-multitool"
-version = "3.1.0"
+version = "3.1.1"
 description = "Beu MultiTool - desktop edition"
 authors = ["beu"]
 edition = "2021"
@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 notify = "6"
@@ -27,6 +28,8 @@ rand = "0.8"
 anyhow = "1"
 # Self-updater HTTP client (GitHub Releases API + asset download).
 ureq = { version = "2", features = ["json", "socks-proxy"] }
+base64 = "0.22"
+url = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.59", features = [

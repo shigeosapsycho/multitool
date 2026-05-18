@@ -186,7 +186,8 @@ export const api = {
   },
   net: {
     testProxies: (args: { url: string; proxies: string[]; concurrency?: number }) =>
-      invoke<ProxyTestEntry[]>('net_test_proxies', { args })
+      invoke<ProxyTestEntry[]>('net_test_proxies', { args }),
+    cancelProxies: () => invoke<void>('net_cancel_proxies')
   },
   updater: {
     onStatus: (cb: (status: UpdaterStatus) => void) =>

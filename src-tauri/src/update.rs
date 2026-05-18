@@ -153,7 +153,14 @@ fn download(app: &AppHandle, url: &str, expected: u64) -> Result<PathBuf> {
 
 /// Swaps the staged `.new` exe into place and relaunches. Windows allows
 /// renaming a running exe, so this is just two renames + spawn + exit.
-pub fn apply_and_restart() -> Result<()> {
+pub fn apply_and_restart(app: &AppHandle) -> Result<()> {
+    // Persist window size/position before exiting so the relaunched .exe
+    // restores them. The plugin debounces auto-saves on resize/move, but
+    // process::exit below bypasses Tauri's normal shutdown choreography,
+    // so we save explicitly here as a guarantee.
+    use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+    let _ = app.save_window_state(StateFlags::all());
+
     let exe = std::env::current_exe().context("current_exe")?;
     let dir = exe.parent().context("exe parent")?;
     let new_exe = dir.join(format!("{ASSET_NAME}.new"));
@@ -312,8 +319,8 @@ pub async fn updater_check(app: AppHandle) -> Result<UpdaterResult, String> {
 /// Applies the staged update and relaunches. Does not return on success — the
 /// process exits inside `apply_and_restart`.
 #[tauri::command]
-pub fn updater_apply_and_restart() -> Result<(), String> {
-    apply_and_restart().map_err(|e| e.to_string())
+pub fn updater_apply_and_restart(app: AppHandle) -> Result<(), String> {
+    apply_and_restart(&app).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
