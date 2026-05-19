@@ -2,7 +2,7 @@ name: build
 
 # Builds the Tauri app on Windows.
 #  - PRs to main         -> build only (verify main still compiles)
-#  - pushing a v* tag    -> build + create a DRAFT GitHub release
+#  - pushing a v* tag    -> build + publish a GitHub release (live, not draft)
 #  - workflow_dispatch   -> manual run from the Actions tab
 #
 # Plain pushes to main are NOT built — when you tag a release, pushing main
@@ -10,15 +10,15 @@ name: build
 # run produces the release the in-app self-updater needs, so the main-push
 # trigger is omitted.
 #
-# The release is a DRAFT on purpose: review the attached files, then click
-# Publish. The in-app self-updater only sees PUBLISHED releases (it queries
-# releases/latest), so a draft ships nothing until you publish it.
+# Releases publish directly (no draft). The tag push is the publish trigger,
+# and the in-app self-updater (queries releases/latest) picks the new version
+# up on the next launch.
 #
 # To cut a release:
 #   1. Bump the version in package.json, src-tauri/Cargo.toml and
 #      src-tauri/tauri.conf.json (all three must match).
-#   2. Commit + push, then: git tag v3.1.2 && git push origin v3.1.2
-#   3. Wait for this workflow, review the draft release, click Publish.
+#   2. Commit + push, then: git tag v3.1.4 && git push origin v3.1.4
+#   3. Wait for this workflow — release goes live automatically.
 
 on:
   push:
@@ -78,12 +78,13 @@ jobs:
       # Only tag pushes create a release. beu-multitool.exe MUST keep this
       # exact filename — it's the asset the in-app self-updater downloads
       # (ASSET_NAME in src-tauri/src/update.rs).
-      - name: Publish draft release
+      - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          draft: true
+          draft: false
+          make_latest: true
           generate_release_notes: true
           files: |
             src-tauri/target/release/beu-multitool.exe
