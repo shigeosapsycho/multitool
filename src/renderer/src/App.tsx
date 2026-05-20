@@ -47,6 +47,7 @@ export default function App() {
   const [updateReady, setUpdateReady] = useState(false)
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
   const [restarting, setRestarting] = useState(false)
+  const [oldVersionRemoved, setOldVersionRemoved] = useState(false)
   const [filePreview, setFilePreview] = useState(false)
   const [deleteToTrash, setDeleteToTrash] = useState(true)
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
@@ -128,9 +129,22 @@ export default function App() {
         { time: Date.now(), message: `Updated to v${version}.`, kind: 'success' }
       ])
     })
+    // Fires on the launch where the legacy Electron build was uninstalled.
+    const offOldVersion = window.api.app.onOldVersionRemoved(() => {
+      setOldVersionRemoved(true)
+      setLogs((prev) => [
+        ...prev,
+        {
+          time: Date.now(),
+          message: 'Removed the previous (Electron) version of Beu MultiTool.',
+          kind: 'success'
+        }
+      ])
+    })
     return () => {
       offStatus()
       offUpgrade()
+      offOldVersion()
     }
   }, [])
 
@@ -312,6 +326,13 @@ export default function App() {
           })}
         </main>
       </div>
+      {oldVersionRemoved && (
+        <StatusBar
+          message="Cleaned up the previous version of Beu MultiTool."
+          actionLabel="Dismiss"
+          onAction={() => setOldVersionRemoved(false)}
+        />
+      )}
       {updateReady && (
         <StatusBar
           message={
