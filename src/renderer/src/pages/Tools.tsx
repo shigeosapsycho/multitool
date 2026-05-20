@@ -5,40 +5,10 @@ import { setPendingFile } from '../lib/pending'
 
 const tools: ToolMeta[] = [
   {
-    id: 'find-duplicates',
-    title: 'Find Duplicates',
-    description: 'Lines that appear more than once — in one file or across two.',
-    accent: '#7c5cff'
-  },
-  {
-    id: 'remove-passwords',
-    title: 'Remove Passwords',
-    description: 'Strip the :password from a user:pass list.',
-    accent: '#f87171'
-  },
-  {
-    id: 'find-non-duplicates',
-    title: 'Find Non-Duplicates',
-    description: 'Lines that appear only once — in one file or across two.',
-    accent: '#f59e0b'
-  },
-  {
-    id: 'split-by-n',
-    title: 'Split by Number',
-    description: 'Split a file into N evenly-sized parts.',
-    accent: '#22d3ee'
-  },
-  {
-    id: 'randomize',
-    title: 'Randomize List',
-    description: 'Shuffle the lines in random order.',
-    accent: '#f472b6'
-  },
-  {
-    id: 'search-master',
-    title: 'Search Master',
-    description: 'Find items from a search list that also appear in a master list.',
-    accent: '#34d399'
+    id: 'csv-email-pass',
+    title: 'CSV → Email:Password',
+    description: 'Pull email & password columns from a CSV into an email:password list.',
+    accent: '#60a5fa'
   },
   {
     id: 'email-filter',
@@ -47,10 +17,16 @@ const tools: ToolMeta[] = [
     accent: '#2dd4bf'
   },
   {
-    id: 'csv-email-pass',
-    title: 'CSV → Email:Password',
-    description: 'Pull email & password columns from a CSV into an email:password list.',
-    accent: '#60a5fa'
+    id: 'find-duplicates',
+    title: 'Find Duplicates',
+    description: 'Lines that appear more than once — in one file or across two.',
+    accent: '#7c5cff'
+  },
+  {
+    id: 'find-non-duplicates',
+    title: 'Find Non-Duplicates',
+    description: 'Lines that appear only once — in one file or across two.',
+    accent: '#f59e0b'
   },
   {
     id: 'proxy-tester',
@@ -59,10 +35,34 @@ const tools: ToolMeta[] = [
     accent: '#38bdf8'
   },
   {
+    id: 'randomize',
+    title: 'Randomize List',
+    description: 'Shuffle the lines in random order.',
+    accent: '#f472b6'
+  },
+  {
+    id: 'remove-passwords',
+    title: 'Remove Passwords',
+    description: 'Strip the :password from a user:pass list.',
+    accent: '#f87171'
+  },
+  {
     id: 'reverse-list',
     title: 'Reverse List',
     description: 'Reverse the order of lines in a file.',
     accent: '#c084fc'
+  },
+  {
+    id: 'search-master',
+    title: 'Search Master',
+    description: 'Find items from a search list that also appear in a master list.',
+    accent: '#34d399'
+  },
+  {
+    id: 'split-by-n',
+    title: 'Split by Number',
+    description: 'Split a file into N evenly-sized parts.',
+    accent: '#22d3ee'
   }
 ]
 
@@ -166,16 +166,16 @@ const ReverseListIcon = () => (
 )
 
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
-  'find-duplicates': DuplicatesIcon,
-  'remove-passwords': KeyIcon,
-  'find-non-duplicates': StarIcon,
-  'split-by-n': SplitByNumberIcon,
-  'randomize': DiceIcon,
-  'search-master': SearchIcon,
-  'email-filter': FunnelIcon,
   'csv-email-pass': CsvEmailPassIcon,
+  'email-filter': FunnelIcon,
+  'find-duplicates': DuplicatesIcon,
+  'find-non-duplicates': StarIcon,
   'proxy-tester': ProxyTesterIcon,
-  'reverse-list': ReverseListIcon
+  'randomize': DiceIcon,
+  'remove-passwords': KeyIcon,
+  'reverse-list': ReverseListIcon,
+  'search-master': SearchIcon,
+  'split-by-n': SplitByNumberIcon
 }
 
 function ToolCard({
