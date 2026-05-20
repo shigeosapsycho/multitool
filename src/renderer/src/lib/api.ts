@@ -56,6 +56,8 @@ export type ScanResult = { emails: EmailHeader[]; cancelled: boolean }
 
 export type DeleteResult = { deleted: number; failed: number[] }
 
+export type EmailBody = { html: string | null; text: string | null }
+
 type UpdaterStatus =
   | { type: 'checking'; currentVersion: string }
   | { type: 'no-update'; currentVersion: string }
@@ -233,7 +235,9 @@ export const api = {
       invoke<ScanResult>('imap_scan', { id, range }),
     cancel: () => invoke<void>('imap_cancel'),
     delete: (id: string, uids: number[], permanent: boolean) =>
-      invoke<DeleteResult>('imap_delete', { id, uids, permanent })
+      invoke<DeleteResult>('imap_delete', { id, uids, permanent }),
+    fetchBody: (id: string, uid: number) =>
+      invoke<EmailBody>('imap_fetch_body', { id, uid })
   },
   updater: {
     onStatus: (cb: (status: UpdaterStatus) => void) =>

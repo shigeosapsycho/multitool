@@ -35,6 +35,7 @@ imap = "2.4"
 native-tls = "0.2"
 keyring = { version = "3", features = ["windows-native"] }
 rfc2047-decoder = "1"
+mailparse = "0.15"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.59", features = [

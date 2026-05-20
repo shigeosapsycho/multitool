@@ -114,6 +114,7 @@ pub fn run() {
             imap_cleaner::imap_scan,
             imap_cleaner::imap_cancel,
             imap_cleaner::imap_delete,
+            imap_cleaner::imap_fetch_body,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

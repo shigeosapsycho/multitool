@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { EmailHeader } from '../lib/api'
+import { ContextMenu } from '../components/ContextMenu'
 
 export type SenderGroup = {
   /** Stable identity for this group — used as the React key and expand key. */
@@ -91,6 +93,21 @@ const CaretIcon = ({ open }: { open: boolean }) => (
   </svg>
 )
 
+const EyeIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4"
+  >
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
 /** Tri-state checkbox: checked, unchecked, or indeterminate (some selected). */
 function Check({
   state,
@@ -130,6 +147,7 @@ type Props = {
   onToggleGroup: (group: SenderGroup) => void
   onToggleEmail: (uid: number) => void
   onToggleExpand: (addr: string) => void
+  onPreview: (email: EmailHeader) => void
 }
 
 export function EmailCleanerGroups({
@@ -138,8 +156,11 @@ export function EmailCleanerGroups({
   expanded,
   onToggleGroup,
   onToggleEmail,
-  onToggleExpand
+  onToggleExpand,
+  onPreview
 }: Props) {
+  const [menu, setMenu] = useState<{ x: number; y: number; email: EmailHeader } | null>(null)
+
   return (
     <div className="min-h-0 flex-1 overflow-auto">
       {groups.map((g) => {
@@ -182,7 +203,11 @@ export function EmailCleanerGroups({
                       // than aiming for the checkbox.
                       if (ev.ctrlKey || ev.metaKey) onToggleEmail(e.uid)
                     }}
-                    title="Ctrl+click to select"
+                    onContextMenu={(ev) => {
+                      ev.preventDefault()
+                      setMenu({ x: ev.clientX, y: ev.clientY, email: e })
+                    }}
+                    title="Ctrl+click to select · right-click to preview"
                     className="flex select-none items-center gap-2.5 py-1.5 pl-11 pr-3 hover:bg-surface-2"
                   >
                     <Check
@@ -205,6 +230,20 @@ export function EmailCleanerGroups({
           </div>
         )
       })}
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            {
+              label: 'Preview email',
+              icon: <EyeIcon />,
+              onClick: () => onPreview(menu.email)
+            }
+          ]}
+        />
+      )}
     </div>
   )
 }

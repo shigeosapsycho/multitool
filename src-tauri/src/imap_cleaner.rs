@@ -48,6 +48,16 @@ pub struct ScanResult {
     pub cancelled: bool,
 }
 
+/// The body of one email, fetched on demand for the preview popup.
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailBody {
+    /// The `text/html` part, if the message has one.
+    pub html: Option<String>,
+    /// The `text/plain` part, if the message has one.
+    pub text: Option<String>,
+}
+
 /// A mailbox folder and its IMAP special-use attributes (e.g. `\Trash`).
 #[derive(Debug, Clone)]
 pub struct FolderInfo {
@@ -332,6 +342,55 @@ fn delete_emails(
     })
 }
 
+/// Walk a parsed MIME tree, collecting the first `text/html` and the first
+/// `text/plain` part into `html` / `text`.
+fn extract_bodies(
+    mail: &mailparse::ParsedMail,
+    html: &mut Option<String>,
+    text: &mut Option<String>,
+) {
+    match mail.ctype.mimetype.to_ascii_lowercase().as_str() {
+        "text/html" if html.is_none() => {
+            if let Ok(body) = mail.get_body() {
+                *html = Some(body);
+            }
+        }
+        "text/plain" if text.is_none() => {
+            if let Ok(body) = mail.get_body() {
+                *text = Some(body);
+            }
+        }
+        _ => {}
+    }
+    for sub in &mail.subparts {
+        extract_bodies(sub, html, text);
+    }
+}
+
+/// Fetch one message's raw source and split it into HTML / plain-text parts.
+/// Uses `BODY.PEEK[]` so previewing does not mark the message as read.
+fn fetch_body(session: &mut ImapSession, uid: u32) -> Result<EmailBody, String> {
+    session
+        .select("INBOX")
+        .map_err(|e| format!("Could not open INBOX: {e}"))?;
+    let fetches = session
+        .uid_fetch(uid.to_string(), "BODY.PEEK[]")
+        .map_err(|e| format!("Fetching the message failed: {e}"))?;
+    let fetch = fetches
+        .iter()
+        .next()
+        .ok_or_else(|| "That message no longer exists in the inbox.".to_string())?;
+    let raw = fetch
+        .body()
+        .ok_or_else(|| "The message had no content.".to_string())?;
+    let parsed =
+        mailparse::parse_mail(raw).map_err(|e| format!("Could not parse the message: {e}"))?;
+    let mut html = None;
+    let mut text = None;
+    extract_bodies(&parsed, &mut html, &mut text);
+    Ok(EmailBody { html, text })
+}
+
 // ---------- Tauri commands ----------
 
 use crate::AppState;
@@ -491,6 +550,23 @@ pub async fn imap_delete(
     tauri::async_runtime::spawn_blocking(move || {
         let mut session = connect_session(&account, &password)?;
         let result = delete_emails(&mut session, &uids, permanent);
+        let _ = session.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+#[tauri::command]
+pub async fn imap_fetch_body(
+    app: AppHandle,
+    id: String,
+    uid: u32,
+) -> Result<EmailBody, String> {
+    let (account, password) = account_with_password(&app, &id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut session = connect_session(&account, &password)?;
+        let result = fetch_body(&mut session, uid);
         let _ = session.logout();
         result
     })

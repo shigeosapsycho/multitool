@@ -3,8 +3,9 @@ import { ToolLayout, Button, Icons } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { Select } from '../components/Select'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import type { ImapAccount, EmailHeader, ScanRange, ScanResult } from '../lib/api'
+import type { ImapAccount, EmailHeader, ScanRange, ScanResult, EmailBody } from '../lib/api'
 import { EmailCleanerGroups, groupBySender } from './EmailCleanerGroups'
+import { EmailPreview } from './EmailPreview'
 
 type Props = {
   onBack: () => void
@@ -85,6 +86,12 @@ export function EmailCleanerPage({ onBack }: Props) {
   const [deleting, setDeleting] = useState(false)
   const [status, setStatus] = useState('Pick an account and a date range, then scan the inbox.')
   const [search, setSearch] = useState('')
+  const [preview, setPreview] = useState<{
+    email: EmailHeader
+    body: EmailBody | null
+    loading: boolean
+    error: string | null
+  } | null>(null)
 
   // Load saved accounts on first mount.
   useEffect(() => {
@@ -316,6 +323,21 @@ export function EmailCleanerPage({ onBack }: Props) {
       }
       return next
     })
+  }
+
+  // ---------- preview ----------
+
+  async function handlePreview(email: EmailHeader) {
+    if (!selectedId) return
+    setPreview({ email, body: null, loading: true, error: null })
+    try {
+      const body = await window.api.imap.fetchBody(selectedId, email.uid)
+      setPreview((p) => (p && p.email.uid === email.uid ? { ...p, body, loading: false } : p))
+    } catch (e) {
+      setPreview((p) =>
+        p && p.email.uid === email.uid ? { ...p, loading: false, error: String(e) } : p
+      )
+    }
   }
 
   // ---------- delete ----------
@@ -582,6 +604,7 @@ export function EmailCleanerPage({ onBack }: Props) {
                 onToggleGroup={toggleGroup}
                 onToggleEmail={toggleEmail}
                 onToggleExpand={toggleExpand}
+                onPreview={handlePreview}
               />
             )}
             <div className="flex items-center gap-3 border-t border-border p-3">
@@ -634,6 +657,16 @@ export function EmailCleanerPage({ onBack }: Props) {
         onConfirm={confirmDelete}
         onCancel={() => setConfirmOpen(false)}
       />
+
+      {preview && (
+        <EmailPreview
+          email={preview.email}
+          body={preview.body}
+          loading={preview.loading}
+          error={preview.error}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </ToolLayout>
   )
 }
