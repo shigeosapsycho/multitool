@@ -136,7 +136,7 @@ use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Concrete IMAP session type — always TLS, so no generics needed.
-type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
+pub(crate) type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
 
 /// Process UIDs in batches of this many so a huge inbox does not become one
 /// enormous FETCH or DELETE command line, and so cancellation can be checked
@@ -144,7 +144,10 @@ type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
 const IMAP_BATCH: usize = 500;
 
 /// Open an IMAP-over-TLS connection and log in.
-fn connect_session(account: &ImapAccount, password: &str) -> Result<ImapSession, String> {
+pub(crate) fn connect_session(
+    account: &ImapAccount,
+    password: &str,
+) -> Result<ImapSession, String> {
     let tls = native_tls::TlsConnector::builder()
         .build()
         .map_err(|e| format!("TLS initialisation failed: {e}"))?;
@@ -168,7 +171,7 @@ fn connect_session(account: &ImapAccount, password: &str) -> Result<ImapSession,
 }
 
 /// Convert one IMAP FETCH result into an `EmailHeader`.
-fn fetch_to_header(f: &imap::types::Fetch) -> EmailHeader {
+pub(crate) fn fetch_to_header(f: &imap::types::Fetch) -> EmailHeader {
     let env = f.envelope();
     let subject = env
         .and_then(|e| e.subject.as_ref())
@@ -473,7 +476,7 @@ pub async fn imap_delete_account(app: AppHandle, id: String) -> Result<(), Strin
 }
 
 /// Look up an account by id and load its password from the credential store.
-fn account_with_password(
+pub(crate) fn account_with_password(
     app: &AppHandle,
     id: &str,
 ) -> Result<(ImapAccount, String), String> {

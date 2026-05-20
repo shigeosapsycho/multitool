@@ -44,6 +44,7 @@ const items: SidebarItem[] = [
 
 const TOOL_ROUTES = new Set<Route>([
   'csv-email-pass',
+  'email-unsubscribe',
   'find-duplicates',
   'find-non-duplicates',
   'randomize',
