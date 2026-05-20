@@ -43,12 +43,12 @@ const items: SidebarItem[] = [
 ]
 
 const TOOL_ROUTES = new Set<Route>([
+  'csv-email-pass',
   'find-duplicates',
-  'remove-passwords',
   'find-non-duplicates',
-  'split-by-n',
   'randomize',
-  'csv-email-pass'
+  'remove-passwords',
+  'split-by-n'
 ])
 
 function topLevelOf(route: Route): SidebarItem['id'] {
