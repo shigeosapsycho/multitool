@@ -129,6 +129,14 @@ pub fn decode_header(raw: &[u8]) -> String {
     rfc2047_decoder::decode(raw).unwrap_or_else(|_| String::from_utf8_lossy(raw).into_owned())
 }
 
+/// Wrap an IMAP mailbox name as a quoted string, escaping `\` and `"`.
+/// `uid_copy` in the imap crate does not quote its mailbox argument, so a name
+/// containing a space — such as iCloud's "Deleted Messages" — must be quoted
+/// here or the `UID COPY` command is malformed.
+pub fn quote_mailbox(name: &str) -> String {
+    format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 // ---------- IMAP operations ----------
 
 use crate::config::ImapAccount;
@@ -327,8 +335,12 @@ fn delete_emails(
                     .uid_mv(&set, trash)
                     .map_err(|e| format!("Moving messages to {trash} failed: {e}"))?;
             } else {
+                // The imap crate's `uid_copy` — unlike `uid_mv` — does not
+                // quote the mailbox name, so a name with a space (e.g.
+                // iCloud's "Deleted Messages") yields a malformed command.
+                // Quote it here.
                 session
-                    .uid_copy(&set, trash)
+                    .uid_copy(&set, quote_mailbox(trash))
                     .map_err(|e| format!("Copying messages to {trash} failed: {e}"))?;
                 session
                     .uid_store(&set, "+FLAGS (\\Deleted)")
@@ -656,5 +668,12 @@ mod tests {
     fn decode_header_decodes_encoded_word() {
         // "=?UTF-8?B?w6lj?=" is base64 "éc".
         assert_eq!(decode_header(b"=?UTF-8?B?w6lj?="), "éc");
+    }
+
+    #[test]
+    fn quote_mailbox_wraps_and_escapes() {
+        assert_eq!(quote_mailbox("Deleted Messages"), "\"Deleted Messages\"");
+        assert_eq!(quote_mailbox("Trash"), "\"Trash\"");
+        assert_eq!(quote_mailbox("a\"b\\c"), "\"a\\\"b\\\\c\"");
     }
 }
