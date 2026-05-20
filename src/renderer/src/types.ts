@@ -1,10 +1,8 @@
 export type Route =
   | 'tools'
   | 'find-duplicates'
-  | 'find-duplicates-2'
   | 'remove-passwords'
   | 'find-non-duplicates'
-  | 'find-non-duplicates-2'
   | 'split-by-n'
   | 'randomize'
   | 'search-master'
