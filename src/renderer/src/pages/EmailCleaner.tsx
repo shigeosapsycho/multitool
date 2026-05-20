@@ -3,7 +3,7 @@ import { ToolLayout, Button, Icons } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { Select } from '../components/Select'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import type { ImapAccount, EmailHeader, ScanRange } from '../lib/api'
+import type { ImapAccount, EmailHeader, ScanRange, ScanResult } from '../lib/api'
 import { EmailCleanerGroups, groupBySender } from './EmailCleanerGroups'
 
 type Props = {
@@ -163,6 +163,7 @@ export function EmailCleanerPage({ onBack }: Props) {
       setSelectedId(list[0]?.id ?? null)
       setEmails(null)
       setSelected(new Set())
+      setExpanded(new Set())
       setStatus('Account removed.')
     } catch (e) {
       setStatus(`Could not remove account: ${String(e)}`)
@@ -196,12 +197,22 @@ export function EmailCleanerPage({ onBack }: Props) {
     setStatus('Scanning inbox…')
     try {
       const result = await window.api.imap.scan(selectedId, range)
-      setEmails(result)
-      setStatus(
-        result.length === 0
-          ? 'No emails found in that range.'
-          : `Found ${result.length.toLocaleString()} emails from ${groupBySender(result).length} senders.`
-      )
+      setEmails(result.emails)
+      if (result.cancelled) {
+        setStatus(
+          `Scan stopped — showing ${result.emails.length.toLocaleString()} ${
+            result.emails.length === 1 ? 'email' : 'emails'
+          } found before stopping.`
+        )
+      } else {
+        setStatus(
+          result.emails.length === 0
+            ? 'No emails found in that range.'
+            : `Found ${result.emails.length.toLocaleString()} emails from ${groupBySender(
+                result.emails
+              ).length} senders.`
+        )
+      }
     } catch (e) {
       setStatus(`Scan failed: ${String(e)}`)
     } finally {

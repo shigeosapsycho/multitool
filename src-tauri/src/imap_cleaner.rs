@@ -39,6 +39,15 @@ pub struct DeleteResult {
     pub failed: Vec<u32>,
 }
 
+/// Result of an inbox scan. `cancelled` is true when the user stopped the
+/// scan before it finished — `emails` then holds only what was fetched so far.
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanResult {
+    pub emails: Vec<EmailHeader>,
+    pub cancelled: bool,
+}
+
 /// A mailbox folder and its IMAP special-use attributes (e.g. `\Trash`).
 #[derive(Debug, Clone)]
 pub struct FolderInfo {
@@ -197,7 +206,7 @@ fn scan_inbox(
     session: &mut ImapSession,
     range: &ScanRange,
     cancel: &AtomicBool,
-) -> Result<Vec<EmailHeader>, String> {
+) -> Result<ScanResult, String> {
     session
         .select("INBOX")
         .map_err(|e| format!("Could not open INBOX: {e}"))?;
@@ -209,8 +218,10 @@ fn scan_inbox(
     uid_list.sort_unstable();
 
     let mut out: Vec<EmailHeader> = Vec::with_capacity(uid_list.len());
+    let mut cancelled = false;
     for chunk in uid_list.chunks(IMAP_BATCH) {
         if cancel.load(Ordering::Acquire) {
+            cancelled = true;
             break;
         }
         let set = chunk
@@ -228,7 +239,7 @@ fn scan_inbox(
             out.push(fetch_to_header(f));
         }
     }
-    Ok(out)
+    Ok(ScanResult { emails: out, cancelled })
 }
 
 /// List all folders and pick the Trash folder.
@@ -444,8 +455,10 @@ pub async fn imap_scan(
     app: AppHandle,
     id: String,
     range: ScanRange,
-) -> Result<Vec<EmailHeader>, String> {
+) -> Result<ScanResult, String> {
     let (account, password) = account_with_password(&app, &id)?;
+    // Reset before each scan so a Stop click left over from a previous scan
+    // cannot abort this one. This is what makes the shared flag safe.
     let cancel = {
         let state = app.state::<AppState>();
         state.imap_cancel.store(false, Ordering::Release);

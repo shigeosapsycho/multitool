@@ -52,6 +52,8 @@ export type ScanRange =
   | { mode: 'dateRange'; from: string; to: string }
   | { mode: 'lastDays'; days: number }
 
+export type ScanResult = { emails: EmailHeader[]; cancelled: boolean }
+
 export type DeleteResult = { deleted: number; failed: number[] }
 
 type UpdaterStatus =
@@ -228,7 +230,7 @@ export const api = {
     deleteAccount: (id: string) => invoke<void>('imap_delete_account', { id }),
     test: (id: string) => invoke<void>('imap_test', { id }),
     scan: (id: string, range: ScanRange) =>
-      invoke<EmailHeader[]>('imap_scan', { id, range }),
+      invoke<ScanResult>('imap_scan', { id, range }),
     cancel: () => invoke<void>('imap_cancel'),
     delete: (id: string, uids: number[], permanent: boolean) =>
       invoke<DeleteResult>('imap_delete', { id, uids, permanent })
