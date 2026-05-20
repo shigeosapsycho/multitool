@@ -15,6 +15,7 @@ import { EmailFilterPage } from './pages/EmailFilter'
 import { CsvEmailPassPage } from './pages/CsvEmailPass'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { ReverseListPage } from './pages/ReverseList'
+import { EmailCleanerPage } from './pages/EmailCleaner'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 import { LogsPage } from './pages/Logs'
@@ -31,7 +32,8 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'email-filter',
   'csv-email-pass',
   'proxy-tester',
-  'reverse-list'
+  'reverse-list',
+  'email-cleaner'
 ]
 
 function isToolRoute(r: Route): boolean {
@@ -247,6 +249,8 @@ export default function App() {
         return <ProxyTesterPage {...props} />
       case 'reverse-list':
         return <ReverseListPage {...props} />
+      case 'email-cleaner':
+        return <EmailCleanerPage {...props} />
       default:
         return null
     }

@@ -63,6 +63,12 @@ const tools: ToolMeta[] = [
     title: 'Reverse List',
     description: 'Reverse the order of lines in a file.',
     accent: '#c084fc'
+  },
+  {
+    id: 'email-cleaner',
+    title: 'Email Cleaner',
+    description: 'Scan an IMAP inbox by date and delete unwanted email.',
+    accent: '#fb7185'
   }
 ]
 
@@ -165,6 +171,14 @@ const ReverseListIcon = () => (
   </svg>
 )
 
+const EmailCleanerIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+    <path d="M8 21l3-3M16 21l-3-3" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
   'remove-passwords': KeyIcon,
@@ -175,7 +189,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'email-filter': FunnelIcon,
   'csv-email-pass': CsvEmailPassIcon,
   'proxy-tester': ProxyTesterIcon,
-  'reverse-list': ReverseListIcon
+  'reverse-list': ReverseListIcon,
+  'email-cleaner': EmailCleanerIcon
 }
 
 function ToolCard({
