@@ -41,6 +41,28 @@ const StopIcon = () => (
 const fieldClass =
   'h-9 rounded-lg border border-border bg-surface px-3 text-[12.5px] text-text-primary outline-none transition focus:border-accent'
 
+// Known IMAP providers keyed by email domain. When the user types an email
+// whose domain is listed here, the host and port fields are auto-filled.
+const IMAP_PROVIDERS: Record<string, { host: string; port: number }> = {
+  'gmail.com': { host: 'imap.gmail.com', port: 993 },
+  'googlemail.com': { host: 'imap.gmail.com', port: 993 },
+  'outlook.com': { host: 'outlook.office365.com', port: 993 },
+  'hotmail.com': { host: 'outlook.office365.com', port: 993 },
+  'live.com': { host: 'outlook.office365.com', port: 993 },
+  'msn.com': { host: 'outlook.office365.com', port: 993 },
+  'icloud.com': { host: 'imap.mail.me.com', port: 993 },
+  'me.com': { host: 'imap.mail.me.com', port: 993 },
+  'mac.com': { host: 'imap.mail.me.com', port: 993 },
+  'yahoo.com': { host: 'imap.mail.yahoo.com', port: 993 },
+  'aol.com': { host: 'imap.aol.com', port: 993 }
+}
+
+/** Look up IMAP host/port for an email address's domain, if known. */
+function providerFor(email: string): { host: string; port: number } | undefined {
+  const domain = email.split('@')[1]?.toLowerCase().trim()
+  return domain ? IMAP_PROVIDERS[domain] : undefined
+}
+
 export function EmailCleanerPage({ onBack }: Props) {
   const [accounts, setAccounts] = useState<ImapAccount[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -369,6 +391,23 @@ export function EmailCleanerPage({ onBack }: Props) {
                 />
                 <input
                   className={fieldClass}
+                  placeholder="Email address"
+                  value={form.username}
+                  onChange={(e) => {
+                    const email = e.target.value
+                    const provider = providerFor(email)
+                    setForm((f) => ({
+                      ...f,
+                      username: email,
+                      ...(provider
+                        ? { host: provider.host, port: String(provider.port) }
+                        : {})
+                    }))
+                  }}
+                  spellCheck={false}
+                />
+                <input
+                  className={fieldClass}
                   placeholder="IMAP host (e.g. imap.gmail.com)"
                   value={form.host}
                   onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
@@ -383,23 +422,11 @@ export function EmailCleanerPage({ onBack }: Props) {
                 />
                 <input
                   className={fieldClass}
-                  placeholder="Username (full email address)"
-                  value={form.username}
-                  onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-                  spellCheck={false}
-                />
-                <input
-                  className={fieldClass}
                   type="password"
                   placeholder={form.mode === 'edit' ? 'Password (re-enter to change)' : 'Password'}
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 />
-                <p className="text-[11px] leading-snug text-text-muted">
-                  Gmail and Outlook accounts with 2-step verification need an
-                  app password, not your normal password. The password is stored
-                  in the Windows Credential Manager.
-                </p>
                 {testStatus && (
                   <p className="text-[12px] leading-snug text-text-secondary">{testStatus}</p>
                 )}
