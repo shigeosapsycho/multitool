@@ -11,6 +11,12 @@ const tools: ToolMeta[] = [
     accent: '#60a5fa'
   },
   {
+    id: 'email-cleaner',
+    title: 'Email Cleaner',
+    description: 'Scan an IMAP inbox by date and delete unwanted email.',
+    accent: '#fb7185'
+  },
+  {
     id: 'email-filter',
     title: 'Email Filter',
     description: 'Remove emails from a master list that already appear in a success list.',
@@ -165,8 +171,16 @@ const ReverseListIcon = () => (
   </svg>
 )
 
+const EmailCleanerIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'csv-email-pass': CsvEmailPassIcon,
+  'email-cleaner': EmailCleanerIcon,
   'email-filter': FunnelIcon,
   'find-duplicates': DuplicatesIcon,
   'find-non-duplicates': StarIcon,

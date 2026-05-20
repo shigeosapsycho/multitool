@@ -1,6 +1,7 @@
 export type Route =
   | 'tools'
   | 'csv-email-pass'
+  | 'email-cleaner'
   | 'email-filter'
   | 'find-duplicates'
   | 'find-non-duplicates'

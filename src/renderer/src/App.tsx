@@ -6,6 +6,7 @@ import { StatusBar } from './components/StatusBar'
 import { ToolsPage } from './pages/Tools'
 import { Placeholder } from './pages/Placeholder'
 import { CsvEmailPassPage } from './pages/CsvEmailPass'
+import { EmailCleanerPage } from './pages/EmailCleaner'
 import { EmailFilterPage } from './pages/EmailFilter'
 import { FindDuplicatesPage } from './pages/FindDuplicates'
 import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
@@ -23,6 +24,7 @@ type NavState = { history: Route[]; index: number }
 
 const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] = [
   'csv-email-pass',
+  'email-cleaner',
   'email-filter',
   'find-duplicates',
   'find-non-duplicates',
@@ -229,6 +231,8 @@ export default function App() {
     switch (r) {
       case 'csv-email-pass':
         return <CsvEmailPassPage {...props} />
+      case 'email-cleaner':
+        return <EmailCleanerPage {...props} />
       case 'email-filter':
         return <EmailFilterPage {...props} />
       case 'find-duplicates':
