@@ -109,7 +109,7 @@ The field is `Option` so existing `config.json` files still deserialize.
 | Command | Behavior |
 |---|---|
 | `imap_list_accounts() -> Vec<ImapAccount>` | Read accounts from `config.json`. |
-| `imap_save_account(account, password) -> ImapAccount` | Generate `id` if new, write config + keyring, return the saved account. |
+| `imap_save_account(account, password) -> ImapAccount` | If the account has no `id`, generate one (a random hex string via the already-present `rand` crate); write config + keyring; return the saved account. Editing an existing account keeps its `id`. |
 | `imap_delete_account(id)` | Remove the config entry and the keyring entry. |
 | `imap_test(id) -> Result<()>` | Connect → login → `SELECT INBOX` → logout. Verifies credentials. |
 | `imap_scan(id, range) -> Vec<EmailHeader>` | Connect, `SELECT INBOX`, `UID SEARCH` by date, `UID FETCH` ENVELOPE + RFC822.SIZE + INTERNALDATE, disconnect. |
