@@ -299,6 +299,8 @@ type ToolLayoutProps = {
   title: string
   hint?: ReactNode
   banner?: ReactNode
+  /** Optional control row rendered between the status banner and the panels. */
+  toolbar?: ReactNode
   onBack: () => void
   onRun?: () => void
   running?: boolean
@@ -306,7 +308,7 @@ type ToolLayoutProps = {
   children: ReactNode
 }
 
-export function ToolLayout({ title, hint, banner, onBack, onRun, running, actions, children }: ToolLayoutProps) {
+export function ToolLayout({ title, hint, banner, toolbar, onBack, onRun, running, actions, children }: ToolLayoutProps) {
   useEffect(() => {
     if (!onRun) return
     const handler = (e: KeyboardEvent) => {
@@ -323,6 +325,7 @@ export function ToolLayout({ title, hint, banner, onBack, onRun, running, action
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={title} onBack={onBack} actions={actions} />
       <StatusBanner spinning={running}>{banner ?? hint}</StatusBanner>
+      {toolbar && <div className="px-8 pt-4">{toolbar}</div>}
       <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-1 gap-4 px-8 pb-8 pt-4">{children}</div>
     </div>
   )

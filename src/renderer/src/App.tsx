@@ -6,9 +6,7 @@ import { StatusBar } from './components/StatusBar'
 import { ToolsPage } from './pages/Tools'
 import { Placeholder } from './pages/Placeholder'
 import { FindDuplicatesPage } from './pages/FindDuplicates'
-import { FindDuplicates2Page } from './pages/FindDuplicates2'
 import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
-import { FindNonDuplicates2Page } from './pages/FindNonDuplicates2'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { SplitByNumberPage } from './pages/SplitByNumber'
 import { RandomizePage } from './pages/Randomize'
@@ -25,9 +23,7 @@ type NavState = { history: Route[]; index: number }
 
 const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] = [
   'find-duplicates',
-  'find-duplicates-2',
   'find-non-duplicates',
-  'find-non-duplicates-2',
   'remove-passwords',
   'split-by-n',
   'randomize',
@@ -233,12 +229,8 @@ export default function App() {
     switch (r) {
       case 'find-duplicates':
         return <FindDuplicatesPage {...props} />
-      case 'find-duplicates-2':
-        return <FindDuplicates2Page {...props} />
       case 'find-non-duplicates':
         return <FindNonDuplicatesPage {...props} />
-      case 'find-non-duplicates-2':
-        return <FindNonDuplicates2Page {...props} />
       case 'remove-passwords':
         return <RemovePasswordsPage {...props} />
       case 'split-by-n':

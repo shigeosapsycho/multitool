@@ -8,10 +8,8 @@ A Windows desktop utility for batch text-file operations — find duplicates, sp
 
 | Tool | What it does |
 |---|---|
-| **Find Duplicates** | Surface lines that appear more than once in a file |
-| **Find Non-Duplicates** | Surface lines that appear exactly once |
-| **Duplicates Across 2 Files** | Combine two files and report lines that overlap |
-| **Non-Dupes Across 2 Files** | Combine two files and report lines unique to the union |
+| **Find Duplicates** | Surface lines that appear more than once — one file, or across two (toggle in-tool) |
+| **Find Non-Duplicates** | Surface lines that appear exactly once — one file, or across two (toggle in-tool) |
 | **Remove Passwords** | Strip `:password` from each line of a `user:pass` list |
 | **Split by Number** | Split a file into `N` evenly-sized parts (use N=2 to halve) |
 | **Randomize List** | Shuffle lines into random order |
