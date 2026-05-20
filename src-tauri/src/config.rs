@@ -29,6 +29,9 @@ pub struct Config {
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
     pub imap_accounts: Option<Vec<ImapAccount>>,
+    /// Set once the legacy Electron build of BeuMultiTool has been fully
+    /// removed, so later launches skip the uninstall scan entirely.
+    pub old_version_removed: Option<bool>,
 }
 
 impl Config {
@@ -110,5 +113,18 @@ mod tests {
         let json = r#"{"theme":"dark"}"#;
         let cfg: Config = serde_json::from_str(json).unwrap();
         assert!(cfg.imap_accounts.is_none());
+        // The uninstall run-once flag also defaults cleanly for old configs.
+        assert!(cfg.old_version_removed.is_none());
+    }
+
+    #[test]
+    fn old_version_removed_flag_round_trips() {
+        let mut cfg = Config::default();
+        cfg.old_version_removed = Some(true);
+        let json = serde_json::to_string(&cfg).unwrap();
+        // Serializes under the camelCase contract shared with the renderer.
+        assert!(json.contains("\"oldVersionRemoved\":true"));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.old_version_removed, Some(true));
     }
 }
