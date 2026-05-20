@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod imap_creds;
 mod update;
 mod watcher;
 
