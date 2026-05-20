@@ -107,6 +107,362 @@ pub fn decode_header(raw: &[u8]) -> String {
     rfc2047_decoder::decode(raw).unwrap_or_else(|_| String::from_utf8_lossy(raw).into_owned())
 }
 
+// ---------- IMAP operations ----------
+
+use crate::config::ImapAccount;
+use std::net::TcpStream;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Concrete IMAP session type — always TLS, so no generics needed.
+type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
+
+/// Fetch UIDs in batches of this many so a huge inbox does not become one
+/// enormous FETCH, and so cancellation can be checked between batches.
+const FETCH_BATCH: usize = 500;
+
+/// Open an IMAP-over-TLS connection and log in.
+fn connect_session(account: &ImapAccount, password: &str) -> Result<ImapSession, String> {
+    let tls = native_tls::TlsConnector::builder()
+        .build()
+        .map_err(|e| format!("TLS initialisation failed: {e}"))?;
+    let client = imap::connect(
+        (account.host.as_str(), account.port),
+        account.host.as_str(),
+        &tls,
+    )
+    .map_err(|e| {
+        format!(
+            "Could not connect to {}:{} — {e}",
+            account.host, account.port
+        )
+    })?;
+    client.login(&account.username, password).map_err(|(e, _client)| {
+        format!(
+            "Login failed — check the username and password. \
+             Gmail and Outlook accounts with 2FA need an app password. ({e})"
+        )
+    })
+}
+
+/// Convert one IMAP FETCH result into an `EmailHeader`.
+fn fetch_to_header(f: &imap::types::Fetch) -> EmailHeader {
+    let env = f.envelope();
+    let subject = env
+        .and_then(|e| e.subject.as_ref())
+        .map(|s| decode_header(s))
+        .unwrap_or_default();
+    let (from_name, from_addr) = env
+        .and_then(|e| e.from.as_ref())
+        .and_then(|list| list.first())
+        .map(|a| {
+            let name = a
+                .name
+                .as_ref()
+                .map(|n| decode_header(n))
+                .unwrap_or_default();
+            let mailbox = a
+                .mailbox
+                .as_ref()
+                .map(|m| String::from_utf8_lossy(m).into_owned())
+                .unwrap_or_default();
+            let host = a
+                .host
+                .as_ref()
+                .map(|h| String::from_utf8_lossy(h).into_owned())
+                .unwrap_or_default();
+            let addr = if host.is_empty() {
+                mailbox
+            } else {
+                format!("{mailbox}@{host}")
+            };
+            (name, addr)
+        })
+        .unwrap_or_default();
+    EmailHeader {
+        uid: f.uid.unwrap_or(0),
+        from_name,
+        from_addr,
+        subject,
+        date_ms: f.internal_date().map(|d| d.timestamp_millis()).unwrap_or(0),
+        size_bytes: f.size.unwrap_or(0),
+    }
+}
+
+/// Scan INBOX for the given range. Checks `cancel` between fetch batches.
+fn scan_inbox(
+    session: &mut ImapSession,
+    range: &ScanRange,
+    cancel: &AtomicBool,
+) -> Result<Vec<EmailHeader>, String> {
+    session
+        .select("INBOX")
+        .map_err(|e| format!("Could not open INBOX: {e}"))?;
+    let query = build_search_query(range)?;
+    let uids = session
+        .uid_search(&query)
+        .map_err(|e| format!("Search failed: {e}"))?;
+    let mut uid_list: Vec<u32> = uids.into_iter().collect();
+    uid_list.sort_unstable();
+
+    let mut out: Vec<EmailHeader> = Vec::with_capacity(uid_list.len());
+    for chunk in uid_list.chunks(FETCH_BATCH) {
+        if cancel.load(Ordering::Acquire) {
+            break;
+        }
+        let set = chunk
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        let fetches = session
+            .uid_fetch(&set, "(UID ENVELOPE RFC822.SIZE INTERNALDATE)")
+            .map_err(|e| format!("Fetching message headers failed: {e}"))?;
+        for f in fetches.iter() {
+            out.push(fetch_to_header(f));
+        }
+    }
+    Ok(out)
+}
+
+/// List all folders and pick the Trash folder.
+fn find_trash_folder(session: &mut ImapSession) -> Result<String, String> {
+    let names = session
+        .list(Some(""), Some("*"))
+        .map_err(|e| format!("Listing folders failed: {e}"))?;
+    let folders: Vec<FolderInfo> = names
+        .iter()
+        .map(|n| FolderInfo {
+            name: n.name().to_string(),
+            attributes: n
+                .attributes()
+                .iter()
+                .filter_map(|a| match a {
+                    imap::types::NameAttribute::Custom(c) => Some(c.to_string()),
+                    _ => None,
+                })
+                .collect(),
+        })
+        .collect();
+    pick_trash_folder(&folders).ok_or_else(|| {
+        "No Trash folder was found on this account. \
+         Use 'Delete Permanently' instead."
+            .to_string()
+    })
+}
+
+/// Delete the given UIDs from INBOX. `permanent` expunges; otherwise the
+/// emails are moved to the Trash folder.
+fn delete_emails(
+    session: &mut ImapSession,
+    uids: &[u32],
+    permanent: bool,
+) -> Result<DeleteResult, String> {
+    if uids.is_empty() {
+        return Ok(DeleteResult { deleted: 0, failed: vec![] });
+    }
+    session
+        .select("INBOX")
+        .map_err(|e| format!("Could not open INBOX: {e}"))?;
+    let set = uids.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
+
+    if permanent {
+        session
+            .uid_store(&set, "+FLAGS (\\Deleted)")
+            .map_err(|e| format!("Flagging messages failed: {e}"))?;
+        session
+            .expunge()
+            .map_err(|e| format!("Expunge failed: {e}"))?;
+    } else {
+        let trash = find_trash_folder(session)?;
+        let supports_move = session
+            .capabilities()
+            .map(|caps| caps.has_str("MOVE"))
+            .unwrap_or(false);
+        if supports_move {
+            session
+                .uid_mv(&set, &trash)
+                .map_err(|e| format!("Moving messages to {trash} failed: {e}"))?;
+        } else {
+            session
+                .uid_copy(&set, &trash)
+                .map_err(|e| format!("Copying messages to {trash} failed: {e}"))?;
+            session
+                .uid_store(&set, "+FLAGS (\\Deleted)")
+                .map_err(|e| format!("Flagging messages failed: {e}"))?;
+            session
+                .expunge()
+                .map_err(|e| format!("Expunge failed: {e}"))?;
+        }
+    }
+    Ok(DeleteResult {
+        deleted: uids.len() as u32,
+        failed: vec![],
+    })
+}
+
+// ---------- Tauri commands ----------
+
+use crate::AppState;
+use rand::Rng;
+use tauri::{AppHandle, Manager};
+
+/// Generate a 32-hex-char random id for a new account.
+fn new_account_id() -> String {
+    let mut rng = rand::thread_rng();
+    format!("{:016x}{:016x}", rng.gen::<u64>(), rng.gen::<u64>())
+}
+
+/// Account fields coming in from the renderer's Save form.
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountInput {
+    /// Present when editing an existing account; absent/empty when adding.
+    pub id: Option<String>,
+    pub label: String,
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+}
+
+/// Read, mutate, and persist the saved account list.
+fn with_accounts<F, T>(app: &AppHandle, f: F) -> Result<T, String>
+where
+    F: FnOnce(&mut Vec<ImapAccount>) -> T,
+{
+    let state = app.state::<AppState>();
+    let mut cfg = state.config.lock().unwrap();
+    let mut accounts = cfg.imap_accounts.clone().unwrap_or_default();
+    let result = f(&mut accounts);
+    cfg.imap_accounts = Some(accounts);
+    cfg.save(app).map_err(|e| e.to_string())?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn imap_list_accounts(app: AppHandle) -> Vec<ImapAccount> {
+    let state = app.state::<AppState>();
+    let cfg = state.config.lock().unwrap();
+    cfg.imap_accounts.clone().unwrap_or_default()
+}
+
+#[tauri::command]
+pub async fn imap_save_account(
+    app: AppHandle,
+    account: AccountInput,
+) -> Result<ImapAccount, String> {
+    let id = match account.id {
+        Some(ref s) if !s.is_empty() => s.clone(),
+        _ => new_account_id(),
+    };
+    let saved = ImapAccount {
+        id: id.clone(),
+        label: account.label,
+        host: account.host,
+        port: account.port,
+        username: account.username,
+    };
+    // Persist the password first; if that fails the config is left untouched.
+    crate::imap_creds::save_password(&id, &account.password)?;
+    with_accounts(&app, |accounts| {
+        if let Some(existing) = accounts.iter_mut().find(|a| a.id == id) {
+            *existing = saved.clone();
+        } else {
+            accounts.push(saved.clone());
+        }
+    })?;
+    Ok(saved)
+}
+
+#[tauri::command]
+pub async fn imap_delete_account(app: AppHandle, id: String) -> Result<(), String> {
+    with_accounts(&app, |accounts| accounts.retain(|a| a.id != id))?;
+    crate::imap_creds::delete_password(&id)?;
+    Ok(())
+}
+
+/// Look up an account by id and load its password from the credential store.
+fn account_with_password(
+    app: &AppHandle,
+    id: &str,
+) -> Result<(ImapAccount, String), String> {
+    let account = {
+        let state = app.state::<AppState>();
+        let cfg = state.config.lock().unwrap();
+        cfg.imap_accounts
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|a| a.id == id)
+            .ok_or_else(|| "That account no longer exists.".to_string())?
+    };
+    let password = crate::imap_creds::load_password(id)?.ok_or_else(|| {
+        "No saved password for this account. Edit the account and re-enter it.".to_string()
+    })?;
+    Ok((account, password))
+}
+
+#[tauri::command]
+pub async fn imap_test(app: AppHandle, id: String) -> Result<(), String> {
+    let (account, password) = account_with_password(&app, &id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut session = connect_session(&account, &password)?;
+        session
+            .select("INBOX")
+            .map_err(|e| format!("Connected, but could not open INBOX: {e}"))?;
+        let _ = session.logout();
+        Ok::<(), String>(())
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+#[tauri::command]
+pub async fn imap_scan(
+    app: AppHandle,
+    id: String,
+    range: ScanRange,
+) -> Result<Vec<EmailHeader>, String> {
+    let (account, password) = account_with_password(&app, &id)?;
+    let cancel = {
+        let state = app.state::<AppState>();
+        state.imap_cancel.store(false, Ordering::Release);
+        state.imap_cancel.clone()
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut session = connect_session(&account, &password)?;
+        let result = scan_inbox(&mut session, &range, &cancel);
+        let _ = session.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+#[tauri::command]
+pub fn imap_cancel(app: AppHandle) {
+    let state = app.state::<AppState>();
+    state.imap_cancel.store(true, Ordering::Release);
+}
+
+#[tauri::command]
+pub async fn imap_delete(
+    app: AppHandle,
+    id: String,
+    uids: Vec<u32>,
+    permanent: bool,
+) -> Result<DeleteResult, String> {
+    let (account, password) = account_with_password(&app, &id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut session = connect_session(&account, &password)?;
+        let result = delete_emails(&mut session, &uids, permanent);
+        let _ = session.logout();
+        result
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
