@@ -33,6 +33,9 @@ pub struct EmailHeader {
 #[serde(rename_all = "camelCase")]
 pub struct DeleteResult {
     pub deleted: u32,
+    /// UIDs that failed to delete. Currently always empty: `delete_emails`
+    /// fails the whole operation (returns `Err`) on the first IMAP error
+    /// rather than tracking per-UID outcomes. Kept for forward compatibility.
     pub failed: Vec<u32>,
 }
 
@@ -116,9 +119,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// Concrete IMAP session type — always TLS, so no generics needed.
 type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
 
-/// Fetch UIDs in batches of this many so a huge inbox does not become one
-/// enormous FETCH, and so cancellation can be checked between batches.
-const FETCH_BATCH: usize = 500;
+/// Process UIDs in batches of this many so a huge inbox does not become one
+/// enormous FETCH or DELETE command line, and so cancellation can be checked
+/// between batches. Used for both fetch and delete batching.
+const IMAP_BATCH: usize = 500;
 
 /// Open an IMAP-over-TLS connection and log in.
 fn connect_session(account: &ImapAccount, password: &str) -> Result<ImapSession, String> {
@@ -205,7 +209,7 @@ fn scan_inbox(
     uid_list.sort_unstable();
 
     let mut out: Vec<EmailHeader> = Vec::with_capacity(uid_list.len());
-    for chunk in uid_list.chunks(FETCH_BATCH) {
+    for chunk in uid_list.chunks(IMAP_BATCH) {
         if cancel.load(Ordering::Acquire) {
             break;
         }
@@ -218,6 +222,9 @@ fn scan_inbox(
             .uid_fetch(&set, "(UID ENVELOPE RFC822.SIZE INTERNALDATE)")
             .map_err(|e| format!("Fetching message headers failed: {e}"))?;
         for f in fetches.iter() {
+            if f.uid.is_none() {
+                continue;
+            }
             out.push(fetch_to_header(f));
         }
     }
@@ -251,7 +258,8 @@ fn find_trash_folder(session: &mut ImapSession) -> Result<String, String> {
 }
 
 /// Delete the given UIDs from INBOX. `permanent` expunges; otherwise the
-/// emails are moved to the Trash folder.
+/// emails are moved to the Trash folder. UIDs are processed in batches so a
+/// huge selection does not become one oversized IMAP command line.
 fn delete_emails(
     session: &mut ImapSession,
     uids: &[u32],
@@ -263,35 +271,48 @@ fn delete_emails(
     session
         .select("INBOX")
         .map_err(|e| format!("Could not open INBOX: {e}"))?;
-    let set = uids.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
 
-    if permanent {
-        session
-            .uid_store(&set, "+FLAGS (\\Deleted)")
-            .map_err(|e| format!("Flagging messages failed: {e}"))?;
-        session
-            .expunge()
-            .map_err(|e| format!("Expunge failed: {e}"))?;
+    // Resolve the delete strategy once, before the batch loop.
+    let trash = if permanent {
+        None
     } else {
-        let trash = find_trash_folder(session)?;
-        let supports_move = session
+        Some(find_trash_folder(session)?)
+    };
+    let supports_move = if permanent {
+        false
+    } else {
+        session
             .capabilities()
             .map(|caps| caps.has_str("MOVE"))
-            .unwrap_or(false);
-        if supports_move {
-            session
-                .uid_mv(&set, &trash)
-                .map_err(|e| format!("Moving messages to {trash} failed: {e}"))?;
-        } else {
-            session
-                .uid_copy(&set, &trash)
-                .map_err(|e| format!("Copying messages to {trash} failed: {e}"))?;
+            .unwrap_or(false)
+    };
+
+    for chunk in uids.chunks(IMAP_BATCH) {
+        let set = chunk.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
+        if permanent {
             session
                 .uid_store(&set, "+FLAGS (\\Deleted)")
                 .map_err(|e| format!("Flagging messages failed: {e}"))?;
             session
                 .expunge()
                 .map_err(|e| format!("Expunge failed: {e}"))?;
+        } else {
+            let trash = trash.as_ref().expect("trash set when not permanent");
+            if supports_move {
+                session
+                    .uid_mv(&set, trash)
+                    .map_err(|e| format!("Moving messages to {trash} failed: {e}"))?;
+            } else {
+                session
+                    .uid_copy(&set, trash)
+                    .map_err(|e| format!("Copying messages to {trash} failed: {e}"))?;
+                session
+                    .uid_store(&set, "+FLAGS (\\Deleted)")
+                    .map_err(|e| format!("Flagging messages failed: {e}"))?;
+                session
+                    .expunge()
+                    .map_err(|e| format!("Expunge failed: {e}"))?;
+            }
         }
     }
     Ok(DeleteResult {
@@ -376,8 +397,8 @@ pub async fn imap_save_account(
 
 #[tauri::command]
 pub async fn imap_delete_account(app: AppHandle, id: String) -> Result<(), String> {
-    with_accounts(&app, |accounts| accounts.retain(|a| a.id != id))?;
     crate::imap_creds::delete_password(&id)?;
+    with_accounts(&app, |accounts| accounts.retain(|a| a.id != id))?;
     Ok(())
 }
 
@@ -407,11 +428,12 @@ pub async fn imap_test(app: AppHandle, id: String) -> Result<(), String> {
     let (account, password) = account_with_password(&app, &id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut session = connect_session(&account, &password)?;
-        session
+        let result = session
             .select("INBOX")
-            .map_err(|e| format!("Connected, but could not open INBOX: {e}"))?;
+            .map(|_| ())
+            .map_err(|e| format!("Connected, but could not open INBOX: {e}"));
         let _ = session.logout();
-        Ok::<(), String>(())
+        result
     })
     .await
     .map_err(|e| format!("Task error: {e}"))?
