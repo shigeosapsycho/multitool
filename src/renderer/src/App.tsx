@@ -5,17 +5,17 @@ import { Sidebar } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
 import { ToolsPage } from './pages/Tools'
 import { Placeholder } from './pages/Placeholder'
+import { CsvEmailPassPage } from './pages/CsvEmailPass'
+import { EmailCleanerPage } from './pages/EmailCleaner'
+import { EmailFilterPage } from './pages/EmailFilter'
 import { FindDuplicatesPage } from './pages/FindDuplicates'
 import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
-import { RemovePasswordsPage } from './pages/RemovePasswords'
-import { SplitByNumberPage } from './pages/SplitByNumber'
-import { RandomizePage } from './pages/Randomize'
-import { SearchMasterPage } from './pages/SearchMaster'
-import { EmailFilterPage } from './pages/EmailFilter'
-import { CsvEmailPassPage } from './pages/CsvEmailPass'
 import { ProxyTesterPage } from './pages/ProxyTester'
+import { RandomizePage } from './pages/Randomize'
+import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { ReverseListPage } from './pages/ReverseList'
-import { EmailCleanerPage } from './pages/EmailCleaner'
+import { SearchMasterPage } from './pages/SearchMaster'
+import { SplitByNumberPage } from './pages/SplitByNumber'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 import { LogsPage } from './pages/Logs'
@@ -23,17 +23,17 @@ import { LogsPage } from './pages/Logs'
 type NavState = { history: Route[]; index: number }
 
 const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] = [
+  'csv-email-pass',
+  'email-cleaner',
+  'email-filter',
   'find-duplicates',
   'find-non-duplicates',
-  'remove-passwords',
-  'split-by-n',
-  'randomize',
-  'search-master',
-  'email-filter',
-  'csv-email-pass',
   'proxy-tester',
+  'randomize',
+  'remove-passwords',
   'reverse-list',
-  'email-cleaner'
+  'search-master',
+  'split-by-n'
 ]
 
 function isToolRoute(r: Route): boolean {
@@ -229,28 +229,28 @@ export default function App() {
   function renderTool(r: Route, active: boolean): JSX.Element | null {
     const props = { onBack: goBack, onSetStatus: noopStatus, active }
     switch (r) {
+      case 'csv-email-pass':
+        return <CsvEmailPassPage {...props} />
+      case 'email-cleaner':
+        return <EmailCleanerPage {...props} />
+      case 'email-filter':
+        return <EmailFilterPage {...props} />
       case 'find-duplicates':
         return <FindDuplicatesPage {...props} />
       case 'find-non-duplicates':
         return <FindNonDuplicatesPage {...props} />
-      case 'remove-passwords':
-        return <RemovePasswordsPage {...props} />
-      case 'split-by-n':
-        return <SplitByNumberPage {...props} />
-      case 'randomize':
-        return <RandomizePage {...props} />
-      case 'search-master':
-        return <SearchMasterPage {...props} />
-      case 'email-filter':
-        return <EmailFilterPage {...props} />
-      case 'csv-email-pass':
-        return <CsvEmailPassPage {...props} />
       case 'proxy-tester':
         return <ProxyTesterPage {...props} />
+      case 'randomize':
+        return <RandomizePage {...props} />
+      case 'remove-passwords':
+        return <RemovePasswordsPage {...props} />
       case 'reverse-list':
         return <ReverseListPage {...props} />
-      case 'email-cleaner':
-        return <EmailCleanerPage {...props} />
+      case 'search-master':
+        return <SearchMasterPage {...props} />
+      case 'split-by-n':
+        return <SplitByNumberPage {...props} />
       default:
         return null
     }
