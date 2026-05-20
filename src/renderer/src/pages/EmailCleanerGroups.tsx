@@ -1,26 +1,64 @@
 import type { EmailHeader } from '../lib/api'
 
 export type SenderGroup = {
-  addr: string
+  /** Stable identity for this group — used as the React key and expand key. */
+  key: string
+  /** Display name, or the address when the sender has no display name. */
   name: string
+  /** The sender address — empty when the group spans several addresses. */
+  addr: string
+  /** How many distinct sender addresses fall under this group. */
+  addrCount: number
   emails: EmailHeader[]
   totalSize: number
 }
 
-/** Group scanned emails by sender address, biggest groups first. */
+/**
+ * Group scanned emails by sender, biggest groups first.
+ *
+ * Senders are keyed by display name when they have one, and by address
+ * otherwise. Keying by name merges mail from senders that rotate their From
+ * address per message — e.g. iCloud "Hide My Email" relay aliases, where
+ * every message from "Best Buy" arrives from a different address.
+ */
 export function groupBySender(emails: EmailHeader[]): SenderGroup[] {
-  const map = new Map<string, SenderGroup>()
+  type Acc = {
+    name: string
+    firstAddr: string
+    addrKeys: Set<string>
+    emails: EmailHeader[]
+    totalSize: number
+  }
+  const map = new Map<string, Acc>()
   for (const e of emails) {
-    const key = e.fromAddr.toLowerCase()
+    const name = e.fromName.trim()
+    const addr = e.fromAddr.trim()
+    const key = name ? `name:${name.toLowerCase()}` : `addr:${addr.toLowerCase()}`
     let g = map.get(key)
     if (!g) {
-      g = { addr: e.fromAddr || '(unknown sender)', name: e.fromName, emails: [], totalSize: 0 }
+      g = {
+        name: name || addr || '(unknown sender)',
+        firstAddr: addr,
+        addrKeys: new Set(),
+        emails: [],
+        totalSize: 0
+      }
       map.set(key, g)
     }
+    if (addr) g.addrKeys.add(addr.toLowerCase())
     g.emails.push(e)
     g.totalSize += e.sizeBytes
   }
-  return [...map.values()].sort((a, b) => b.emails.length - a.emails.length)
+  return [...map.entries()]
+    .map(([key, g]) => ({
+      key,
+      name: g.name,
+      addr: g.addrKeys.size <= 1 ? g.firstAddr : '',
+      addrCount: g.addrKeys.size,
+      emails: g.emails,
+      totalSize: g.totalSize
+    }))
+    .sort((a, b) => b.emails.length - a.emails.length)
 }
 
 /** Human-readable byte size. */
@@ -108,23 +146,22 @@ export function EmailCleanerGroups({
         const selectedCount = g.emails.filter((e) => selected.has(e.uid)).length
         const groupState: 'on' | 'off' | 'some' =
           selectedCount === 0 ? 'off' : selectedCount === g.emails.length ? 'on' : 'some'
-        const isOpen = expanded.has(g.addr)
+        const isOpen = expanded.has(g.key)
+        const subline = g.addr || (g.addrCount > 1 ? `${g.addrCount} addresses` : '')
         return (
-          <div key={g.addr} className="border-b border-border/60">
+          <div key={g.key} className="border-b border-border/60">
             <div
               className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-surface-2"
-              onClick={() => onToggleExpand(g.addr)}
+              onClick={() => onToggleExpand(g.key)}
             >
               <Check state={groupState} onClick={() => onToggleGroup(g)} />
               <span className="text-text-muted">
                 <CaretIcon open={isOpen} />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] text-text-primary">
-                  {g.name || g.addr}
-                </div>
-                {g.name && (
-                  <div className="truncate text-[11px] text-text-muted">{g.addr}</div>
+                <div className="truncate text-[13px] text-text-primary">{g.name}</div>
+                {subline && (
+                  <div className="truncate text-[11px] text-text-muted">{subline}</div>
                 )}
               </div>
               <span className="shrink-0 text-[12px] text-text-secondary">
