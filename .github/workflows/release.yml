@@ -1,33 +1,43 @@
 name: build
 
 # Builds the Tauri app on Windows.
-#  - PRs to main         -> build only (verify main still compiles)
+#  - PRs to main         -> build only (verify the PR compiles)
+#  - pushes to main      -> build only (incl. PR merges — verify main compiles)
 #  - pushing a v* tag    -> build + publish a GitHub release (live, not draft)
 #  - workflow_dispatch   -> manual run from the Actions tab
-#
-# Plain pushes to main are NOT built — when you tag a release, pushing main
-# and pushing the tag would otherwise fire two duplicate runs. Only the tag
-# run produces the release the in-app self-updater needs, so the main-push
-# trigger is omitted.
 #
 # Releases publish directly (no draft). The tag push is the publish trigger,
 # and the in-app self-updater (queries releases/latest) picks the new version
 # up on the next launch.
 #
+# A release pushes main and a v* tag at the same commit, which would fire two
+# runs. The `concurrency` block below groups runs by commit SHA and cancels the
+# older one, so a release collapses to a single run — the tag run, which
+# publishes — and an ordinary PR merge still gets its own build.
+#
 # To cut a release:
 #   1. Bump the version in package.json, src-tauri/Cargo.toml and
 #      src-tauri/tauri.conf.json (all three must match).
-#   2. Commit + push, then: git tag v3.1.4 && git push origin v3.1.4
+#   2. Commit + push, then: git tag v3.2.0 && git push origin v3.2.0
 #   3. Wait for this workflow — release goes live automatically.
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
   workflow_dispatch:
+
+# Collapse the duplicate run a release creates (main push + tag push at the
+# same commit) into one. Runs for different commits have different SHAs, so an
+# ordinary PR merge is never cancelled by an unrelated build.
+concurrency:
+  group: build-${{ github.sha }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
