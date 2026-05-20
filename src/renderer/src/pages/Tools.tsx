@@ -7,14 +7,8 @@ const tools: ToolMeta[] = [
   {
     id: 'find-duplicates',
     title: 'Find Duplicates',
-    description: 'Identify lines that appear more than once in a file.',
+    description: 'Lines that appear more than once — in one file or across two.',
     accent: '#7c5cff'
-  },
-  {
-    id: 'find-duplicates-2',
-    title: 'Duplicates Across 2 Files',
-    description: 'Compare two files and report lines that overlap.',
-    accent: '#a78bfa'
   },
   {
     id: 'remove-passwords',
@@ -25,14 +19,8 @@ const tools: ToolMeta[] = [
   {
     id: 'find-non-duplicates',
     title: 'Find Non-Duplicates',
-    description: 'Lines that appear only once in a file.',
+    description: 'Lines that appear only once — in one file or across two.',
     accent: '#f59e0b'
-  },
-  {
-    id: 'find-non-duplicates-2',
-    title: 'Non-Dupes Across 2 Files',
-    description: 'Lines unique within the union of two files.',
-    accent: '#fbbf24'
   },
   {
     id: 'split-by-n',
@@ -101,14 +89,6 @@ const DuplicatesIcon = () => (
   </svg>
 )
 
-const Duplicates2Icon = () => (
-  <svg {...SVG_PROPS}>
-    <rect x="2" y="4" width="8" height="16" rx="1.5" />
-    <rect x="14" y="4" width="8" height="16" rx="1.5" />
-    <circle cx="12" cy="12" r="2.2" />
-  </svg>
-)
-
 const KeyIcon = () => (
   <svg {...SVG_PROPS}>
     <circle cx="12" cy="12" r="9" />
@@ -123,15 +103,6 @@ const KeyIcon = () => (
 const StarIcon = () => (
   <svg {...SVG_PROPS}>
     <polygon points="12 3 14.5 9 21 9.5 16 13.5 17.5 20 12 16.5 6.5 20 8 13.5 3 9.5 9.5 9" />
-  </svg>
-)
-
-const NonDupes2Icon = () => (
-  <svg {...SVG_PROPS}>
-    <rect x="2" y="4" width="8" height="16" rx="1.5" />
-    <rect x="14" y="4" width="8" height="16" rx="1.5" />
-    <path d="M10.5 10.5 L13.5 13.5" />
-    <path d="M13.5 10.5 L10.5 13.5" />
   </svg>
 )
 
@@ -196,10 +167,8 @@ const ReverseListIcon = () => (
 
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
-  'find-duplicates-2': Duplicates2Icon,
   'remove-passwords': KeyIcon,
   'find-non-duplicates': StarIcon,
-  'find-non-duplicates-2': NonDupes2Icon,
   'split-by-n': SplitByNumberIcon,
   'randomize': DiceIcon,
   'search-master': SearchIcon,

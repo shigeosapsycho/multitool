@@ -4,7 +4,8 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState
+  useState,
+  type ReactNode
 } from 'react'
 import {
   ToolLayout,
@@ -28,6 +29,7 @@ export type TwoFileToolProps = {
   transform: (text1: string, text2: string) => string[]
   file1Label?: string
   file2Label?: string
+  toolbar?: ReactNode
   active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
@@ -157,6 +159,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
     transform,
     file1Label = 'File 1',
     file2Label = 'File 2',
+    toolbar,
     active = true,
     onBack,
     onSetStatus
@@ -246,6 +249,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
   return (
     <ToolLayout
       title={title}
+      toolbar={toolbar}
       onBack={onBack}
       onRun={handleRun}
       running={running}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ToolLayout,
   FilePanel,
@@ -22,6 +22,7 @@ export type SingleFileToolProps = {
   transform: (text: string) => string[]
   pickerTitle?: string
   pickerFilters?: { name: string; extensions: string[] }[]
+  toolbar?: ReactNode
   active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
@@ -40,6 +41,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
     transform,
     pickerTitle,
     pickerFilters,
+    toolbar,
     active = true,
     onBack,
     onSetStatus
@@ -113,6 +115,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
   return (
     <ToolLayout
       title={title}
+      toolbar={toolbar}
       onBack={onBack}
       onRun={handleRun}
       running={running}
