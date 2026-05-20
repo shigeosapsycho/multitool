@@ -3,6 +3,20 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
+/// A saved IMAP account. The password is NOT stored here — it lives in the
+/// Windows Credential Manager, keyed by `id` (see `imap_creds.rs`).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ImapAccount {
+    /// Stable random key. Also the Credential Manager entry key.
+    pub id: String,
+    /// User-facing display name.
+    pub label: String,
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
@@ -13,6 +27,8 @@ pub struct Config {
     pub output_sort: Option<String>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
+    /// Saved IMAP accounts for the Email Cleaner module.
+    pub imap_accounts: Option<Vec<ImapAccount>>,
 }
 
 impl Config {
@@ -63,5 +79,36 @@ impl Config {
             Some(s @ ("name" | "size" | "modified")) => s.to_string(),
             _ => "name".into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_round_trips_imap_accounts() {
+        let mut cfg = Config::default();
+        cfg.imap_accounts = Some(vec![ImapAccount {
+            id: "abc123".into(),
+            label: "Work".into(),
+            host: "imap.example.com".into(),
+            port: 993,
+            username: "me@example.com".into(),
+        }]);
+        let json = serde_json::to_string(&cfg).unwrap();
+        let back: Config = serde_json::from_str(&json).unwrap();
+        let accounts = back.imap_accounts.unwrap();
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].id, "abc123");
+        assert_eq!(accounts[0].port, 993);
+        assert_eq!(accounts[0].username, "me@example.com");
+    }
+
+    #[test]
+    fn old_config_without_imap_accounts_still_deserializes() {
+        let json = r#"{"theme":"dark"}"#;
+        let cfg: Config = serde_json::from_str(json).unwrap();
+        assert!(cfg.imap_accounts.is_none());
     }
 }
