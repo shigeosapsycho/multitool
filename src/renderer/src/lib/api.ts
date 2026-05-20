@@ -22,6 +22,38 @@ export type ProxyTestEntry = {
   error: string | null
 }
 
+export type ImapAccount = {
+  id: string
+  label: string
+  host: string
+  port: number
+  username: string
+}
+
+export type ImapAccountInput = {
+  id?: string
+  label: string
+  host: string
+  port: number
+  username: string
+  password: string
+}
+
+export type EmailHeader = {
+  uid: number
+  fromName: string
+  fromAddr: string
+  subject: string
+  dateMs: number
+  sizeBytes: number
+}
+
+export type ScanRange =
+  | { mode: 'dateRange'; from: string; to: string }
+  | { mode: 'lastDays'; days: number }
+
+export type DeleteResult = { deleted: number; failed: number[] }
+
 type UpdaterStatus =
   | { type: 'checking'; currentVersion: string }
   | { type: 'no-update'; currentVersion: string }
@@ -188,6 +220,18 @@ export const api = {
     testProxies: (args: { url: string; proxies: string[]; concurrency?: number }) =>
       invoke<ProxyTestEntry[]>('net_test_proxies', { args }),
     cancelProxies: () => invoke<void>('net_cancel_proxies')
+  },
+  imap: {
+    listAccounts: () => invoke<ImapAccount[]>('imap_list_accounts'),
+    saveAccount: (account: ImapAccountInput) =>
+      invoke<ImapAccount>('imap_save_account', { account }),
+    deleteAccount: (id: string) => invoke<void>('imap_delete_account', { id }),
+    test: (id: string) => invoke<void>('imap_test', { id }),
+    scan: (id: string, range: ScanRange) =>
+      invoke<EmailHeader[]>('imap_scan', { id, range }),
+    cancel: () => invoke<void>('imap_cancel'),
+    delete: (id: string, uids: number[], permanent: boolean) =>
+      invoke<DeleteResult>('imap_delete', { id, uids, permanent })
   },
   updater: {
     onStatus: (cb: (status: UpdaterStatus) => void) =>
