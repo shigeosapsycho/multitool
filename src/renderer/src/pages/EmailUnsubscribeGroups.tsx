@@ -173,7 +173,19 @@ export function EmailUnsubscribeGroups({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] text-text-primary">{g.name}</div>
-                {subline && <div className="truncate text-[11px] text-text-muted">{subline}</div>}
+                {result ? (
+                  <div
+                    className={`truncate text-[11px] ${
+                      result.ok ? 'text-success' : 'text-danger'
+                    }`}
+                  >
+                    {result.detail}
+                  </div>
+                ) : (
+                  subline && (
+                    <div className="truncate text-[11px] text-text-muted">{subline}</div>
+                  )
+                )}
               </div>
               {result ? (
                 <span
@@ -182,7 +194,11 @@ export function EmailUnsubscribeGroups({
                     result.ok ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
                   }`}
                 >
-                  {result.ok ? 'Unsubscribed' : 'Failed'}
+                  {result.ok
+                    ? info.method === 'one-click'
+                      ? 'Unsubscribed'
+                      : 'Request sent'
+                    : 'Failed'}
                 </span>
               ) : (
                 <span

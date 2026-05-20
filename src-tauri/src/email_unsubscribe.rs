@@ -297,13 +297,23 @@ fn run_one(agent: &ureq::Agent, target: &UnsubTarget) -> UnsubRunItem {
     };
 
     match result {
-        Ok(resp) => UnsubRunItem {
-            key,
-            ok: true,
-            detail: format!("Unsubscribed (HTTP {}).", resp.status()),
-        },
+        // A one-click POST returning 2xx is a real confirmation per RFC 8058.
+        // A plain link GET returning 2xx only means the page loaded — the
+        // sender may still require a click there — so word it honestly.
+        Ok(resp) => {
+            let status = resp.status();
+            UnsubRunItem {
+                key,
+                ok: true,
+                detail: if is_post {
+                    format!("Unsubscribed · server accepted one-click (HTTP {status})")
+                } else {
+                    format!("Unsubscribe page opened (HTTP {status})")
+                },
+            }
+        }
         Err(ureq::Error::Status(code, _)) => {
-            fail(format!("The server rejected the request (HTTP {code})."))
+            fail(format!("Server rejected the request (HTTP {code})"))
         }
         Err(ureq::Error::Transport(e)) => fail(format!("Could not reach the server — {e}")),
     }
