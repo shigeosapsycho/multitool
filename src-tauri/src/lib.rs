@@ -13,6 +13,7 @@ pub struct AppState {
     pub config: Mutex<config::Config>,
     pub watcher: Mutex<Option<watcher::OutputWatcher>>,
     pub proxy_cancel: Arc<AtomicBool>,
+    pub imap_cancel: Arc<AtomicBool>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,6 +30,7 @@ pub fn run() {
                 config: Mutex::new(cfg),
                 watcher: Mutex::new(None),
                 proxy_cancel: Arc::new(AtomicBool::new(false)),
+                imap_cancel: Arc::new(AtomicBool::new(false)),
             });
 
             if let Err(err) = commands::ensure_output_dir(&handle) {
@@ -105,6 +107,13 @@ pub fn run() {
             commands::net_cancel_proxies,
             update::updater_check,
             update::updater_apply_and_restart,
+            imap_cleaner::imap_list_accounts,
+            imap_cleaner::imap_save_account,
+            imap_cleaner::imap_delete_account,
+            imap_cleaner::imap_test,
+            imap_cleaner::imap_scan,
+            imap_cleaner::imap_cancel,
+            imap_cleaner::imap_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
