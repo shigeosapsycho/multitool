@@ -139,7 +139,14 @@ export function EmailCleanerGroups({
                 {g.emails.map((e) => (
                   <div
                     key={e.uid}
-                    className="flex items-center gap-2.5 py-1.5 pl-11 pr-3 hover:bg-surface-2"
+                    onClick={(ev) => {
+                      // Ctrl+click (Cmd+click on macOS) anywhere on the row
+                      // toggles the email's selection — a faster multi-select
+                      // than aiming for the checkbox.
+                      if (ev.ctrlKey || ev.metaKey) onToggleEmail(e.uid)
+                    }}
+                    title="Ctrl+click to select"
+                    className="flex select-none items-center gap-2.5 py-1.5 pl-11 pr-3 hover:bg-surface-2"
                   >
                     <Check
                       state={selected.has(e.uid) ? 'on' : 'off'}

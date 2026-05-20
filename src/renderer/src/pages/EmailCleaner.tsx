@@ -84,6 +84,7 @@ export function EmailCleanerPage({ onBack }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [status, setStatus] = useState('Pick an account and a date range, then scan the inbox.')
+  const [search, setSearch] = useState('')
 
   // Load saved accounts on first mount.
   useEffect(() => {
@@ -96,7 +97,20 @@ export function EmailCleanerPage({ onBack }: Props) {
       .catch((e) => setStatus(`Could not load accounts: ${String(e)}`))
   }, [])
 
-  const groups = useMemo(() => (emails ? groupBySender(emails) : []), [emails])
+  // Scanned emails grouped by sender, narrowed by the inbox search box.
+  // A search term matches against the sender name, sender address, or subject.
+  const groups = useMemo(() => {
+    if (!emails) return []
+    const q = search.trim().toLowerCase()
+    if (!q) return groupBySender(emails)
+    const filtered = emails.filter(
+      (e) =>
+        e.fromName.toLowerCase().includes(q) ||
+        e.fromAddr.toLowerCase().includes(q) ||
+        e.subject.toLowerCase().includes(q)
+    )
+    return groupBySender(filtered)
+  }, [emails, search])
 
   // ---------- account form ----------
 
@@ -186,6 +200,7 @@ export function EmailCleanerPage({ onBack }: Props) {
       setEmails(null)
       setSelected(new Set())
       setExpanded(new Set())
+      setSearch('')
       setStatus('Account removed.')
     } catch (e) {
       setStatus(`Could not remove account: ${String(e)}`)
@@ -216,6 +231,7 @@ export function EmailCleanerPage({ onBack }: Props) {
     setEmails(null)
     setSelected(new Set())
     setExpanded(new Set())
+    setSearch('')
     setStatus('Scanning inbox…')
     try {
       const result = await window.api.imap.scan(selectedId, range)
@@ -286,11 +302,20 @@ export function EmailCleanerPage({ onBack }: Props) {
     })
   }
 
+  // Operates on the currently visible (search-filtered) emails: if every
+  // visible email is already selected, clear them; otherwise add them all.
   function selectAll() {
-    if (!emails) return
-    setSelected((prev) =>
-      prev.size === emails.length ? new Set() : new Set(emails.map((e) => e.uid))
-    )
+    const visible = groups.flatMap((g) => g.emails.map((e) => e.uid))
+    if (visible.length === 0) return
+    setSelected((prev) => {
+      const allVisibleSelected = visible.every((u) => prev.has(u))
+      const next = new Set(prev)
+      for (const u of visible) {
+        if (allVisibleSelected) next.delete(u)
+        else next.add(u)
+      }
+      return next
+    })
   }
 
   // ---------- delete ----------
@@ -324,7 +349,8 @@ export function EmailCleanerPage({ onBack }: Props) {
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.label }))
   const canScan = !!selectedId && !running
   const selectedCount = selected.size
-  const allSelected = !!emails && emails.length > 0 && selectedCount === emails.length
+  const visibleUids = groups.flatMap((g) => g.emails.map((e) => e.uid))
+  const allSelected = visibleUids.length > 0 && visibleUids.every((u) => selected.has(u))
 
   return (
     <ToolLayout
@@ -524,6 +550,15 @@ export function EmailCleanerPage({ onBack }: Props) {
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
+            <div className="border-b border-border px-3 py-2">
+              <input
+                className={`${fieldClass} w-full`}
+                placeholder="Search senders and subjects…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
               <button
                 onClick={selectAll}
@@ -535,14 +570,20 @@ export function EmailCleanerPage({ onBack }: Props) {
                 {selectedCount.toLocaleString()} selected
               </span>
             </div>
-            <EmailCleanerGroups
-              groups={groups}
-              selected={selected}
-              expanded={expanded}
-              onToggleGroup={toggleGroup}
-              onToggleEmail={toggleEmail}
-              onToggleExpand={toggleExpand}
-            />
+            {groups.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center p-6 text-center text-[13px] text-text-muted">
+                No senders or subjects match “{search}”.
+              </div>
+            ) : (
+              <EmailCleanerGroups
+                groups={groups}
+                selected={selected}
+                expanded={expanded}
+                onToggleGroup={toggleGroup}
+                onToggleEmail={toggleEmail}
+                onToggleExpand={toggleExpand}
+              />
+            )}
             <div className="flex items-center gap-3 border-t border-border p-3">
               <label className="flex items-center gap-2 text-[12.5px] text-text-secondary">
                 <input
