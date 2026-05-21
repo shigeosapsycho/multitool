@@ -4,6 +4,7 @@ import { Card } from '../components/Card'
 import { Toggle } from '../components/Toggle'
 import { Select } from '../components/Select'
 import { Icons } from '../components/ToolShell'
+import type { GroupingMode } from '../lib/targetSkus'
 
 const PencilIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -33,6 +34,8 @@ type Props = {
   onThemeChange: (next: ThemePref) => void
   outputSort: OutputSort
   onOutputSortChange: (next: OutputSort) => void
+  pokemonGrouping: GroupingMode
+  onPokemonGroupingChange: (next: GroupingMode) => void
 }
 
 export function SettingsPage({
@@ -43,7 +46,9 @@ export function SettingsPage({
   theme,
   onThemeChange,
   outputSort,
-  onOutputSortChange
+  onOutputSortChange,
+  pokemonGrouping,
+  onPokemonGroupingChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -74,6 +79,11 @@ export function SettingsPage({
   async function handleChangeOutputSort(next: OutputSort) {
     await window.api.config.setOutputSort(next)
     onOutputSortChange(next)
+  }
+
+  async function handleChangePokemonGrouping(next: GroupingMode) {
+    await window.api.config.setPokemonGrouping(next)
+    onPokemonGroupingChange(next)
   }
 
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -193,6 +203,29 @@ export function SettingsPage({
                 <Icons.Folder />
                 Open
               </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card label="Target SKUs">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Pokémon grouping</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  How Pokémon SKUs are grouped in the Target SKUs checklist.
+                </div>
+              </div>
+              <Select
+                value={pokemonGrouping}
+                options={[
+                  { value: 'set', label: 'By set' },
+                  { value: 'era-set', label: 'By era → set' },
+                  { value: 'era', label: 'By era' }
+                ]}
+                onChange={handleChangePokemonGrouping}
+                ariaLabel="Pokémon grouping"
+              />
             </div>
           </div>
         </Card>

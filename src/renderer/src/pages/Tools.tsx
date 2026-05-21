@@ -215,9 +215,8 @@ const EmailUnsubscribeIcon = () => (
 
 const TargetIcon = () => (
   <svg {...SVG_PROPS}>
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="5.2" />
-    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="8.5" strokeWidth="3" />
+    <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />
   </svg>
 )
 
@@ -310,7 +309,7 @@ export function ToolsPage({ onNavigate }: Props) {
     <div className="flex h-full flex-col">
       <PageHeader
         title="Tools"
-        subtitle="Pick a utility to get started — or drop a file onto one."
+        subtitle="Drag and drop a file on a module or choose a module."
       />
       <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8">
         {tools.map((t) => (

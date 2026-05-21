@@ -269,6 +269,13 @@ pub async fn files_open_file(app: AppHandle, path: String) -> Result<(), String>
 }
 
 #[tauri::command]
+pub async fn files_open_url(app: AppHandle, url: String) -> Result<(), String> {
+    app.opener()
+        .open_url(&url, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn files_open_output_dir(app: AppHandle) -> Result<(), String> {
     let dir = ensure_output_dir(&app).map_err(|e| e.to_string())?;
     app.opener()
@@ -486,6 +493,7 @@ pub struct ConfigSnapshot {
     pub delete_to_trash: bool,
     pub theme: String,
     pub output_sort: String,
+    pub pokemon_grouping: String,
 }
 
 #[tauri::command]
@@ -501,6 +509,7 @@ pub async fn config_get(app: AppHandle) -> Result<ConfigSnapshot, String> {
         delete_to_trash: cfg.delete_to_trash(),
         theme: cfg.theme(),
         output_sort: cfg.output_sort(),
+        pokemon_grouping: cfg.pokemon_grouping(),
     })
 }
 
@@ -539,6 +548,20 @@ pub async fn config_set_output_sort(app: AppHandle, sort: String) -> Result<Stri
     }
     mutate_config(&app, |cfg| cfg.output_sort = Some(sort.clone()))?;
     Ok(sort)
+}
+
+#[tauri::command]
+pub async fn config_set_pokemon_grouping(
+    app: AppHandle,
+    grouping: String,
+) -> Result<String, String> {
+    if !matches!(grouping.as_str(), "set" | "era-set" | "era") {
+        let state = app.state::<AppState>();
+        let cfg = state.config.lock().unwrap();
+        return Ok(cfg.pokemon_grouping());
+    }
+    mutate_config(&app, |cfg| cfg.pokemon_grouping = Some(grouping.clone()))?;
+    Ok(grouping)
 }
 
 // ---------- app ----------
