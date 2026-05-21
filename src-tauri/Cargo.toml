@@ -38,10 +38,15 @@ rfc2047-decoder = "1"
 mailparse = "0.15"
 
 [target.'cfg(windows)'.dependencies]
+# Registry walk for detecting the legacy Electron install (see uninstall_old.rs).
+winreg = "0.52"
 windows = { version = "0.59", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
+  # Process enumeration + termination for uninstall_old.rs.
+  "Win32_System_Threading",
+  "Win32_System_Diagnostics_ToolHelp",
 ] }
 
 [profile.release]

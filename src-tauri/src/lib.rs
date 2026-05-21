@@ -4,6 +4,8 @@ mod email_unsubscribe;
 mod imap_cleaner;
 mod imap_creds;
 mod update;
+#[cfg(target_os = "windows")]
+mod uninstall_old;
 mod watcher;
 
 use std::sync::atomic::AtomicBool;
@@ -64,6 +66,36 @@ pub fn run() {
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(800));
                     let _ = handle_for_upgrade.emit("upgrade-applied", env!("CARGO_PKG_VERSION"));
+                });
+            }
+
+            // Remove the legacy Electron-based BeuMultiTool if it's still
+            // installed, so only this Tauri build remains. Runs off-thread so a
+            // slow NSIS uninstaller never blocks the window from painting.
+            #[cfg(target_os = "windows")]
+            {
+                let handle_for_uninstall = handle.clone();
+                let skip_uninstall = {
+                    let state = handle.state::<AppState>();
+                    let cfg = state.config.lock().unwrap();
+                    cfg.old_version_removed.unwrap_or(false)
+                };
+                std::thread::spawn(move || {
+                    let outcome = uninstall_old::detect_and_remove_old_version(skip_uninstall);
+                    if outcome.attempted {
+                        // Give the renderer a moment to mount its listeners.
+                        std::thread::sleep(std::time::Duration::from_millis(1200));
+                        let _ = handle_for_uninstall.emit("old-version-removed", ());
+                    }
+                    // Persist the run-once flag only on a confirmed removal, so
+                    // a partial uninstall is retried on the next launch.
+                    if outcome.fully_removed {
+                        if let Some(state) = handle_for_uninstall.try_state::<AppState>() {
+                            let mut cfg = state.config.lock().unwrap();
+                            cfg.old_version_removed = Some(true);
+                            let _ = cfg.save(&handle_for_uninstall);
+                        }
+                    }
                 });
             }
 

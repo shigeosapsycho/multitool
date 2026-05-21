@@ -224,7 +224,10 @@ export const api = {
     getOutputDir: () => invoke<string>('files_get_output_dir')
   },
   app: {
-    getVersion: () => invoke<string>('app_get_version')
+    getVersion: () => invoke<string>('app_get_version'),
+    /** Fires once, on the launch where the legacy Electron build was removed. */
+    onOldVersionRemoved: (cb: () => void) =>
+      onEvent<unknown>('old-version-removed', () => cb())
   },
   config: {
     get: () =>
