@@ -126,6 +126,11 @@ const SET_MATCH_ORDER: PokemonSet[] = [
   ...POKEMON_SETS.filter((s) => s.base)
 ]
 
+// Lowercase set keyword(s) keyed by set name — drives row-label set stripping.
+const SET_KEYWORDS: Record<string, string[]> = Object.fromEntries(
+  POKEMON_SETS.map((s) => [s.name, s.keywords])
+)
+
 /** Detect the Pokémon set from an item title, or null if none is recognized. */
 export function detectSet(item: string): { set: string; era: PokemonEra } | null {
   const t = item.toLowerCase()
@@ -149,6 +154,45 @@ const GAME_PREFIX =
 /** Cleaned item title for display — see TCG_PREFIX / GAME_PREFIX. */
 export function displayName(item: string): string {
   return item.replace(TCG_PREFIX, '').replace(GAME_PREFIX, '').trim()
+}
+
+// Item titles also lead with the era name ("Scarlet & Violet—…", "Sword &
+// Shield …"), which is redundant once the row sits under its era/set group.
+// Target's punctuation is loose — em/en dash or hyphen separators, a missing
+// "&", an optional set code like "S3.5" — so each era gets a permissive
+// leading matcher that also eats the trailing code and separators.
+const ERA_PREFIX: Record<PokemonEra, RegExp> = {
+  'Sword & Shield Era': /^sword\s*&?\s*shield(?:\s+s\d+(?:\.\d+)?)?[\s:—–-]*/i,
+  'Scarlet & Violet Era': /^scarlet\s*&?\s*violet(?:\s+s\d+(?:\.\d+)?)?[\s:—–-]*/i,
+  'Mega Evolution Era': /^mega\s+evolution(?:\s+s\d+(?:\.\d+)?)?[\s:—–-]*/i
+}
+
+// Trailing run of separators Target puts between an era/set name and the rest
+// of the title (space, colon, em/en dash, hyphen).
+const NAME_SEP = '[\\s:—–-]*'
+
+/**
+ * Display title for a checklist row. Like `displayName`, but drops the leading
+ * Pokémon era name — the row already sits under its era/set group, so
+ * repeating "Scarlet & Violet" on every line is just noise. When `stripSet` is
+ * set (the row also sits under a set group), the leading set name is dropped
+ * too. Falls back to the full name if stripping would leave nothing.
+ */
+export function rowDisplayName(entry: SkuEntry, stripSet = false): string {
+  const name = displayName(entry.item)
+  if (!entry.era) return name
+  let out = name.replace(ERA_PREFIX[entry.era], '').trim()
+  if (stripSet && entry.set) {
+    for (const kw of SET_KEYWORDS[entry.set] ?? []) {
+      const re = new RegExp('^' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + NAME_SEP, 'i')
+      const m = out.match(re)
+      if (m) {
+        out = out.slice(m[0].length).trim()
+        break
+      }
+    }
+  }
+  return out || name
 }
 
 /**

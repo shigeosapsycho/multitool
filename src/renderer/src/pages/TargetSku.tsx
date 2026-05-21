@@ -11,10 +11,10 @@ import {
   buildGroups,
   chunkEvenly,
   detectFormat,
-  displayName,
   fetchRemoteSkus,
   formatSkus,
   parseSkuList,
+  rowDisplayName,
   type ExportFormat,
   type GroupingMode,
   type SkuEntry,
@@ -68,11 +68,13 @@ const LinkIcon = () => (
 function SkuRow({
   entry,
   checked,
+  stripSet,
   onSelect,
   onContextMenu
 }: {
   entry: SkuEntry
   checked: boolean
+  stripSet: boolean
   onSelect: (e: React.MouseEvent) => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
@@ -93,7 +95,7 @@ function SkuRow({
         {entry.sku}
       </span>
       <span className="min-w-0 flex-1 truncate text-[12.5px] text-text-primary">
-        {displayName(entry.item)}
+        {rowDisplayName(entry, stripSet)}
       </span>
     </button>
   )
@@ -414,6 +416,7 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
                   <SkuRow
                     entry={e}
                     checked={selected.has(e.sku)}
+                    stripSet={pokemonGrouping !== 'era'}
                     onSelect={(ev) => handleRowClick(e.sku, ev.shiftKey)}
                     onContextMenu={(ev) => {
                       ev.preventDefault()
