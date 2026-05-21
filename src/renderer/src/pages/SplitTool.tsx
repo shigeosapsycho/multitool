@@ -10,6 +10,7 @@ import {
 import { Card } from '../components/Card'
 import { basenameNoExt, nonEmptyLines } from '../lib/parse'
 import { consumePendingFile } from '../lib/pending'
+import { shortOutputPath } from '../lib/paths'
 
 export type SplitToolProps = {
   title: string
@@ -185,7 +186,7 @@ export function SplitTool(props: SplitToolProps) {
                       {o.lines.toLocaleString()} lines
                     </span>
                     <span className="flex-1 truncate font-mono text-[12px] text-text-primary">
-                      {o.path}
+                      {shortOutputPath(o.path)}
                     </span>
                     <Button
                       onClick={() => window.api.files.openFile(o.path)}

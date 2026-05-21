@@ -47,9 +47,9 @@ const TOOL_ROUTES = new Set<Route>([
   'email-unsubscribe',
   'find-duplicates',
   'find-non-duplicates',
+  'proxy-cleaner',
   'randomize',
   'remove-passwords',
-  'resi-cleaner',
   'split-by-n'
 ])
 

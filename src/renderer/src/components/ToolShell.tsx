@@ -10,6 +10,7 @@ import {
 import { PageHeader, Button } from './PageHeader'
 import { StatusBanner, Stat } from './StatusBanner'
 import { Card } from './Card'
+import { shortOutputPath } from '../lib/paths'
 
 const FolderIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -271,7 +272,7 @@ export function ResultPanel({
           <div className="flex items-center gap-2 border-t border-border p-3">
             {savedTo ? (
               <span className="flex-1 truncate text-[12px] text-text-secondary">
-                Saved to <span className="text-text-primary">{savedTo}</span>
+                Saved to <span className="text-text-primary">{shortOutputPath(savedTo)}</span>
               </span>
             ) : (
               <span className="flex-1" />
