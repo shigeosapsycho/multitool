@@ -23,6 +23,8 @@ export type SingleFileToolProps = {
   pickerTitle?: string
   pickerFilters?: { name: string; extensions: string[] }[]
   toolbar?: ReactNode
+  /** Extra action(s) rendered in the result panel footer when there are results. */
+  resultActions?: (results: string[]) => ReactNode
   active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
@@ -42,6 +44,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
     pickerTitle,
     pickerFilters,
     toolbar,
+    resultActions,
     active = true,
     onBack,
     onSetStatus
@@ -165,6 +168,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
         initialMessage={`Run "${runLabel}" to populate.`}
         taskName={taskName}
         savedTo={savedTo}
+        footerActions={resultActions}
         onSaved={(path) => {
           setSavedTo(path)
           onSetStatus(`Saved to ${path}`)

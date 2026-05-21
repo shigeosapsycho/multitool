@@ -8,6 +8,7 @@ export type Route =
   | 'proxy-tester'
   | 'randomize'
   | 'remove-passwords'
+  | 'resi-cleaner'
   | 'reverse-list'
   | 'search-master'
   | 'split-by-n'

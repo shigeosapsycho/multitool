@@ -13,6 +13,7 @@ import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
+import { ResiCleanerPage } from './pages/ResiCleaner'
 import { ReverseListPage } from './pages/ReverseList'
 import { SearchMasterPage } from './pages/SearchMaster'
 import { SplitByNumberPage } from './pages/SplitByNumber'
@@ -31,6 +32,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'proxy-tester',
   'randomize',
   'remove-passwords',
+  'resi-cleaner',
   'reverse-list',
   'search-master',
   'split-by-n'
@@ -241,7 +243,7 @@ export default function App() {
   }, [goBack])
 
   function renderTool(r: Route, active: boolean): JSX.Element | null {
-    const props = { onBack: goBack, onSetStatus: noopStatus, active }
+    const props = { onBack: goBack, onSetStatus: noopStatus, active, onNavigate: navigate }
     switch (r) {
       case 'csv-email-pass':
         return <CsvEmailPassPage {...props} />
@@ -259,6 +261,8 @@ export default function App() {
         return <RandomizePage {...props} />
       case 'remove-passwords':
         return <RemovePasswordsPage {...props} />
+      case 'resi-cleaner':
+        return <ResiCleanerPage {...props} />
       case 'reverse-list':
         return <ReverseListPage {...props} />
       case 'search-master':
