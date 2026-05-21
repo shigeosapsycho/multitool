@@ -139,6 +139,7 @@ pub fn run() {
             commands::config_set_theme,
             commands::config_set_output_sort,
             commands::config_set_pokemon_grouping,
+            commands::config_set_restore_last_module,
             commands::app_get_version,
             commands::net_test_proxies,
             commands::net_cancel_proxies,

@@ -36,6 +36,8 @@ type Props = {
   onOutputSortChange: (next: OutputSort) => void
   pokemonGrouping: GroupingMode
   onPokemonGroupingChange: (next: GroupingMode) => void
+  restoreLastModule: boolean
+  onRestoreLastModuleChange: (next: boolean) => void
 }
 
 export function SettingsPage({
@@ -48,7 +50,9 @@ export function SettingsPage({
   outputSort,
   onOutputSortChange,
   pokemonGrouping,
-  onPokemonGroupingChange
+  onPokemonGroupingChange,
+  restoreLastModule,
+  onRestoreLastModuleChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -84,6 +88,11 @@ export function SettingsPage({
   async function handleChangePokemonGrouping(next: GroupingMode) {
     await window.api.config.setPokemonGrouping(next)
     onPokemonGroupingChange(next)
+  }
+
+  async function handleToggleRestoreLastModule(next: boolean) {
+    await window.api.config.setRestoreLastModule(next)
+    onRestoreLastModuleChange(next)
   }
 
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -130,6 +139,25 @@ export function SettingsPage({
                 ]}
                 onChange={handleChangeTheme}
                 ariaLabel="Color theme"
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Card label="Navigation">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Resume last module</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  When on, the Tools tab reopens the module you had open instead of the
+                  tool list — so switching to Settings or Output and back keeps your place.
+                </div>
+              </div>
+              <Toggle
+                checked={restoreLastModule}
+                onChange={handleToggleRestoreLastModule}
+                ariaLabel="Toggle resume last module"
               />
             </div>
           </div>

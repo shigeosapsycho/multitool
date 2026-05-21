@@ -27,6 +27,9 @@ pub struct Config {
     pub output_sort: Option<String>,
     /// Target SKUs checklist grouping: "set" | "era-set" | "era".
     pub pokemon_grouping: Option<String>,
+    /// When true, the Tools sidebar tab reopens the last-used module instead
+    /// of the tool grid.
+    pub restore_last_module: Option<bool>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
@@ -92,6 +95,11 @@ impl Config {
             _ => "set".into(),
         }
     }
+
+    pub fn restore_last_module(&self) -> bool {
+        // Default true — returning to the open module is the expected behavior.
+        self.restore_last_module.unwrap_or(true)
+    }
 }
 
 #[cfg(test)]
@@ -124,6 +132,19 @@ mod tests {
         assert!(cfg.imap_accounts.is_none());
         // The uninstall run-once flag also defaults cleanly for old configs.
         assert!(cfg.old_version_removed.is_none());
+    }
+
+    #[test]
+    fn restore_last_module_defaults_true_and_round_trips() {
+        // Old configs with no field default to true.
+        let cfg: Config = serde_json::from_str("{}").unwrap();
+        assert!(cfg.restore_last_module());
+        // An explicit false survives a serialize/deserialize round trip.
+        let mut cfg = Config::default();
+        cfg.restore_last_module = Some(false);
+        let json = serde_json::to_string(&cfg).unwrap();
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert!(!back.restore_last_module());
     }
 
     #[test]

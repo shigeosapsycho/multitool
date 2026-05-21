@@ -240,6 +240,7 @@ export const api = {
         theme: ThemePref
         outputSort: OutputSort
         pokemonGrouping: PokemonGrouping
+        restoreLastModule: boolean
       }>('config_get'),
     setFilePreview: (enabled: boolean) =>
       invoke<boolean>('config_set_file_preview', { enabled }),
@@ -248,7 +249,9 @@ export const api = {
     setTheme: (theme: ThemePref) => invoke<ThemePref>('config_set_theme', { theme }),
     setOutputSort: (sort: OutputSort) => invoke<OutputSort>('config_set_output_sort', { sort }),
     setPokemonGrouping: (grouping: PokemonGrouping) =>
-      invoke<PokemonGrouping>('config_set_pokemon_grouping', { grouping })
+      invoke<PokemonGrouping>('config_set_pokemon_grouping', { grouping }),
+    setRestoreLastModule: (enabled: boolean) =>
+      invoke<boolean>('config_set_restore_last_module', { enabled })
   },
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),

@@ -494,6 +494,7 @@ pub struct ConfigSnapshot {
     pub theme: String,
     pub output_sort: String,
     pub pokemon_grouping: String,
+    pub restore_last_module: bool,
 }
 
 #[tauri::command]
@@ -510,6 +511,7 @@ pub async fn config_get(app: AppHandle) -> Result<ConfigSnapshot, String> {
         theme: cfg.theme(),
         output_sort: cfg.output_sort(),
         pokemon_grouping: cfg.pokemon_grouping(),
+        restore_last_module: cfg.restore_last_module(),
     })
 }
 
@@ -562,6 +564,15 @@ pub async fn config_set_pokemon_grouping(
     }
     mutate_config(&app, |cfg| cfg.pokemon_grouping = Some(grouping.clone()))?;
     Ok(grouping)
+}
+
+#[tauri::command]
+pub async fn config_set_restore_last_module(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<bool, String> {
+    mutate_config(&app, |cfg| cfg.restore_last_module = Some(enabled))?;
+    Ok(enabled)
 }
 
 // ---------- app ----------

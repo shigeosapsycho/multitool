@@ -60,8 +60,12 @@ export default function App() {
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
   const [outputSort, setOutputSort] = useState<'name' | 'size' | 'modified'>('name')
   const [pokemonGrouping, setPokemonGrouping] = useState<GroupingMode>('set')
+  // When true, the Tools sidebar tab reopens the last-used module.
+  const [restoreLastModule, setRestoreLastModule] = useState(true)
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
+  // The most recently opened module — the Tools tab returns here.
+  const [lastTool, setLastTool] = useState<Route | null>(null)
   const noopStatus = () => {}
 
   const route = nav.history[nav.index] ?? 'tools'
@@ -76,6 +80,7 @@ export default function App() {
         setTheme(cfg.theme)
         setOutputSort(cfg.outputSort)
         setPokemonGrouping(cfg.pokemonGrouping)
+        setRestoreLastModule(cfg.restoreLastModule)
       })
       .catch(() => {})
     // Check for updates once on launch (the Rust side no longer polls).
@@ -159,6 +164,7 @@ export default function App() {
 
   const navigate = useCallback((next: Route) => {
     if (isToolRoute(next)) {
+      setLastTool(next)
       setVisitedTools((prev) => {
         if (prev.has(next)) return prev
         const out = new Set(prev)
@@ -183,6 +189,17 @@ export default function App() {
       prev.index < prev.history.length - 1 ? { ...prev, index: prev.index + 1 } : prev
     )
   }, [])
+
+  // Sidebar nav. When "restore last module" is on, the Tools tab reopens the
+  // last-used module instead of the tool grid, so a detour through Settings or
+  // Output and back keeps the user's place. Other tabs navigate normally.
+  const navigateFromSidebar = useCallback(
+    (next: Route) => {
+      if (next === 'tools' && restoreLastModule && lastTool) navigate(lastTool)
+      else navigate(next)
+    },
+    [navigate, restoreLastModule, lastTool]
+  )
 
   // Mouse4 / Mouse5 ("Back" / "Forward" thumb buttons). Listen via three paths
   // and debounce per-direction so a single click that fires multiple events
@@ -301,6 +318,8 @@ export default function App() {
         onOutputSortChange={setOutputSort}
         pokemonGrouping={pokemonGrouping}
         onPokemonGroupingChange={setPokemonGrouping}
+        restoreLastModule={restoreLastModule}
+        onRestoreLastModuleChange={setRestoreLastModule}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />
@@ -309,7 +328,7 @@ export default function App() {
     <div className="flex h-full min-h-0 flex-col bg-bg">
       <TitleBar title="Beu MultiTool" version={version} />
       <div className="flex min-h-0 flex-1">
-        <Sidebar current={route} onNavigate={navigate} />
+        <Sidebar current={route} onNavigate={navigateFromSidebar} />
         <main className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
           {/* Non-tool pages: animated, re-mount on each visit. */}
           {nonToolContent && (
