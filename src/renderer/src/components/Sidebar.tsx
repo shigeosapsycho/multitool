@@ -50,7 +50,8 @@ const TOOL_ROUTES = new Set<Route>([
   'proxy-cleaner',
   'randomize',
   'remove-passwords',
-  'split-by-n'
+  'split-by-n',
+  'target-sku'
 ])
 
 function topLevelOf(route: Route): SidebarItem['id'] {

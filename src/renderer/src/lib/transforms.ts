@@ -65,7 +65,7 @@ export function filterEmailsBySuccess(successText: string, masterText: string): 
 
 // Parse one CSV row into fields, honoring RFC 4180-style double-quoted fields
 // where "" inside a quoted field is a literal quote. Trailing \r is stripped.
-function parseCsvRow(row: string): string[] {
+export function parseCsvRow(row: string): string[] {
   const out: string[] = []
   let field = ''
   let inQuotes = false

@@ -81,6 +81,12 @@ const tools: ToolMeta[] = [
     title: 'Split by Number',
     description: 'Split a file into N evenly-sized parts.',
     accent: '#22d3ee'
+  },
+  {
+    id: 'target-sku',
+    title: 'Target SKUs',
+    description: 'Pick Target trading-card SKUs and export them in a bot format.',
+    accent: '#cc0000'
   }
 ]
 
@@ -207,6 +213,14 @@ const EmailUnsubscribeIcon = () => (
   </svg>
 )
 
+const TargetIcon = () => (
+  <svg {...SVG_PROPS}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5.2" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
@@ -220,7 +234,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'remove-passwords': KeyIcon,
   'reverse-list': ReverseListIcon,
   'search-master': SearchIcon,
-  'split-by-n': SplitByNumberIcon
+  'split-by-n': SplitByNumberIcon,
+  'target-sku': TargetIcon
 }
 
 function ToolCard({

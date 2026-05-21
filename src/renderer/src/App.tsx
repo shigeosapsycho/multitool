@@ -18,6 +18,7 @@ import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { ReverseListPage } from './pages/ReverseList'
 import { SearchMasterPage } from './pages/SearchMaster'
 import { SplitByNumberPage } from './pages/SplitByNumber'
+import { TargetSkuPage } from './pages/TargetSku'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 import { LogsPage } from './pages/Logs'
@@ -37,7 +38,8 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'remove-passwords',
   'reverse-list',
   'search-master',
-  'split-by-n'
+  'split-by-n',
+  'target-sku'
 ]
 
 function isToolRoute(r: Route): boolean {
@@ -273,6 +275,8 @@ export default function App() {
         return <SearchMasterPage {...props} />
       case 'split-by-n':
         return <SplitByNumberPage {...props} />
+      case 'target-sku':
+        return <TargetSkuPage {...props} />
       default:
         return null
     }
