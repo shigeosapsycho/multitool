@@ -51,6 +51,17 @@ export function categorize(item: string): SkuCategory {
   return 'Other'
 }
 
+// Item titles repeat the game name (e.g. "Pokémon Trading Card Game: ..."),
+// which is redundant once the entry sits under its category group. This strips
+// the leading "<game> Trading Card Game:" / "Card Game:" / "TCG:" / Magic
+// prefix. The raw `item` is kept for categorization and as the GitHub source.
+const TCG_PREFIX = /^.*?(?:Trading Card Game|Card Game|TCG|The Gathering)\s*:\s*/i
+
+/** Cleaned item title for display — see TCG_PREFIX. */
+export function displayName(item: string): string {
+  return item.replace(TCG_PREFIX, '').trim()
+}
+
 /**
  * Parse a SKU catalog CSV (`SKU,ITEM` header) into entries. The header row is
  * skipped, blank rows ignored, and duplicate SKUs dropped (first wins).
@@ -87,6 +98,27 @@ export function formatSkus(skus: string[], format: ExportFormat): string {
       // Not implemented yet — the UI disables these selectors.
       return ''
   }
+}
+
+/**
+ * Extract the SKU tokens from an export string. Splits on commas and any
+ * whitespace so both the Shikari format and loosely pasted lists round-trip.
+ * Format-specific parsing arrives when Refract/Stellar are imported.
+ */
+export function parseSkuList(text: string, _format: ExportFormat): string[] {
+  return text
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/**
+ * Guess the export format from a typed/pasted string. Only Shikari is
+ * implemented, so this always returns 'shikari' until Refract and Stellar
+ * are imported and given their own detection rules.
+ */
+export function detectFormat(_text: string): ExportFormat {
+  return 'shikari'
 }
 
 /** SKUs parsed from the copy bundled into the app. Always available offline. */
