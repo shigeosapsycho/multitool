@@ -41,6 +41,12 @@ const tools: ToolMeta[] = [
     accent: '#f59e0b'
   },
   {
+    id: 'proxy-cleaner',
+    title: 'Proxy Cleaner',
+    description: 'Filter a proxy list down to residential and/or ISP proxies.',
+    accent: '#818cf8'
+  },
+  {
     id: 'proxy-tester',
     title: 'Proxy Tester',
     description: 'Ping a URL and report latency. Optional proxy.',
@@ -57,12 +63,6 @@ const tools: ToolMeta[] = [
     title: 'Remove Passwords',
     description: 'Strip the :password from a user:pass list.',
     accent: '#f87171'
-  },
-  {
-    id: 'resi-cleaner',
-    title: 'Resi Cleaner',
-    description: 'Filter a proxy list down to residential and/or ISP proxies.',
-    accent: '#818cf8'
   },
   {
     id: 'reverse-list',
@@ -190,7 +190,7 @@ const EmailCleanerIcon = () => (
   </svg>
 )
 
-const ResiCleanerIcon = () => (
+const ProxyCleanerIcon = () => (
   <svg {...SVG_PROPS}>
     <path d="M13 3 12 13" />
     <path d="M8.5 13h7l2 8h-11z" />
@@ -214,10 +214,10 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'email-unsubscribe': EmailUnsubscribeIcon,
   'find-duplicates': DuplicatesIcon,
   'find-non-duplicates': StarIcon,
+  'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
   'remove-passwords': KeyIcon,
-  'resi-cleaner': ResiCleanerIcon,
   'reverse-list': ReverseListIcon,
   'search-master': SearchIcon,
   'split-by-n': SplitByNumberIcon

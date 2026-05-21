@@ -17,6 +17,7 @@ import {
 } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { consumePendingFile } from '../lib/pending'
+import { shortOutputPath } from '../lib/paths'
 
 export type TwoFileToolProps = {
   title: string
@@ -309,7 +310,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
         savedTo={savedTo}
         onSaved={(p) => {
           setSavedTo(p)
-          onSetStatus(`Saved to ${p}`)
+          onSetStatus(`Saved to ${shortOutputPath(p)}`)
         }}
       />
     </ToolLayout>

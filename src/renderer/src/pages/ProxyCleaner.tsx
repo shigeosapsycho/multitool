@@ -52,7 +52,7 @@ function FilterChip({
   )
 }
 
-export function ResiCleanerPage({ onBack, onSetStatus, onNavigate, active }: Props) {
+export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Props) {
   const [filters, setFilters] = useState<ProxyFilters>({ residential: true, isp: true })
 
   const toolbar = (
@@ -74,7 +74,7 @@ export function ResiCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pro
 
   return (
     <SingleFileTool
-      title="Resi Cleaner"
+      title="Proxy Cleaner"
       hint="Keep only Residential and/or ISP proxies. Toggle filters in the header."
       taskName="filtered-proxies"
       inputLabel="Proxy List"

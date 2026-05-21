@@ -9,6 +9,7 @@ import {
   type FilePanelHandle
 } from '../components/ToolShell'
 import { consumePendingFile } from '../lib/pending'
+import { shortOutputPath } from '../lib/paths'
 
 export type SingleFileToolProps = {
   title: string
@@ -171,7 +172,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
         footerActions={resultActions}
         onSaved={(path) => {
           setSavedTo(path)
-          onSetStatus(`Saved to ${path}`)
+          onSetStatus(`Saved to ${shortOutputPath(path)}`)
         }}
       />
     </ToolLayout>

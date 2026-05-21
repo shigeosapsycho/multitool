@@ -3,6 +3,7 @@ import { ToolLayout, FilePanel, Button, Icons, Stat, type FilePanelHandle } from
 import { Card } from '../components/Card'
 import { consumePendingFile, consumePendingProxies } from '../lib/pending'
 import type { ProxyTestEntry } from '../lib/api'
+import { shortOutputPath } from '../lib/paths'
 
 type Props = {
   onBack: () => void
@@ -37,14 +38,14 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
 
   useEffect(() => {
     if (!active) return
-    // A list handed over from Resi Cleaner's "Send to Proxy Tester" button.
+    // A list handed over from Proxy Cleaner's "Send to Proxy Tester" button.
     const proxies = consumePendingProxies()
     if (proxies != null) {
       setFilePath(null)
       panelRef.current?.setValue(proxies)
       setResults(null)
       setSavedTo(null)
-      onSetStatus('Loaded filtered proxies from Resi Cleaner')
+      onSetStatus('Loaded filtered proxies from Proxy Cleaner')
       return
     }
     const pending = consumePendingFile()
@@ -119,7 +120,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
     if (working.length === 0) return
     const path = await window.api.files.writeOutput('working-proxies', working.join('\n') + '\n')
     setSavedTo(path)
-    onSetStatus(`Saved ${working.length.toLocaleString()} to ${path}`)
+    onSetStatus(`Saved ${working.length.toLocaleString()} to ${shortOutputPath(path)}`)
   }
 
   const canRun = url.trim().length > 0 && lineCount > 0 && !running
@@ -242,7 +243,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
             <div className="flex items-center gap-2 border-t border-border p-3">
               {savedTo ? (
                 <span className="flex-1 truncate text-[12px] text-text-secondary">
-                  Saved to <span className="text-text-primary">{savedTo}</span>
+                  Saved to <span className="text-text-primary">{shortOutputPath(savedTo)}</span>
                 </span>
               ) : (
                 <span className="flex-1 text-[12px] text-text-muted">

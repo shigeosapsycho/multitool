@@ -11,10 +11,10 @@ import { EmailFilterPage } from './pages/EmailFilter'
 import { EmailUnsubscribePage } from './pages/EmailUnsubscribe'
 import { FindDuplicatesPage } from './pages/FindDuplicates'
 import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
+import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
-import { ResiCleanerPage } from './pages/ResiCleaner'
 import { ReverseListPage } from './pages/ReverseList'
 import { SearchMasterPage } from './pages/SearchMaster'
 import { SplitByNumberPage } from './pages/SplitByNumber'
@@ -31,10 +31,10 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'email-unsubscribe',
   'find-duplicates',
   'find-non-duplicates',
+  'proxy-cleaner',
   'proxy-tester',
   'randomize',
   'remove-passwords',
-  'resi-cleaner',
   'reverse-list',
   'search-master',
   'split-by-n'
@@ -259,14 +259,14 @@ export default function App() {
         return <FindDuplicatesPage {...props} />
       case 'find-non-duplicates':
         return <FindNonDuplicatesPage {...props} />
+      case 'proxy-cleaner':
+        return <ProxyCleanerPage {...props} />
       case 'proxy-tester':
         return <ProxyTesterPage {...props} />
       case 'randomize':
         return <RandomizePage {...props} />
       case 'remove-passwords':
         return <RemovePasswordsPage {...props} />
-      case 'resi-cleaner':
-        return <ResiCleanerPage {...props} />
       case 'reverse-list':
         return <ReverseListPage {...props} />
       case 'search-master':

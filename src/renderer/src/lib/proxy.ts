@@ -1,4 +1,4 @@
-// Proxy-list parsing and classification for the Resi Cleaner tool.
+// Proxy-list parsing and classification for the Proxy Cleaner tool.
 //
 // A proxy line is sorted into one of two buckets by the shape of its host:
 //   - Residential: the host is a hostname/domain (residential/rotating
