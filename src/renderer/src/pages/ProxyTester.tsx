@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ToolLayout, FilePanel, Button, Icons, Stat, type FilePanelHandle } from '../components/ToolShell'
 import { Card } from '../components/Card'
-import { consumePendingFile } from '../lib/pending'
+import { consumePendingFile, consumePendingProxies } from '../lib/pending'
 import type { ProxyTestEntry } from '../lib/api'
 
 type Props = {
@@ -37,6 +37,16 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
 
   useEffect(() => {
     if (!active) return
+    // A list handed over from Resi Cleaner's "Send to Proxy Tester" button.
+    const proxies = consumePendingProxies()
+    if (proxies != null) {
+      setFilePath(null)
+      panelRef.current?.setValue(proxies)
+      setResults(null)
+      setSavedTo(null)
+      onSetStatus('Loaded filtered proxies from Resi Cleaner')
+      return
+    }
     const pending = consumePendingFile()
     if (pending) void loadFromPath(pending)
   }, [active])

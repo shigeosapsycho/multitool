@@ -59,6 +59,12 @@ const tools: ToolMeta[] = [
     accent: '#f87171'
   },
   {
+    id: 'resi-cleaner',
+    title: 'Resi Cleaner',
+    description: 'Filter a proxy list down to residential and/or ISP proxies.',
+    accent: '#818cf8'
+  },
+  {
     id: 'reverse-list',
     title: 'Reverse List',
     description: 'Reverse the order of lines in a file.',
@@ -184,6 +190,15 @@ const EmailCleanerIcon = () => (
   </svg>
 )
 
+const ResiCleanerIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M13 3 12 13" />
+    <path d="M8.5 13h7l2 8h-11z" />
+    <path d="M7.7 16.5h8.6" />
+    <path d="M12 16.5V21M10 16.5 9.2 21M14 16.5l.8 4.5" />
+  </svg>
+)
+
 const EmailUnsubscribeIcon = () => (
   <svg {...SVG_PROPS}>
     <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -202,6 +217,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
   'remove-passwords': KeyIcon,
+  'resi-cleaner': ResiCleanerIcon,
   'reverse-list': ReverseListIcon,
   'search-master': SearchIcon,
   'split-by-n': SplitByNumberIcon

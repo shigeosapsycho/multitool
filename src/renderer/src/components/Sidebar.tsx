@@ -49,6 +49,7 @@ const TOOL_ROUTES = new Set<Route>([
   'find-non-duplicates',
   'randomize',
   'remove-passwords',
+  'resi-cleaner',
   'split-by-n'
 ])
 

@@ -214,6 +214,8 @@ type ResultPanelProps = {
   onSaved: (path: string) => void
   badgeOverride?: ReactNode
   emptyIsError?: boolean
+  /** Extra action(s) rendered in the footer when there are results. */
+  footerActions?: (results: string[]) => ReactNode
 }
 
 export function ResultPanel({
@@ -223,7 +225,8 @@ export function ResultPanel({
   initialMessage = 'Run to populate.',
   taskName,
   savedTo,
-  onSaved
+  onSaved,
+  footerActions
 }: ResultPanelProps) {
   const [copied, setCopied] = useState(false)
 
@@ -277,6 +280,7 @@ export function ResultPanel({
               <CopyIcon />
               {copied ? 'Copied!' : 'Copy all'}
             </Button>
+            {footerActions?.(results)}
             {savedTo ? (
               <Button onClick={() => window.api.files.reveal(savedTo)} variant="ghost">
                 <RevealIcon />
