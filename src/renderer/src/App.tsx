@@ -8,6 +8,7 @@ import { Placeholder } from './pages/Placeholder'
 import { CsvEmailPassPage } from './pages/CsvEmailPass'
 import { EmailCleanerPage } from './pages/EmailCleaner'
 import { EmailFilterPage } from './pages/EmailFilter'
+import { EmailUnsubscribePage } from './pages/EmailUnsubscribe'
 import { FindDuplicatesPage } from './pages/FindDuplicates'
 import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
 import { ProxyTesterPage } from './pages/ProxyTester'
@@ -26,6 +27,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'csv-email-pass',
   'email-cleaner',
   'email-filter',
+  'email-unsubscribe',
   'find-duplicates',
   'find-non-duplicates',
   'proxy-tester',
@@ -249,6 +251,8 @@ export default function App() {
         return <EmailCleanerPage {...props} />
       case 'email-filter':
         return <EmailFilterPage {...props} />
+      case 'email-unsubscribe':
+        return <EmailUnsubscribePage {...props} />
       case 'find-duplicates':
         return <FindDuplicatesPage {...props} />
       case 'find-non-duplicates':

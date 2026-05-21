@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { ToolLayout, Button, Icons } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImapAccountPicker } from '../components/ImapAccountPicker'
-import type { EmailHeader, ScanRange, ScanResult, EmailBody } from '../lib/api'
-import { EmailCleanerGroups, groupBySender } from './EmailCleanerGroups'
+import type { UnsubEmail, UnsubRunItem, UnsubTarget, ScanRange, EmailBody } from '../lib/api'
+import { groupBySender } from './EmailCleanerGroups'
+import { EmailUnsubscribeGroups, groupUnsubInfo } from './EmailUnsubscribeGroups'
 import { EmailPreview } from './EmailPreview'
 
 type Props = {
@@ -22,7 +24,7 @@ const StopIcon = () => (
 const fieldClass =
   'h-9 rounded-lg border border-border bg-surface px-3 text-[12.5px] text-text-primary outline-none transition focus:border-accent'
 
-export function EmailCleanerPage({ onBack }: Props) {
+export function EmailUnsubscribePage({ onBack }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const [rangeMode, setRangeMode] = useState<'dateRange' | 'lastDays'>('lastDays')
@@ -32,44 +34,56 @@ export function EmailCleanerPage({ onBack }: Props) {
 
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
-  const [emails, setEmails] = useState<EmailHeader[] | null>(null)
-  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [emails, setEmails] = useState<UnsubEmail[] | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [permanent, setPermanent] = useState(false)
+  const [results, setResults] = useState<Map<string, UnsubRunItem>>(new Map())
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [status, setStatus] = useState('Pick an account and a date range, then scan the inbox.')
+  const [unsubscribing, setUnsubscribing] = useState(false)
+  const [deleteEmails, setDeleteEmails] = useState(false)
+  const [status, setStatus] = useState(
+    'Pick an account and a date range, then scan for mailing lists.'
+  )
   const [search, setSearch] = useState('')
   const [preview, setPreview] = useState<{
-    email: EmailHeader
+    email: UnsubEmail
     body: EmailBody | null
     loading: boolean
     error: string | null
   } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<UnsubEmail | null>(null)
 
-  // When the chosen account changes, drop stale scan results so the inbox
-  // panel never shows mail from a different (or removed) account.
+  // When the chosen account changes, drop stale scan results.
   useEffect(() => {
     setEmails(null)
     setSelected(new Set())
     setExpanded(new Set())
+    setResults(new Map())
     setSearch('')
   }, [selectedId])
 
-  // Scanned emails grouped by sender, narrowed by the inbox search box.
-  // A search term matches against the sender name, sender address, or subject.
+  // All scanned senders grouped, and the search-narrowed subset shown.
+  const allGroups = useMemo(() => (emails ? groupBySender(emails) : []), [emails])
   const groups = useMemo(() => {
-    if (!emails) return []
     const q = search.trim().toLowerCase()
-    if (!q) return groupBySender(emails)
-    const filtered = emails.filter(
-      (e) =>
-        e.fromName.toLowerCase().includes(q) ||
-        e.fromAddr.toLowerCase().includes(q) ||
-        e.subject.toLowerCase().includes(q)
+    if (!q) return allGroups
+    return allGroups.filter(
+      (g) =>
+        g.name.toLowerCase().includes(q) ||
+        g.addr.toLowerCase().includes(q) ||
+        g.emails.some((e) => e.subject.toLowerCase().includes(q))
     )
-    return groupBySender(filtered)
-  }, [emails, search])
+  }, [allGroups, search])
+
+  // Visible groups that can be unsubscribed in bulk (mailto-only ones can't).
+  const selectableVisible = useMemo(
+    () => groups.filter((g) => groupUnsubInfo(g).method !== 'email'),
+    [groups]
+  )
+  const emailOnlyCount = useMemo(
+    () => allGroups.filter((g) => groupUnsubInfo(g).method === 'email').length,
+    [allGroups]
+  )
 
   // ---------- scan ----------
 
@@ -95,24 +109,26 @@ export function EmailCleanerPage({ onBack }: Props) {
     setEmails(null)
     setSelected(new Set())
     setExpanded(new Set())
+    setResults(new Map())
     setSearch('')
-    setStatus('Scanning inbox…')
+    setStatus('Scanning inbox for mailing lists…')
     try {
-      const result = await window.api.imap.scan(selectedId, range)
+      const result = await window.api.unsub.scan(selectedId, range)
       setEmails(result.emails)
+      const senderCount = groupBySender(result.emails).length
       if (result.cancelled) {
         setStatus(
-          `Scan stopped — showing ${result.emails.length.toLocaleString()} ${
-            result.emails.length === 1 ? 'email' : 'emails'
-          } found before stopping.`
+          `Scan stopped — found ${senderCount} ${
+            senderCount === 1 ? 'sender' : 'senders'
+          } before stopping.`
         )
       } else {
         setStatus(
           result.emails.length === 0
-            ? 'No emails found in that range.'
-            : `Found ${result.emails.length.toLocaleString()} emails from ${groupBySender(
-                result.emails
-              ).length} senders.`
+            ? 'No mail with an unsubscribe option was found in that range.'
+            : `Found ${senderCount} ${
+                senderCount === 1 ? 'sender' : 'senders'
+              } you can unsubscribe from.`
         )
       }
     } catch (e) {
@@ -128,7 +144,7 @@ export function EmailCleanerPage({ onBack }: Props) {
     setStopping(true)
     setStatus('Stopping scan…')
     try {
-      await window.api.imap.cancel()
+      await window.api.unsub.cancel()
     } catch {
       // ignore
     }
@@ -136,47 +152,33 @@ export function EmailCleanerPage({ onBack }: Props) {
 
   // ---------- selection ----------
 
-  function toggleGroup(group: { emails: EmailHeader[] }) {
+  function toggleGroup(key: string) {
     setSelected((prev) => {
       const next = new Set(prev)
-      const allSelected = group.emails.every((e) => next.has(e.uid))
-      for (const e of group.emails) {
-        if (allSelected) next.delete(e.uid)
-        else next.add(e.uid)
-      }
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
 
-  function toggleEmail(uid: number) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(uid)) next.delete(uid)
-      else next.add(uid)
-      return next
-    })
-  }
-
-  function toggleExpand(addr: string) {
+  function toggleExpand(key: string) {
     setExpanded((prev) => {
       const next = new Set(prev)
-      if (next.has(addr)) next.delete(addr)
-      else next.add(addr)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
 
-  // Operates on the currently visible (search-filtered) emails: if every
-  // visible email is already selected, clear them; otherwise add them all.
+  // Toggles every visible, bulk-unsubscribable group at once.
   function selectAll() {
-    const visible = groups.flatMap((g) => g.emails.map((e) => e.uid))
-    if (visible.length === 0) return
+    if (selectableVisible.length === 0) return
     setSelected((prev) => {
-      const allVisibleSelected = visible.every((u) => prev.has(u))
+      const allOn = selectableVisible.every((g) => prev.has(g.key))
       const next = new Set(prev)
-      for (const u of visible) {
-        if (allVisibleSelected) next.delete(u)
-        else next.add(u)
+      for (const g of selectableVisible) {
+        if (allOn) next.delete(g.key)
+        else next.add(g.key)
       }
       return next
     })
@@ -184,7 +186,7 @@ export function EmailCleanerPage({ onBack }: Props) {
 
   // ---------- preview ----------
 
-  async function handlePreview(email: EmailHeader) {
+  async function handlePreview(email: UnsubEmail) {
     if (!selectedId) return
     setPreview({ email, body: null, loading: true, error: null })
     try {
@@ -197,42 +199,105 @@ export function EmailCleanerPage({ onBack }: Props) {
     }
   }
 
-  // ---------- delete ----------
-
-  async function confirmDelete() {
-    if (!selectedId || selected.size === 0) return
-    setConfirmOpen(false)
-    setDeleting(true)
-    const uids = [...selected]
-    setStatus(permanent ? 'Permanently deleting emails…' : 'Moving emails to Trash…')
+  async function handleOpenMailto(mailto: string) {
     try {
-      const result = await window.api.imap.delete(selectedId, uids, permanent)
-      const deletedSet = new Set(uids.filter((u) => !result.failed.includes(u)))
-      setEmails((prev) => (prev ? prev.filter((e) => !deletedSet.has(e.uid)) : prev))
-      setSelected(new Set())
-      const base = `Deleted ${result.deleted.toLocaleString()} emails.`
-      setStatus(
-        result.failed.length > 0
-          ? `${base} ${result.failed.length} could not be deleted.`
-          : base
-      )
+      await openUrl(mailto)
     } catch (e) {
-      setStatus(`Delete failed: ${String(e)}`)
-    } finally {
-      setDeleting(false)
+      setStatus(`Could not open your mail app: ${String(e)}`)
     }
+  }
+
+  // Right-click → permanently delete a single email (bypasses Trash).
+  async function confirmDeleteEmail() {
+    const target = deleteTarget
+    setDeleteTarget(null)
+    if (!target || !selectedId) return
+    setStatus(`Permanently deleting “${target.subject || '(no subject)'}”…`)
+    try {
+      await window.api.imap.delete(selectedId, [target.uid], true)
+      setEmails((prev) => (prev ? prev.filter((e) => e.uid !== target.uid) : prev))
+      setStatus(`Permanently deleted “${target.subject || '(no subject)'}”.`)
+    } catch (e) {
+      setStatus(`Could not delete email: ${String(e)}`)
+    }
+  }
+
+  // ---------- unsubscribe ----------
+
+  async function confirmUnsub() {
+    setConfirmOpen(false)
+    const selectedKeys = [...selected]
+    const targets: UnsubTarget[] = []
+    for (const key of selectedKeys) {
+      const group = allGroups.find((g) => g.key === key)
+      if (!group) continue
+      const info = groupUnsubInfo(group)
+      if (info.url && info.method === 'one-click') {
+        targets.push({ key, url: info.url, method: 'post' })
+      } else if (info.url && info.method === 'link') {
+        targets.push({ key, url: info.url, method: 'get' })
+      }
+    }
+    if (targets.length === 0) {
+      setStatus('Nothing to unsubscribe — the selected senders have no web link.')
+      return
+    }
+    setUnsubscribing(true)
+    setStatus(`Unsubscribing from ${targets.length} ${targets.length === 1 ? 'sender' : 'senders'}…`)
+    let summary: string
+    try {
+      const items = await window.api.unsub.run(targets)
+      setResults((prev) => {
+        const next = new Map(prev)
+        for (const item of items) next.set(item.key, item)
+        return next
+      })
+      const ok = items.filter((i) => i.ok).length
+      const failed = items.length - ok
+      summary =
+        failed > 0
+          ? `Unsubscribed from ${ok} of ${items.length} senders — ${failed} failed.`
+          : `Unsubscribed from ${ok} ${ok === 1 ? 'sender' : 'senders'}.`
+    } catch (e) {
+      setUnsubscribing(false)
+      setStatus(`Unsubscribe failed: ${String(e)}`)
+      return
+    }
+
+    // "Delete emails" option: move the scanned mail from those senders to Trash.
+    if (deleteEmails && selectedId) {
+      const keySet = new Set(selectedKeys)
+      const uids = allGroups
+        .filter((g) => keySet.has(g.key))
+        .flatMap((g) => g.emails.map((e) => e.uid))
+      if (uids.length > 0) {
+        setStatus(`${summary} Moving ${uids.length.toLocaleString()} emails to Trash…`)
+        try {
+          const result = await window.api.imap.delete(selectedId, uids, false)
+          const gone = new Set(uids.filter((u) => !result.failed.includes(u)))
+          setEmails((prev) => (prev ? prev.filter((e) => !gone.has(e.uid)) : prev))
+          summary = `${summary} Moved ${result.deleted.toLocaleString()} emails to Trash.`
+        } catch (e) {
+          summary = `${summary} Could not delete emails: ${String(e)}`
+        }
+      }
+    }
+
+    setSelected(new Set())
+    setUnsubscribing(false)
+    setStatus(summary)
   }
 
   // ---------- render ----------
 
   const canScan = !!selectedId && !running
   const selectedCount = selected.size
-  const visibleUids = groups.flatMap((g) => g.emails.map((e) => e.uid))
-  const allSelected = visibleUids.length > 0 && visibleUids.every((u) => selected.has(u))
+  const allSelected =
+    selectableVisible.length > 0 && selectableVisible.every((g) => selected.has(g.key))
 
   return (
     <ToolLayout
-      title="Email Cleaner"
+      title="Email Unsubscribe"
       onBack={onBack}
       onRun={canScan ? handleScan : undefined}
       running={running}
@@ -324,15 +389,15 @@ export function EmailCleanerPage({ onBack }: Props) {
         </div>
       </Card>
 
-      {/* Right column: results */}
-      <Card label="Inbox" badge={emails ? emails.length.toLocaleString() : '—'}>
+      {/* Right column: mailing lists */}
+      <Card label="Mailing lists" badge={emails ? allGroups.length.toLocaleString() : '—'}>
         {emails === null ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
-            Scan an inbox to see emails grouped by sender.
+            Scan an inbox to find mailing lists you can leave.
           </div>
         ) : emails.length === 0 ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-secondary">
-            No emails found in that date range.
+            No mail with an unsubscribe option was found in that date range.
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
@@ -349,6 +414,7 @@ export function EmailCleanerPage({ onBack }: Props) {
               <button
                 onClick={selectAll}
                 className="text-[12px] text-accent hover:underline"
+                disabled={selectableVisible.length === 0}
               >
                 {allSelected ? 'Clear selection' : 'Select all'}
               </button>
@@ -361,37 +427,47 @@ export function EmailCleanerPage({ onBack }: Props) {
                 No senders or subjects match “{search}”.
               </div>
             ) : (
-              <EmailCleanerGroups
+              <EmailUnsubscribeGroups
                 groups={groups}
                 selected={selected}
                 expanded={expanded}
+                results={results}
                 onToggleGroup={toggleGroup}
-                onToggleEmail={toggleEmail}
                 onToggleExpand={toggleExpand}
                 onPreview={handlePreview}
+                onOpenMailto={handleOpenMailto}
+                onDeleteEmail={setDeleteTarget}
               />
             )}
             <div className="flex items-center gap-3 border-t border-border p-3">
-              <label className="flex items-center gap-2 text-[12.5px] text-text-secondary">
+              <label
+                className="flex shrink-0 items-center gap-2 text-[12.5px] text-text-secondary"
+                title="Also move the scanned emails from those senders to Trash."
+              >
                 <input
                   type="checkbox"
-                  checked={permanent}
-                  onChange={(e) => setPermanent(e.target.checked)}
+                  checked={deleteEmails}
+                  onChange={(e) => setDeleteEmails(e.target.checked)}
                   className="h-4 w-4 accent-danger"
                 />
-                Delete Permanently
+                Delete emails
               </label>
-              <span className="flex-1" />
+              <span className="flex-1 text-right text-[11.5px] leading-snug text-text-muted">
+                {emailOnlyCount > 0
+                  ? `${emailOnlyCount} ${
+                      emailOnlyCount === 1 ? 'sender offers' : 'senders offer'
+                    } email-only unsubscribe — use “Open”.`
+                  : ''}
+              </span>
               <Button
                 onClick={() => setConfirmOpen(true)}
                 variant="primary"
-                disabled={selectedCount === 0 || deleting}
+                disabled={selectedCount === 0 || unsubscribing}
               >
-                <Icons.Trash />
-                {deleting
-                  ? 'Deleting…'
-                  : `Delete ${selectedCount.toLocaleString()} ${
-                      selectedCount === 1 ? 'email' : 'emails'
+                {unsubscribing
+                  ? 'Working…'
+                  : `Unsubscribe${deleteEmails ? ' & delete' : ''} · ${selectedCount.toLocaleString()} ${
+                      selectedCount === 1 ? 'sender' : 'senders'
                     }`}
               </Button>
             </div>
@@ -401,25 +477,34 @@ export function EmailCleanerPage({ onBack }: Props) {
 
       <ConfirmDialog
         open={confirmOpen}
-        title={permanent ? 'Delete permanently?' : 'Move to Trash?'}
+        title={`Unsubscribe from ${selectedCount} ${
+          selectedCount === 1 ? 'sender' : 'senders'
+        }?`}
         message={
-          permanent
-            ? `${selectedCount} ${
-                selectedCount === 1 ? 'email' : 'emails'
-              } will be permanently removed and cannot be recovered.`
-            : `${selectedCount} ${
-                selectedCount === 1 ? 'email' : 'emails'
-              } will be moved to the Trash folder.`
+          `This sends an unsubscribe request to each selected sender’s server. ` +
+          `It cannot be undone from here — re-subscribing means signing up again.` +
+          (deleteEmails
+            ? ' The scanned emails from those senders will also be moved to Trash.'
+            : '')
         }
-        detail={
-          permanent
-            ? 'This empties them straight from the server, bypassing Trash.'
-            : 'You can still recover them from Trash in your mail client.'
-        }
-        confirmLabel={permanent ? 'Delete permanently' : 'Move to Trash'}
-        danger={permanent}
-        onConfirm={confirmDelete}
+        detail="One-click senders are unsubscribed instantly; link senders are visited once to confirm."
+        confirmLabel={deleteEmails ? 'Unsubscribe & delete' : 'Unsubscribe'}
+        danger={deleteEmails}
+        onConfirm={confirmUnsub}
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete email permanently?"
+        message={`“${
+          deleteTarget?.subject || '(no subject)'
+        }” will be permanently removed from the server and cannot be recovered.`}
+        detail="This empties it straight from the server, bypassing Trash."
+        confirmLabel="Delete permanently"
+        danger
+        onConfirm={confirmDeleteEmail}
+        onCancel={() => setDeleteTarget(null)}
       />
 
       {preview && (

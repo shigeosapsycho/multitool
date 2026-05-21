@@ -58,6 +58,32 @@ export type DeleteResult = { deleted: number; failed: number[] }
 
 export type EmailBody = { html: string | null; text: string | null }
 
+// ---------- Email Unsubscribe ----------
+
+/** A scanned email that carries a `List-Unsubscribe` header. */
+export type UnsubEmail = {
+  uid: number
+  fromName: string
+  fromAddr: string
+  subject: string
+  dateMs: number
+  sizeBytes: number
+  /** First `http(s)` unsubscribe URL, if any. */
+  httpUrl: string | null
+  /** First `mailto:` unsubscribe URI, if any. */
+  mailto: string | null
+  /** True when an RFC 8058 one-click POST can complete the unsubscribe. */
+  oneClick: boolean
+}
+
+export type UnsubScanResult = { emails: UnsubEmail[]; cancelled: boolean }
+
+/** One unsubscribe request handed to the backend. */
+export type UnsubTarget = { key: string; url: string; method: 'post' | 'get' }
+
+/** Outcome of one unsubscribe request, keyed back to its sender group. */
+export type UnsubRunItem = { key: string; ok: boolean; detail: string }
+
 type UpdaterStatus =
   | { type: 'checking'; currentVersion: string }
   | { type: 'no-update'; currentVersion: string }
@@ -241,6 +267,12 @@ export const api = {
       invoke<DeleteResult>('imap_delete', { id, uids, permanent }),
     fetchBody: (id: string, uid: number) =>
       invoke<EmailBody>('imap_fetch_body', { id, uid })
+  },
+  unsub: {
+    scan: (id: string, range: ScanRange) =>
+      invoke<UnsubScanResult>('unsub_scan', { id, range }),
+    cancel: () => invoke<void>('unsub_cancel'),
+    run: (targets: UnsubTarget[]) => invoke<UnsubRunItem[]>('unsub_run', { targets })
   },
   updater: {
     onStatus: (cb: (status: UpdaterStatus) => void) =>
