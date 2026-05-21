@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { LogEntry, Route } from './types'
+import type { GroupingMode } from './lib/targetSkus'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
@@ -18,6 +19,7 @@ import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { ReverseListPage } from './pages/ReverseList'
 import { SearchMasterPage } from './pages/SearchMaster'
 import { SplitByNumberPage } from './pages/SplitByNumber'
+import { TargetSkuPage } from './pages/TargetSku'
 import { ResultsPage } from './pages/Results'
 import { SettingsPage } from './pages/Settings'
 import { LogsPage } from './pages/Logs'
@@ -37,7 +39,8 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'remove-passwords',
   'reverse-list',
   'search-master',
-  'split-by-n'
+  'split-by-n',
+  'target-sku'
 ]
 
 function isToolRoute(r: Route): boolean {
@@ -56,6 +59,7 @@ export default function App() {
   const [deleteToTrash, setDeleteToTrash] = useState(true)
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
   const [outputSort, setOutputSort] = useState<'name' | 'size' | 'modified'>('name')
+  const [pokemonGrouping, setPokemonGrouping] = useState<GroupingMode>('set')
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   const noopStatus = () => {}
@@ -71,6 +75,7 @@ export default function App() {
         setDeleteToTrash(cfg.deleteToTrash)
         setTheme(cfg.theme)
         setOutputSort(cfg.outputSort)
+        setPokemonGrouping(cfg.pokemonGrouping)
       })
       .catch(() => {})
     // Check for updates once on launch (the Rust side no longer polls).
@@ -245,7 +250,13 @@ export default function App() {
   }, [goBack])
 
   function renderTool(r: Route, active: boolean): JSX.Element | null {
-    const props = { onBack: goBack, onSetStatus: noopStatus, active, onNavigate: navigate }
+    const props = {
+      onBack: goBack,
+      onSetStatus: noopStatus,
+      active,
+      onNavigate: navigate,
+      pokemonGrouping
+    }
     switch (r) {
       case 'csv-email-pass':
         return <CsvEmailPassPage {...props} />
@@ -273,6 +284,8 @@ export default function App() {
         return <SearchMasterPage {...props} />
       case 'split-by-n':
         return <SplitByNumberPage {...props} />
+      case 'target-sku':
+        return <TargetSkuPage {...props} />
       default:
         return null
     }
@@ -300,6 +313,8 @@ export default function App() {
         onThemeChange={setTheme}
         outputSort={outputSort}
         onOutputSortChange={setOutputSort}
+        pokemonGrouping={pokemonGrouping}
+        onPokemonGroupingChange={setPokemonGrouping}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />

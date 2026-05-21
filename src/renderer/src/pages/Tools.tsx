@@ -81,6 +81,12 @@ const tools: ToolMeta[] = [
     title: 'Split by Number',
     description: 'Split a file into N evenly-sized parts.',
     accent: '#22d3ee'
+  },
+  {
+    id: 'target-sku',
+    title: 'Target SKUs',
+    description: 'Pick Target trading-card SKUs and export them in a bot format.',
+    accent: '#cc0000'
   }
 ]
 
@@ -207,6 +213,13 @@ const EmailUnsubscribeIcon = () => (
   </svg>
 )
 
+const TargetIcon = () => (
+  <svg {...SVG_PROPS}>
+    <circle cx="12" cy="12" r="8.5" strokeWidth="3" />
+    <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
@@ -220,7 +233,8 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'remove-passwords': KeyIcon,
   'reverse-list': ReverseListIcon,
   'search-master': SearchIcon,
-  'split-by-n': SplitByNumberIcon
+  'split-by-n': SplitByNumberIcon,
+  'target-sku': TargetIcon
 }
 
 function ToolCard({
@@ -295,7 +309,7 @@ export function ToolsPage({ onNavigate }: Props) {
     <div className="flex h-full flex-col">
       <PageHeader
         title="Tools"
-        subtitle="Pick a utility to get started — or drop a file onto one."
+        subtitle="Drag and drop a file on a module or choose a module."
       />
       <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8">
         {tools.map((t) => (

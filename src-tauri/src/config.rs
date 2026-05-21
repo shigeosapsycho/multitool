@@ -25,6 +25,8 @@ pub struct Config {
     pub delete_to_trash: Option<bool>,
     pub theme: Option<String>,
     pub output_sort: Option<String>,
+    /// Target SKUs checklist grouping: "set" | "era-set" | "era".
+    pub pokemon_grouping: Option<String>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
@@ -81,6 +83,13 @@ impl Config {
         match self.output_sort.as_deref() {
             Some(s @ ("name" | "size" | "modified")) => s.to_string(),
             _ => "name".into(),
+        }
+    }
+
+    pub fn pokemon_grouping(&self) -> String {
+        match self.pokemon_grouping.as_deref() {
+            Some(g @ ("set" | "era-set" | "era")) => g.to_string(),
+            _ => "set".into(),
         }
     }
 }

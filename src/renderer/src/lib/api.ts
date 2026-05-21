@@ -8,6 +8,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview'
 
 type ThemePref = 'system' | 'light' | 'dark'
 type OutputSort = 'name' | 'size' | 'modified'
+type PokemonGrouping = 'set' | 'era-set' | 'era'
 
 type DialogFilter = { name: string; extensions: string[] }
 type OpenOpts = { multiple?: boolean; title?: string; filters?: DialogFilter[] }
@@ -202,6 +203,7 @@ export const api = {
       invoke<string[]>('files_write_outputs', { items }),
     reveal: (path: string) => invoke<void>('files_reveal', { path }),
     openFile: (path: string) => invoke<void>('files_open_file', { path }),
+    openUrl: (url: string) => invoke<void>('files_open_url', { url }),
     openOutputDir: () => invoke<void>('files_open_output_dir'),
     listOutput: (sort?: OutputSort) =>
       invoke<OutputEntry[]>('files_list_output', { sort }),
@@ -237,13 +239,16 @@ export const api = {
         deleteToTrash: boolean
         theme: ThemePref
         outputSort: OutputSort
+        pokemonGrouping: PokemonGrouping
       }>('config_get'),
     setFilePreview: (enabled: boolean) =>
       invoke<boolean>('config_set_file_preview', { enabled }),
     setDeleteToTrash: (enabled: boolean) =>
       invoke<boolean>('config_set_delete_to_trash', { enabled }),
     setTheme: (theme: ThemePref) => invoke<ThemePref>('config_set_theme', { theme }),
-    setOutputSort: (sort: OutputSort) => invoke<OutputSort>('config_set_output_sort', { sort })
+    setOutputSort: (sort: OutputSort) => invoke<OutputSort>('config_set_output_sort', { sort }),
+    setPokemonGrouping: (grouping: PokemonGrouping) =>
+      invoke<PokemonGrouping>('config_set_pokemon_grouping', { grouping })
   },
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),

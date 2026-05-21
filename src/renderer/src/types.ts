@@ -13,6 +13,7 @@ export type Route =
   | 'reverse-list'
   | 'search-master'
   | 'split-by-n'
+  | 'target-sku'
   | 'results'
   | 'settings'
   | 'logs'
