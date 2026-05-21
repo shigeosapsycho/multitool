@@ -23,6 +23,12 @@ const tools: ToolMeta[] = [
     accent: '#2dd4bf'
   },
   {
+    id: 'email-unsubscribe',
+    title: 'Email Unsubscribe',
+    description: 'Scan an IMAP inbox and unsubscribe from unwanted mailing lists.',
+    accent: '#a78bfa'
+  },
+  {
     id: 'find-duplicates',
     title: 'Find Duplicates',
     description: 'Lines that appear more than once — in one file or across two.',
@@ -193,10 +199,19 @@ const ResiCleanerIcon = () => (
   </svg>
 )
 
+const EmailUnsubscribeIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 8l9 6 9-6" />
+    <path d="M8 17h8" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
   'email-filter': FunnelIcon,
+  'email-unsubscribe': EmailUnsubscribeIcon,
   'find-duplicates': DuplicatesIcon,
   'find-non-duplicates': StarIcon,
   'proxy-tester': ProxyTesterIcon,

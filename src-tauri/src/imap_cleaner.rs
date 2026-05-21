@@ -129,6 +129,14 @@ pub fn decode_header(raw: &[u8]) -> String {
     rfc2047_decoder::decode(raw).unwrap_or_else(|_| String::from_utf8_lossy(raw).into_owned())
 }
 
+/// Wrap an IMAP mailbox name as a quoted string, escaping `\` and `"`.
+/// `uid_copy` in the imap crate does not quote its mailbox argument, so a name
+/// containing a space — such as iCloud's "Deleted Messages" — must be quoted
+/// here or the `UID COPY` command is malformed.
+pub fn quote_mailbox(name: &str) -> String {
+    format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 // ---------- IMAP operations ----------
 
 use crate::config::ImapAccount;
@@ -136,7 +144,7 @@ use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Concrete IMAP session type — always TLS, so no generics needed.
-type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
+pub(crate) type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
 
 /// Process UIDs in batches of this many so a huge inbox does not become one
 /// enormous FETCH or DELETE command line, and so cancellation can be checked
@@ -144,7 +152,10 @@ type ImapSession = imap::Session<native_tls::TlsStream<TcpStream>>;
 const IMAP_BATCH: usize = 500;
 
 /// Open an IMAP-over-TLS connection and log in.
-fn connect_session(account: &ImapAccount, password: &str) -> Result<ImapSession, String> {
+pub(crate) fn connect_session(
+    account: &ImapAccount,
+    password: &str,
+) -> Result<ImapSession, String> {
     let tls = native_tls::TlsConnector::builder()
         .build()
         .map_err(|e| format!("TLS initialisation failed: {e}"))?;
@@ -168,7 +179,7 @@ fn connect_session(account: &ImapAccount, password: &str) -> Result<ImapSession,
 }
 
 /// Convert one IMAP FETCH result into an `EmailHeader`.
-fn fetch_to_header(f: &imap::types::Fetch) -> EmailHeader {
+pub(crate) fn fetch_to_header(f: &imap::types::Fetch) -> EmailHeader {
     let env = f.envelope();
     let subject = env
         .and_then(|e| e.subject.as_ref())
@@ -324,8 +335,12 @@ fn delete_emails(
                     .uid_mv(&set, trash)
                     .map_err(|e| format!("Moving messages to {trash} failed: {e}"))?;
             } else {
+                // The imap crate's `uid_copy` — unlike `uid_mv` — does not
+                // quote the mailbox name, so a name with a space (e.g.
+                // iCloud's "Deleted Messages") yields a malformed command.
+                // Quote it here.
                 session
-                    .uid_copy(&set, trash)
+                    .uid_copy(&set, quote_mailbox(trash))
                     .map_err(|e| format!("Copying messages to {trash} failed: {e}"))?;
                 session
                     .uid_store(&set, "+FLAGS (\\Deleted)")
@@ -473,7 +488,7 @@ pub async fn imap_delete_account(app: AppHandle, id: String) -> Result<(), Strin
 }
 
 /// Look up an account by id and load its password from the credential store.
-fn account_with_password(
+pub(crate) fn account_with_password(
     app: &AppHandle,
     id: &str,
 ) -> Result<(ImapAccount, String), String> {
@@ -653,5 +668,12 @@ mod tests {
     fn decode_header_decodes_encoded_word() {
         // "=?UTF-8?B?w6lj?=" is base64 "éc".
         assert_eq!(decode_header(b"=?UTF-8?B?w6lj?="), "éc");
+    }
+
+    #[test]
+    fn quote_mailbox_wraps_and_escapes() {
+        assert_eq!(quote_mailbox("Deleted Messages"), "\"Deleted Messages\"");
+        assert_eq!(quote_mailbox("Trash"), "\"Trash\"");
+        assert_eq!(quote_mailbox("a\"b\\c"), "\"a\\\"b\\\\c\"");
     }
 }

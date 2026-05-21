@@ -3,6 +3,7 @@ export type Route =
   | 'csv-email-pass'
   | 'email-cleaner'
   | 'email-filter'
+  | 'email-unsubscribe'
   | 'find-duplicates'
   | 'find-non-duplicates'
   | 'proxy-tester'

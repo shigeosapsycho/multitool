@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod email_unsubscribe;
 mod imap_cleaner;
 mod imap_creds;
 mod update;
@@ -16,6 +17,7 @@ pub struct AppState {
     pub watcher: Mutex<Option<watcher::OutputWatcher>>,
     pub proxy_cancel: Arc<AtomicBool>,
     pub imap_cancel: Arc<AtomicBool>,
+    pub unsub_cancel: Arc<AtomicBool>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -33,6 +35,7 @@ pub fn run() {
                 watcher: Mutex::new(None),
                 proxy_cancel: Arc::new(AtomicBool::new(false)),
                 imap_cancel: Arc::new(AtomicBool::new(false)),
+                unsub_cancel: Arc::new(AtomicBool::new(false)),
             });
 
             if let Err(err) = commands::ensure_output_dir(&handle) {
@@ -147,6 +150,9 @@ pub fn run() {
             imap_cleaner::imap_cancel,
             imap_cleaner::imap_delete,
             imap_cleaner::imap_fetch_body,
+            email_unsubscribe::unsub_scan,
+            email_unsubscribe::unsub_cancel,
+            email_unsubscribe::unsub_run,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

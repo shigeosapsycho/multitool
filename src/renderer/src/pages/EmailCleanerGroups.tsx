@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { EmailHeader } from '../lib/api'
 import { ContextMenu } from '../components/ContextMenu'
 
-export type SenderGroup = {
+export type SenderGroup<T extends EmailHeader = EmailHeader> = {
   /** Stable identity for this group — used as the React key and expand key. */
   key: string
   /** Display name, or the address when the sender has no display name. */
@@ -11,7 +11,7 @@ export type SenderGroup = {
   addr: string
   /** How many distinct sender addresses fall under this group. */
   addrCount: number
-  emails: EmailHeader[]
+  emails: T[]
   totalSize: number
 }
 
@@ -23,12 +23,12 @@ export type SenderGroup = {
  * address per message — e.g. iCloud "Hide My Email" relay aliases, where
  * every message from "Best Buy" arrives from a different address.
  */
-export function groupBySender(emails: EmailHeader[]): SenderGroup[] {
+export function groupBySender<T extends EmailHeader>(emails: T[]): SenderGroup<T>[] {
   type Acc = {
     name: string
     firstAddr: string
     addrKeys: Set<string>
-    emails: EmailHeader[]
+    emails: T[]
     totalSize: number
   }
   const map = new Map<string, Acc>()
@@ -70,7 +70,7 @@ export function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatDate(ms: number): string {
+export function formatDate(ms: number): string {
   if (!ms) return '—'
   return new Date(ms).toLocaleDateString(undefined, {
     year: 'numeric',
