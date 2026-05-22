@@ -254,7 +254,10 @@ export default function App() {
 
   function renderTool(r: Route, active: boolean): JSX.Element | null {
     const props = {
-      onBack: goBack,
+      // A tool's back arrow always returns to the Tools grid. History-based
+      // goBack would land on whatever tab preceded the tool — e.g. Settings,
+      // when the Tools tab reopened the tool from there (restore last module).
+      onBack: () => navigate('tools'),
       onSetStatus: noopStatus,
       active,
       onNavigate: navigate,
