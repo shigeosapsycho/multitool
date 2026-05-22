@@ -76,6 +76,12 @@ type PokemonSet = {
   keywords: string[]
   /** Era base set — matched only after the era's specific sets. */
   base?: boolean
+  /**
+   * Set that ships as two named variants (e.g. Black Bolt / White Flare). The
+   * row label keeps the matched variant as a "[Variant]" tag instead of
+   * stripping it, so the otherwise-identical rows stay distinguishable.
+   */
+  splitTag?: boolean
 }
 
 // Sets per era, in release order — drives both display order and matching.
@@ -111,7 +117,12 @@ const POKEMON_SETS: PokemonSet[] = [
   { name: 'Prismatic Evolutions', era: SV, keywords: ['prismatic evolutions'] },
   { name: 'Journey Together', era: SV, keywords: ['journey together'] },
   { name: 'Destined Rivals', era: SV, keywords: ['destined rivals'] },
-  { name: 'Black Bolt / White Flare', era: SV, keywords: ['black bolt', 'white flare'] },
+  {
+    name: 'Black Bolt / White Flare',
+    era: SV,
+    keywords: ['black bolt', 'white flare'],
+    splitTag: true
+  },
   { name: 'Mega Evolution', era: ME, keywords: ['mega evolution'], base: true },
   { name: 'Phantasmal Flames', era: ME, keywords: ['phantasmal flames'] },
   { name: 'Ascended Heroes', era: ME, keywords: ['ascended heroes'] },
@@ -130,6 +141,10 @@ const SET_MATCH_ORDER: PokemonSet[] = [
 const SET_KEYWORDS: Record<string, string[]> = Object.fromEntries(
   POKEMON_SETS.map((s) => [s.name, s.keywords])
 )
+
+// Set names whose row label keeps the matched variant as a "[Variant]" tag
+// instead of stripping it (see PokemonSet.splitTag).
+const SPLIT_TAG_SETS = new Set(POKEMON_SETS.filter((s) => s.splitTag).map((s) => s.name))
 
 /** Detect the Pokémon set from an item title, or null if none is recognized. */
 export function detectSet(item: string): { set: string; era: PokemonEra } | null {
@@ -171,23 +186,32 @@ const ERA_PREFIX: Record<PokemonEra, RegExp> = {
 // of the title (space, colon, em/en dash, hyphen).
 const NAME_SEP = '[\\s:—–-]*'
 
+/** Title-case a lowercase keyword: "white flare" -> "White Flare". */
+function titleCase(s: string): string {
+  return s.replace(/\b[a-z]/g, (c) => c.toUpperCase())
+}
+
 /**
  * Display title for a checklist row. Like `displayName`, but drops the leading
  * Pokémon era name — the row already sits under its era/set group, so
  * repeating "Scarlet & Violet" on every line is just noise. When `stripSet` is
  * set (the row also sits under a set group), the leading set name is dropped
- * too. Falls back to the full name if stripping would leave nothing.
+ * too — except for split-tag sets (Black Bolt / White Flare), where the
+ * variant is kept as a "[Variant]" tag so the rows stay distinguishable.
+ * Falls back to the full name if stripping would leave nothing.
  */
 export function rowDisplayName(entry: SkuEntry, stripSet = false): string {
   const name = displayName(entry.item)
   if (!entry.era) return name
   let out = name.replace(ERA_PREFIX[entry.era], '').trim()
   if (stripSet && entry.set) {
+    const tagged = SPLIT_TAG_SETS.has(entry.set)
     for (const kw of SET_KEYWORDS[entry.set] ?? []) {
       const re = new RegExp('^' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + NAME_SEP, 'i')
       const m = out.match(re)
       if (m) {
-        out = out.slice(m[0].length).trim()
+        const rest = out.slice(m[0].length).trim()
+        out = tagged ? `[${titleCase(kw)}] ${rest}`.trim() : rest
         break
       }
     }
