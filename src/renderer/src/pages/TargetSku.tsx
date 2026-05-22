@@ -54,6 +54,11 @@ function loadSavedSkus(key: string): string[] {
   }
 }
 
+/** Reorder SKUs so starred ones lead; each part keeps its original order. */
+function starFirst(skus: string[], starred: Set<string>): string[] {
+  return [...skus.filter((s) => starred.has(s)), ...skus.filter((s) => !starred.has(s))]
+}
+
 /** Human "updated N ago" phrasing for a past timestamp. */
 function agoLabel(since: number): string {
   const secs = Math.max(0, Math.round((Date.now() - since) / 1000))
@@ -106,8 +111,9 @@ const StarIcon = ({ filled }: { filled: boolean }) => (
 )
 
 /**
- * A single SKU row: checkbox-style toggle, plus a star that pins the SKU to
- * the top of its group. The star stays hidden until row hover unless set.
+ * A single SKU row: checkbox-style toggle, plus a star that floats the SKU to
+ * the front of the export list. The star stays hidden until row hover unless
+ * the SKU is starred.
  */
 function SkuRow({
   entry,
@@ -268,13 +274,20 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(loadSavedSkus(SELECTION_STORAGE_KEY))
   )
-  // The export text. Editable — typing here re-checks the matching boxes.
-  const [draft, setDraft] = useState(() =>
-    formatSkus(loadSavedSkus(SELECTION_STORAGE_KEY), 'shikari')
-  )
-  // Starred SKUs — pinned to the top of their group. Persisted like selection.
+  // Starred SKUs — floated to the front of the export list. Persisted like
+  // selection.
   const [starred, setStarred] = useState<Set<string>>(
     () => new Set(loadSavedSkus(STARRED_STORAGE_KEY))
+  )
+  // The export text. Editable — typing here re-checks the matching boxes.
+  const [draft, setDraft] = useState(() =>
+    formatSkus(
+      starFirst(
+        loadSavedSkus(SELECTION_STORAGE_KEY),
+        new Set(loadSavedSkus(STARRED_STORAGE_KEY))
+      ),
+      'shikari'
+    )
   )
   const [query, setQuery] = useState('')
   // Group keys that are collapsed in the checklist.
@@ -294,12 +307,17 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
 
   const catalogSkus = useMemo(() => new Set(entries.map((e) => e.sku)), [entries])
 
-  /** Canonical export string for a selection, in catalog order. */
-  function selectionToDraft(sel: Set<string>, fmt: ExportFormat): string {
-    return formatSkus(
-      entries.filter((e) => sel.has(e.sku)).map((e) => e.sku),
-      fmt
-    )
+  /**
+   * Export string for a selection: catalog order, but with starred SKUs
+   * floated to the front so they lead the bot's SKU list.
+   */
+  function selectionToDraft(
+    sel: Set<string>,
+    fmt: ExportFormat,
+    starSet: Set<string>
+  ): string {
+    const chosen = entries.filter((e) => sel.has(e.sku)).map((e) => e.sku)
+    return formatSkus(starFirst(chosen, starSet), fmt)
   }
 
   // Pull the remote SKU catalog. A failed pull flips the offline badge but
@@ -374,8 +392,8 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
           (e) => e.sku.toLowerCase().includes(q) || e.item.toLowerCase().includes(q)
         )
       : entries
-    return buildGroups(visible, pokemonGrouping, starred)
-  }, [entries, query, pokemonGrouping, starred])
+    return buildGroups(visible, pokemonGrouping)
+  }, [entries, query, pokemonGrouping])
 
   const searching = query.trim() !== ''
   // A group is open when expanded, or always while a search is active.
@@ -400,7 +418,7 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
   /** Apply a new selection from a checkbox action and re-render the export. */
   function applySelection(next: Set<string>) {
     setSelected(next)
-    setDraft(selectionToDraft(next, format))
+    setDraft(selectionToDraft(next, format, starred))
   }
 
   // Plain click toggles one SKU and moves the anchor. Shift-click selects every
@@ -450,14 +468,14 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
     onSetStatus('Removed invalid SKUs')
   }
 
-  // Star / unstar a SKU. Starred SKUs are pinned to the top of their group.
+  // Star / unstar a SKU. Starred SKUs lead the exported SKU list; the checklist
+  // order is unaffected. Re-renders the export so the new order shows at once.
   function toggleStar(sku: string) {
-    setStarred((prev) => {
-      const next = new Set(prev)
-      if (next.has(sku)) next.delete(sku)
-      else next.add(sku)
-      return next
-    })
+    const next = new Set(starred)
+    if (next.has(sku)) next.delete(sku)
+    else next.add(sku)
+    setStarred(next)
+    setDraft(selectionToDraft(selected, format, next))
   }
 
   function toggleCollapse(key: string) {
@@ -486,7 +504,7 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
   function handleFormatChange(fmt: ExportFormat) {
     if (!FORMAT_ENABLED[fmt]) return
     setFormat(fmt)
-    setDraft(selectionToDraft(selected, fmt))
+    setDraft(selectionToDraft(selected, fmt, starred))
   }
 
   // Shikari Monitor view: the Tasks SKUs split into comma lists, one per line,

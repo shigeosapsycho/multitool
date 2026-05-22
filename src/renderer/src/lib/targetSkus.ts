@@ -360,25 +360,13 @@ function byDisplayName(a: SkuEntry, b: SkuEntry): number {
 /**
  * Organize entries into checklist groups. Pokémon entries are sub-grouped by
  * the chosen mode; One Piece / Magic / Other always stay single groups. Empty
- * groups are omitted. Within each leaf group, starred SKUs (when a `starred`
- * set is given) float to the top; the rest are sorted by display name.
+ * groups are omitted and leaf items are sorted by display name.
  */
-export function buildGroups(
-  entries: SkuEntry[],
-  mode: GroupingMode,
-  starred?: Set<string>
-): SkuGroup[] {
-  const order = (a: SkuEntry, b: SkuEntry): number => {
-    if (starred) {
-      const diff = Number(starred.has(b.sku)) - Number(starred.has(a.sku))
-      if (diff !== 0) return diff
-    }
-    return byDisplayName(a, b)
-  }
+export function buildGroups(entries: SkuEntry[], mode: GroupingMode): SkuGroup[] {
   const leaf = (key: string, label: string, items: SkuEntry[]): SkuGroup => ({
     key,
     label,
-    items: [...items].sort(order)
+    items: [...items].sort(byDisplayName)
   })
   const pokemon = entries.filter((e) => e.category === 'Pokémon')
   const groups: SkuGroup[] = []
