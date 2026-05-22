@@ -37,13 +37,14 @@ const FORMATS: { id: ExportFormat; label: string }[] = [
 /** Target product page for a SKU. */
 const TARGET_URL = 'https://www.target.com/p/-/A-'
 
-/** localStorage key for the persisted SKU selection. */
+/** localStorage keys for persisted per-SKU state. */
 const SELECTION_STORAGE_KEY = 'target-sku:selection'
+const STARRED_STORAGE_KEY = 'target-sku:starred'
 
-/** Load the persisted SKU selection; returns [] when missing or unreadable. */
-function loadSavedSelection(): string[] {
+/** Load a persisted SKU list from localStorage; [] when missing or unreadable. */
+function loadSavedSkus(key: string): string[] {
   try {
-    const raw = localStorage.getItem(SELECTION_STORAGE_KEY)
+    const raw = localStorage.getItem(key)
     const parsed: unknown = raw ? JSON.parse(raw) : null
     return Array.isArray(parsed)
       ? parsed.filter((s): s is string => typeof s === 'string')
@@ -98,25 +99,38 @@ const RefreshIcon = () => (
   </svg>
 )
 
-/** A single SKU row with a checkbox-style toggle. */
+const StarIcon = ({ filled }: { filled: boolean }) => (
+  <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+)
+
+/**
+ * A single SKU row: checkbox-style toggle, plus a star that pins the SKU to
+ * the top of its group. The star stays hidden until row hover unless set.
+ */
 function SkuRow({
   entry,
   checked,
+  starred,
   stripSet,
   onSelect,
+  onToggleStar,
   onContextMenu
 }: {
   entry: SkuEntry
   checked: boolean
+  starred: boolean
   stripSet: boolean
   onSelect: (e: React.MouseEvent) => void
+  onToggleStar: () => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
   return (
-    <button
+    <div
       onClick={onSelect}
       onContextMenu={onContextMenu}
-      className="flex w-full select-none items-center gap-3 rounded-md px-2 py-1.5 text-left transition hover:bg-surface-2"
+      className="group flex w-full cursor-pointer select-none items-center gap-3 rounded-md px-2 py-1.5 text-left transition hover:bg-surface-2"
     >
       <span
         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border ${
@@ -131,7 +145,21 @@ function SkuRow({
       <span className="min-w-0 flex-1 truncate text-[12.5px] text-text-primary">
         {rowDisplayName(entry, stripSet)}
       </span>
-    </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleStar()
+        }}
+        aria-label={starred ? 'Unstar SKU' : 'Star SKU'}
+        className={`shrink-0 rounded p-0.5 transition ${
+          starred
+            ? 'text-warning'
+            : 'text-text-muted opacity-0 hover:text-text-secondary group-hover:opacity-100'
+        }`}
+      >
+        <StarIcon filled={starred} />
+      </button>
+    </div>
   )
 }
 
@@ -237,9 +265,17 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
   const [entries, setEntries] = useState<SkuEntry[]>(BUNDLED_SKUS)
   // Selection + export text are restored from localStorage so they survive
   // restarts (see the persist effect below).
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(loadSavedSelection()))
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(loadSavedSkus(SELECTION_STORAGE_KEY))
+  )
   // The export text. Editable — typing here re-checks the matching boxes.
-  const [draft, setDraft] = useState(() => formatSkus(loadSavedSelection(), 'shikari'))
+  const [draft, setDraft] = useState(() =>
+    formatSkus(loadSavedSkus(SELECTION_STORAGE_KEY), 'shikari')
+  )
+  // Starred SKUs — pinned to the top of their group. Persisted like selection.
+  const [starred, setStarred] = useState<Set<string>>(
+    () => new Set(loadSavedSkus(STARRED_STORAGE_KEY))
+  )
   const [query, setQuery] = useState('')
   // Group keys that are collapsed in the checklist.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -294,8 +330,8 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
     return () => clearInterval(id)
   }, [])
 
-  // Persist the selection so it survives app restarts. Best-effort — a full or
-  // unavailable localStorage just means the selection isn't remembered.
+  // Persist the selection + stars so they survive app restarts. Best-effort —
+  // a full or unavailable localStorage just means they aren't remembered.
   useEffect(() => {
     try {
       localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify([...selected]))
@@ -303,6 +339,14 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
       // ignore
     }
   }, [selected])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STARRED_STORAGE_KEY, JSON.stringify([...starred]))
+    } catch {
+      // ignore
+    }
+  }, [starred])
 
   // Dismiss the context menu on any click, Esc, scroll, or resize.
   useEffect(() => {
@@ -330,8 +374,8 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
           (e) => e.sku.toLowerCase().includes(q) || e.item.toLowerCase().includes(q)
         )
       : entries
-    return buildGroups(visible, pokemonGrouping)
-  }, [entries, query, pokemonGrouping])
+    return buildGroups(visible, pokemonGrouping, starred)
+  }, [entries, query, pokemonGrouping, starred])
 
   const searching = query.trim() !== ''
   // A group is open when expanded, or always while a search is active.
@@ -404,6 +448,16 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
     )
     applySelection(valid)
     onSetStatus('Removed invalid SKUs')
+  }
+
+  // Star / unstar a SKU. Starred SKUs are pinned to the top of their group.
+  function toggleStar(sku: string) {
+    setStarred((prev) => {
+      const next = new Set(prev)
+      if (next.has(sku)) next.delete(sku)
+      else next.add(sku)
+      return next
+    })
   }
 
   function toggleCollapse(key: string) {
@@ -516,8 +570,10 @@ export function TargetSkuPage({ onBack, onSetStatus, pokemonGrouping }: Props) {
                   <SkuRow
                     entry={e}
                     checked={selected.has(e.sku)}
+                    starred={starred.has(e.sku)}
                     stripSet={pokemonGrouping !== 'era'}
                     onSelect={(ev) => handleRowClick(e.sku, ev.shiftKey)}
+                    onToggleStar={() => toggleStar(e.sku)}
                     onContextMenu={(ev) => {
                       ev.preventDefault()
                       setMenu({ sku: e.sku, x: ev.clientX, y: ev.clientY })
