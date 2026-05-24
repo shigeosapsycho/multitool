@@ -17,8 +17,27 @@ const StopIcon = () => (
   </svg>
 )
 
+const URL_STORAGE_KEY = 'proxyTester.targetUrl'
+const DEFAULT_TARGET_URL = 'https://btcollectibles.com'
+
 export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
-  const [url, setUrl] = useState('https://btcollectibles.com')
+  const [url, setUrl] = useState<string>(() => {
+    try {
+      return localStorage.getItem(URL_STORAGE_KEY) ?? DEFAULT_TARGET_URL
+    } catch {
+      return DEFAULT_TARGET_URL
+    }
+  })
+
+  // Persist the Target URL across launches. Stored in webview localStorage,
+  // which Tauri keeps per identifier under %APPDATA%\com.beu.multitool.
+  useEffect(() => {
+    try {
+      localStorage.setItem(URL_STORAGE_KEY, url)
+    } catch {
+      // ignore (private mode / quota — non-fatal)
+    }
+  }, [url])
   const [filePath, setFilePath] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
