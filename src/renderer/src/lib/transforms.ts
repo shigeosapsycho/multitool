@@ -43,6 +43,28 @@ export function searchInMaster(masterText: string, searchText: string): string[]
   return out
 }
 
+// Keep only `email:password` rows from `emailPassText` whose email portion
+// also appears in `emailsText`. Case-insensitive comparison on the email;
+// the email:password row is returned with its original casing.
+export function matchEmailPassByEmails(emailsText: string, emailPassText: string): string[] {
+  const allowed = new Set<string>()
+  for (const line of emailsText.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    allowed.add(trimmed.toLowerCase())
+  }
+  const out: string[] = []
+  for (const line of emailPassText.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const colon = trimmed.indexOf(':')
+    if (colon === -1) continue
+    const email = trimmed.slice(0, colon).toLowerCase()
+    if (allowed.has(email)) out.push(trimmed)
+  }
+  return out
+}
+
 // Remove emails from `masterText` that also appear in `successText`
 // (which is `email:password` format — we take just the email portion).
 // Case-insensitive comparison; preserves the master list's original casing.

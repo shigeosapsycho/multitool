@@ -12,6 +12,7 @@ import { EmailFilterPage } from './pages/EmailFilter'
 import { EmailUnsubscribePage } from './pages/EmailUnsubscribe'
 import { FindDuplicatesPage } from './pages/FindDuplicates'
 import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
+import { MatchEmailPassPage } from './pages/MatchEmailPass'
 import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
@@ -33,6 +34,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'email-unsubscribe',
   'find-duplicates',
   'find-non-duplicates',
+  'match-email-pass',
   'proxy-cleaner',
   'proxy-tester',
   'randomize',
@@ -276,6 +278,8 @@ export default function App() {
         return <FindDuplicatesPage {...props} />
       case 'find-non-duplicates':
         return <FindNonDuplicatesPage {...props} />
+      case 'match-email-pass':
+        return <MatchEmailPassPage {...props} />
       case 'proxy-cleaner':
         return <ProxyCleanerPage {...props} />
       case 'proxy-tester':

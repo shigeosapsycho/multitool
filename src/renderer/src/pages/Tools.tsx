@@ -41,6 +41,12 @@ const tools: ToolMeta[] = [
     accent: '#f59e0b'
   },
   {
+    id: 'match-email-pass',
+    title: 'Match Email:Password',
+    description: 'Keep email:password rows whose email appears in a separate emails list.',
+    accent: '#10b981'
+  },
+  {
     id: 'proxy-cleaner',
     title: 'Proxy Cleaner',
     description: 'Filter a proxy list down to residential and/or ISP proxies.',
@@ -220,6 +226,14 @@ const TargetIcon = () => (
   </svg>
 )
 
+const MatchEmailPassIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 8l9 6 9-6" />
+    <path d="M15.5 15.5l2 2 3.5-3.5" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
@@ -227,6 +241,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'email-unsubscribe': EmailUnsubscribeIcon,
   'find-duplicates': DuplicatesIcon,
   'find-non-duplicates': StarIcon,
+  'match-email-pass': MatchEmailPassIcon,
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
