@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from './ToolShell'
 import { Select } from './Select'
+import { ConfirmDialog } from './ConfirmDialog'
 import type { ImapAccount } from '../lib/api'
 import { providerFor } from '../lib/imapProviders'
 
@@ -47,6 +48,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
   const [form, setForm] = useState<FormState>(CLOSED_FORM)
   const [testStatus, setTestStatus] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false)
 
   // Load saved accounts once on mount; default the selection to the first one.
   useEffect(() => {
@@ -139,6 +141,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
 
   async function removeAccount() {
     if (!selectedId) return
+    setConfirmRemoveOpen(false)
     try {
       await window.api.imap.deleteAccount(selectedId)
       const list = await window.api.imap.listAccounts()
@@ -149,6 +152,8 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
       onStatus?.(`Could not remove account: ${String(e)}`)
     }
   }
+
+  const selectedAccount = accounts.find((a) => a.id === selectedId) ?? null
 
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.label }))
 
@@ -170,7 +175,11 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
               <Button onClick={openEdit} variant="ghost" disabled={!selectedId}>
                 Edit
               </Button>
-              <Button onClick={removeAccount} variant="ghost" disabled={!selectedId}>
+              <Button
+                onClick={() => setConfirmRemoveOpen(true)}
+                variant="ghost"
+                disabled={!selectedId}
+              >
                 Remove
               </Button>
             </div>
@@ -243,6 +252,18 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmRemoveOpen}
+        title="Remove account?"
+        message={`Are you sure you want to delete ${
+          selectedAccount?.username ?? selectedAccount?.label ?? 'this account'
+        }?`}
+        confirmLabel="Yes"
+        cancelLabel="No"
+        danger
+        onConfirm={removeAccount}
+        onCancel={() => setConfirmRemoveOpen(false)}
+      />
     </div>
   )
 }
