@@ -487,6 +487,11 @@ pub async fn imap_delete_account(app: AppHandle, id: String) -> Result<(), Strin
     Ok(())
 }
 
+#[tauri::command]
+pub async fn imap_load_password(_app: AppHandle, id: String) -> Result<String, String> {
+    Ok(crate::imap_creds::load_password(&id)?.unwrap_or_default())
+}
+
 /// Look up an account by id and load its password from the credential store.
 pub(crate) fn account_with_password(
     app: &AppHandle,

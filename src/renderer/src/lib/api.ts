@@ -267,6 +267,7 @@ export const api = {
     saveAccount: (account: ImapAccountInput) =>
       invoke<ImapAccount>('imap_save_account', { account }),
     deleteAccount: (id: string) => invoke<void>('imap_delete_account', { id }),
+    loadPassword: (id: string) => invoke<string>('imap_load_password', { id }),
     test: (id: string) => invoke<void>('imap_test', { id }),
     scan: (id: string, range: ScanRange) =>
       invoke<ScanResult>('imap_scan', { id, range }),

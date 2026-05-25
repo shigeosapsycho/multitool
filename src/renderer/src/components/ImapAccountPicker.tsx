@@ -68,10 +68,16 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
     setForm({ ...CLOSED_FORM, mode: 'add' })
   }
 
-  function openEdit() {
+  async function openEdit() {
     const acc = accounts.find((a) => a.id === selectedId)
     if (!acc) return
     setTestStatus(null)
+    let password = ''
+    try {
+      password = await window.api.imap.loadPassword(acc.id)
+    } catch {
+      // Missing/locked credential: leave blank and let the user re-enter.
+    }
     setForm({
       mode: 'edit',
       id: acc.id,
@@ -79,7 +85,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
       host: acc.host,
       port: String(acc.port),
       username: acc.username,
-      password: ''
+      password
     })
   }
 
@@ -231,10 +237,12 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
           />
           <input
             className={fieldClass}
-            type="password"
-            placeholder={form.mode === 'edit' ? 'Password (re-enter to change)' : 'Password'}
+            type="text"
+            placeholder="Password"
             value={form.password}
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            spellCheck={false}
+            autoComplete="off"
           />
           {testStatus && (
             <p className="text-[12px] leading-snug text-text-secondary">{testStatus}</p>
@@ -255,9 +263,15 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
       <ConfirmDialog
         open={confirmRemoveOpen}
         title="Remove account?"
-        message={`Are you sure you want to delete ${
-          selectedAccount?.username ?? selectedAccount?.label ?? 'this account'
-        }?`}
+        message={
+          <>
+            Are you sure you want to delete{' '}
+            <strong className="font-semibold text-text-primary">
+              {selectedAccount?.username ?? selectedAccount?.label ?? 'this account'}
+            </strong>
+            ?
+          </>
+        }
         confirmLabel="Yes"
         cancelLabel="No"
         danger

@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 type Props = {
   open: boolean
   title: string
-  message: string
+  message: ReactNode
   detail?: string
   confirmLabel?: string
   cancelLabel?: string

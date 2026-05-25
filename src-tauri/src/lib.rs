@@ -148,6 +148,7 @@ pub fn run() {
             imap_cleaner::imap_list_accounts,
             imap_cleaner::imap_save_account,
             imap_cleaner::imap_delete_account,
+            imap_cleaner::imap_load_password,
             imap_cleaner::imap_test,
             imap_cleaner::imap_scan,
             imap_cleaner::imap_cancel,
