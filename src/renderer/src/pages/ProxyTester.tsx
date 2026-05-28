@@ -135,7 +135,15 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
     if (!results) return
     const working = results
       .filter((r) => r.error == null && r.normalized)
-      .map((r) => r.normalized!)
+      .map((r) => {
+        // Strip scheme, then emit host:port:user:pass (creds last, colon-separated)
+        const stripped = r.normalized!.replace(/^[a-z0-9]+:\/\//i, '')
+        const at = stripped.indexOf('@')
+        if (at === -1) return stripped // host:port (no creds)
+        const creds = stripped.slice(0, at) // user:pass
+        const hostPort = stripped.slice(at + 1) // host:port
+        return `${hostPort}:${creds}` // host:port:user:pass
+      })
     if (working.length === 0) return
     const path = await window.api.files.writeOutput('working-proxies', working.join('\n') + '\n')
     setSavedTo(path)
