@@ -241,6 +241,7 @@ export const api = {
         outputSort: OutputSort
         pokemonGrouping: PokemonGrouping
         restoreLastModule: boolean
+        orderBySelectDate: boolean
       }>('config_get'),
     setFilePreview: (enabled: boolean) =>
       invoke<boolean>('config_set_file_preview', { enabled }),
@@ -251,7 +252,9 @@ export const api = {
     setPokemonGrouping: (grouping: PokemonGrouping) =>
       invoke<PokemonGrouping>('config_set_pokemon_grouping', { grouping }),
     setRestoreLastModule: (enabled: boolean) =>
-      invoke<boolean>('config_set_restore_last_module', { enabled })
+      invoke<boolean>('config_set_restore_last_module', { enabled }),
+    setOrderBySelectDate: (enabled: boolean) =>
+      invoke<boolean>('config_set_order_by_select_date', { enabled })
   },
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),

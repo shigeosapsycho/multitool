@@ -38,6 +38,8 @@ type Props = {
   onPokemonGroupingChange: (next: GroupingMode) => void
   restoreLastModule: boolean
   onRestoreLastModuleChange: (next: boolean) => void
+  orderBySelectDate: boolean
+  onOrderBySelectDateChange: (next: boolean) => void
 }
 
 export function SettingsPage({
@@ -52,7 +54,9 @@ export function SettingsPage({
   pokemonGrouping,
   onPokemonGroupingChange,
   restoreLastModule,
-  onRestoreLastModuleChange
+  onRestoreLastModuleChange,
+  orderBySelectDate,
+  onOrderBySelectDateChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -93,6 +97,11 @@ export function SettingsPage({
   async function handleToggleRestoreLastModule(next: boolean) {
     await window.api.config.setRestoreLastModule(next)
     onRestoreLastModuleChange(next)
+  }
+
+  async function handleToggleOrderBySelectDate(next: boolean) {
+    await window.api.config.setOrderBySelectDate(next)
+    onOrderBySelectDateChange(next)
   }
 
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -253,6 +262,21 @@ export function SettingsPage({
                 ]}
                 onChange={handleChangePokemonGrouping}
                 ariaLabel="Pokémon grouping"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Order by select date</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  Add newly checked SKUs to the end of the export, in the order you check
+                  them. Off: insert them in catalog order. Dragging rows in the Order tab
+                  overrides this either way.
+                </div>
+              </div>
+              <Toggle
+                checked={orderBySelectDate}
+                onChange={handleToggleOrderBySelectDate}
+                ariaLabel="Toggle order SKUs by select date"
               />
             </div>
           </div>
