@@ -64,6 +64,8 @@ export default function App() {
   const [pokemonGrouping, setPokemonGrouping] = useState<GroupingMode>('set')
   // When true, the Tools sidebar tab reopens the last-used module.
   const [restoreLastModule, setRestoreLastModule] = useState(true)
+  // When true (default), newly checked Target SKUs append in check order.
+  const [orderBySelectDate, setOrderBySelectDate] = useState(true)
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   // The most recently opened module — the Tools tab returns here.
@@ -83,6 +85,7 @@ export default function App() {
         setOutputSort(cfg.outputSort)
         setPokemonGrouping(cfg.pokemonGrouping)
         setRestoreLastModule(cfg.restoreLastModule)
+        setOrderBySelectDate(cfg.orderBySelectDate)
       })
       .catch(() => {})
     // Check for updates once on launch (the Rust side no longer polls).
@@ -263,7 +266,8 @@ export default function App() {
       onSetStatus: noopStatus,
       active,
       onNavigate: navigate,
-      pokemonGrouping
+      pokemonGrouping,
+      orderBySelectDate
     }
     switch (r) {
       case 'csv-email-pass':
@@ -327,6 +331,8 @@ export default function App() {
         onPokemonGroupingChange={setPokemonGrouping}
         restoreLastModule={restoreLastModule}
         onRestoreLastModuleChange={setRestoreLastModule}
+        orderBySelectDate={orderBySelectDate}
+        onOrderBySelectDateChange={setOrderBySelectDate}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />

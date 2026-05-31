@@ -30,6 +30,9 @@ pub struct Config {
     /// When true, the Tools sidebar tab reopens the last-used module instead
     /// of the tool grid.
     pub restore_last_module: Option<bool>,
+    /// When true (default), newly checked Target SKUs are appended to the
+    /// export in the order checked; otherwise inserted in catalog order.
+    pub order_by_select_date: Option<bool>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
@@ -99,6 +102,11 @@ impl Config {
     pub fn restore_last_module(&self) -> bool {
         // Default true — returning to the open module is the expected behavior.
         self.restore_last_module.unwrap_or(true)
+    }
+
+    pub fn order_by_select_date(&self) -> bool {
+        // Default true — order SKUs by the sequence they were checked.
+        self.order_by_select_date.unwrap_or(true)
     }
 }
 

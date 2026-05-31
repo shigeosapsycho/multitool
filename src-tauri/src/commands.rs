@@ -495,6 +495,7 @@ pub struct ConfigSnapshot {
     pub output_sort: String,
     pub pokemon_grouping: String,
     pub restore_last_module: bool,
+    pub order_by_select_date: bool,
 }
 
 #[tauri::command]
@@ -512,6 +513,7 @@ pub async fn config_get(app: AppHandle) -> Result<ConfigSnapshot, String> {
         output_sort: cfg.output_sort(),
         pokemon_grouping: cfg.pokemon_grouping(),
         restore_last_module: cfg.restore_last_module(),
+        order_by_select_date: cfg.order_by_select_date(),
     })
 }
 
@@ -572,6 +574,15 @@ pub async fn config_set_restore_last_module(
     enabled: bool,
 ) -> Result<bool, String> {
     mutate_config(&app, |cfg| cfg.restore_last_module = Some(enabled))?;
+    Ok(enabled)
+}
+
+#[tauri::command]
+pub async fn config_set_order_by_select_date(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<bool, String> {
+    mutate_config(&app, |cfg| cfg.order_by_select_date = Some(enabled))?;
     Ok(enabled)
 }
 
