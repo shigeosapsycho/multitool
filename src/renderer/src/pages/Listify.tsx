@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   ToolLayout,
   FilePanel,
@@ -17,7 +17,6 @@ import {
   setMark,
   deleteItems,
   moveItems,
-  moveItemsToIndex,
   markCounts,
   type Item,
   type Mark
@@ -39,6 +38,18 @@ function markGlyph(mark: Mark) {
   }
 }
 
+/** Six-dot grip handle shown on draggable rows (matches the Target SKUs grip). */
+const GripIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+    <circle cx="9" cy="6" r="1.4" />
+    <circle cx="9" cy="12" r="1.4" />
+    <circle cx="9" cy="18" r="1.4" />
+    <circle cx="15" cy="6" r="1.4" />
+    <circle cx="15" cy="12" r="1.4" />
+    <circle cx="15" cy="18" r="1.4" />
+  </svg>
+)
+
 export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
   const [items, setItems] = useState<Item[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -47,7 +58,7 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [lineCount, setLineCount] = useState(0)
   const [copied, setCopied] = useState<'all' | 'selected' | null>(null)
-  const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [dragId, setDragId] = useState<number | null>(null)
   const panelRef = useRef<FilePanelHandle>(null)
   const idRef = useRef(0)
   const anchorRef = useRef<number | null>(null)
@@ -55,8 +66,8 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
   itemsRef.current = items
   const saveTimer = useRef<number | null>(null)
   const firstItemsRun = useRef(true)
-  const dragSelRef = useRef<Set<number>>(new Set())
-  const draggingRef = useRef(false)
+  const dragIdRef = useRef<number | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   // Persist input + list to webview localStorage (survives relaunch), the same
   // approach Target SKUs / Proxy Tester use. Selection is transient, not cached.
@@ -128,6 +139,52 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     if (pending) void loadFromPath(pending)
   }, [active])
 
+  // Pointer-based drag reorder. HTML5 drag events don't fire under Tauri's
+  // OS-level drag-drop, so we hold the dragged row and reorder live by pointer
+  // position (same approach as the Target SKUs Order tab). Refs let the window
+  // listeners read the latest list without re-subscribing on every move.
+  useEffect(() => {
+    if (dragId === null) return
+    const onMove = (e: PointerEvent) => {
+      const id = dragIdRef.current
+      const container = listRef.current
+      if (id === null || !container) return
+      const rows = Array.from(container.children) as HTMLElement[]
+      if (rows.length === 0) return
+      // Insertion slot: first row whose midpoint sits below the pointer, else
+      // rows.length (drop at the very end).
+      let target = rows.length
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]!.getBoundingClientRect()
+        if (e.clientY < r.top + r.height / 2) {
+          target = i
+          break
+        }
+      }
+      const cur = itemsRef.current
+      const from = cur.findIndex((it) => it.id === id)
+      if (from === -1) return
+      const insertAt = from < target ? target - 1 : target
+      if (insertAt === from) return
+      const next = [...cur]
+      const [moved] = next.splice(from, 1)
+      next.splice(insertAt, 0, moved!)
+      itemsRef.current = next
+      setItems(next)
+      setSavedTo(null)
+    }
+    const onUp = () => {
+      dragIdRef.current = null
+      setDragId(null)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [dragId])
+
   // Keyboard: Delete removes selection, Esc clears it, Ctrl/Cmd+A selects all.
   // Ignored while typing in the input editor (textarea/input targets).
   useEffect(() => {
@@ -172,9 +229,7 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     setSelected(new Set())
     setSavedTo(null)
     setMenu(null)
-    setDropIndex(null)
     anchorRef.current = null
-    draggingRef.current = false
     onSetStatus('Ready')
   }
 
@@ -212,8 +267,17 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     setMenu({ x: e.clientX, y: e.clientY })
   }
 
-  function applyMark(mark: Mark) {
-    setItems((prev) => setMark(prev, selected, mark))
+  function handleGripPointerDown(e: ReactPointerEvent, id: number) {
+    e.preventDefault()
+    dragIdRef.current = id
+    setDragId(id)
+  }
+
+  // Toggle: if every selected row already has this mark, clear it; else set it.
+  function toggleMark(mark: Mark) {
+    if (selected.size === 0) return
+    const allHave = items.every((it) => !selected.has(it.id) || it.mark === mark)
+    setItems((prev) => setMark(prev, selected, allHave ? 'none' : mark))
     setSavedTo(null)
   }
 
@@ -254,52 +318,8 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     onSetStatus(`Saved to ${shortOutputPath(path)}`)
   }
 
-  // --- Drag-and-drop reordering ------------------------------------------------
-
-  function handleDragStart(e: DragEvent<HTMLDivElement>, id: number, index: number) {
-    draggingRef.current = true
-    let sel = selected
-    if (!selected.has(id)) {
-      sel = new Set([id])
-      setSelected(sel)
-      anchorRef.current = index
-    }
-    dragSelRef.current = sel
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', String(id)) // Firefox needs data to start a drag.
-  }
-
-  function dropTargetIndex(e: DragEvent<HTMLDivElement>, index: number): number {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const after = e.clientY - rect.top > rect.height / 2
-    return after ? index + 1 : index
-  }
-
-  function handleRowDragOver(e: DragEvent<HTMLDivElement>, index: number) {
-    if (!draggingRef.current) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDropIndex(dropTargetIndex(e, index))
-  }
-
-  function handleListDrop(e: DragEvent<HTMLDivElement>) {
-    if (!draggingRef.current) return
-    e.preventDefault()
-    const target = dropIndex ?? items.length
-    setItems((prev) => moveItemsToIndex(prev, dragSelRef.current, target))
-    setSavedTo(null)
-    setDropIndex(null)
-    draggingRef.current = false
-  }
-
-  function handleDragEnd() {
-    setDropIndex(null)
-    draggingRef.current = false
-  }
-
   const counts = markCounts(items)
   const hasItems = items.length > 0
-  const dropBar = <div className="mx-4 my-px h-0.5 rounded bg-accent" />
 
   const menuItems: ContextMenuItem[] = [
     {
@@ -308,10 +328,14 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
       onClick: handleCopySelected,
       separatorAfter: true
     },
-    { label: 'Mark ★', icon: <span style={{ color: '#fbbf24' }}>★</span>, onClick: () => applyMark('star') },
-    { label: 'Mark ✓', icon: <span style={{ color: '#34d399' }}>✓</span>, onClick: () => applyMark('check') },
-    { label: 'Mark ✗', icon: <span style={{ color: '#f87171' }}>✗</span>, onClick: () => applyMark('cross') },
-    { label: 'Clear mark', onClick: () => applyMark('none'), separatorAfter: true },
+    { label: 'Mark ★', icon: <span style={{ color: '#fbbf24' }}>★</span>, onClick: () => toggleMark('star') },
+    { label: 'Mark ✓', icon: <span style={{ color: '#34d399' }}>✓</span>, onClick: () => toggleMark('check') },
+    {
+      label: 'Mark ✗',
+      icon: <span style={{ color: '#f87171' }}>✗</span>,
+      onClick: () => toggleMark('cross'),
+      separatorAfter: true
+    },
     { label: 'Move up', onClick: () => move('up') },
     { label: 'Move down', onClick: () => move('down') },
     { label: 'Move to top', onClick: () => move('top') },
@@ -338,7 +362,7 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
             />
           </>
         ) : (
-          <span>Paste or load a list, then drag or right-click rows to mark, reorder, or delete.</span>
+          <span>Paste or load a list, then drag the grip or right-click rows to reorder, mark, or delete.</span>
         )
       }
       actions={
@@ -368,42 +392,40 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
       <Card label="List" badge={hasItems ? items.length.toLocaleString() : '—'}>
         {!hasItems ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
-            Load a list to start. Drag or right-click rows to mark, reorder, or delete.
+            Load a list to start. Drag the grip or right-click rows to reorder, mark, or delete.
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
-            <div
-              tabIndex={0}
-              onDragOver={(e) => {
-                if (draggingRef.current) e.preventDefault()
-              }}
-              onDrop={handleListDrop}
-              className="min-h-0 flex-1 overflow-auto py-1 outline-none"
-            >
+            <div ref={listRef} className="min-h-0 flex-1 overflow-auto py-1 outline-none">
               {items.map((it, i) => {
                 const isSel = selected.has(it.id)
+                const isDrag = dragId === it.id
                 return (
-                  <Fragment key={it.id}>
-                    {dropIndex === i && dropBar}
-                    <div
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, it.id, i)}
-                      onDragOver={(e) => handleRowDragOver(e, i)}
-                      onDragEnd={handleDragEnd}
-                      onClick={(e) => handleRowClick(e, it.id, i)}
-                      onContextMenu={(e) => handleRowContextMenu(e, it.id, i)}
-                      className={`flex cursor-default select-none items-center gap-3 px-4 py-1 font-mono text-[12.5px] ${
-                        isSel ? 'bg-accent-soft text-accent' : 'text-text-primary hover:bg-surface-2'
-                      }`}
+                  <div
+                    key={it.id}
+                    onClick={(e) => handleRowClick(e, it.id, i)}
+                    onContextMenu={(e) => handleRowContextMenu(e, it.id, i)}
+                    className={`flex select-none items-center gap-2.5 px-4 py-1 font-mono text-[12.5px] transition-[transform,box-shadow,background-color] duration-150 ${
+                      isDrag
+                        ? 'relative z-10 scale-[1.01] bg-accent-soft text-accent shadow-lg'
+                        : isSel
+                          ? 'bg-accent-soft text-accent'
+                          : 'text-text-primary hover:bg-surface-2'
+                    }`}
+                  >
+                    <span
+                      onPointerDown={(e) => handleGripPointerDown(e, it.id)}
+                      className="shrink-0 cursor-grab touch-none text-text-muted active:cursor-grabbing"
+                      title="Drag to reorder"
                     >
-                      <span className="w-10 shrink-0 text-right tabular-nums text-text-muted">{i + 1}</span>
-                      <span className="flex w-4 shrink-0 justify-center">{markGlyph(it.mark)}</span>
-                      <span className="flex-1 truncate">{it.text}</span>
-                    </div>
-                  </Fragment>
+                      <GripIcon />
+                    </span>
+                    <span className="w-10 shrink-0 text-right tabular-nums text-text-muted">{i + 1}</span>
+                    <span className="flex w-4 shrink-0 justify-center">{markGlyph(it.mark)}</span>
+                    <span className="flex-1 truncate">{it.text}</span>
+                  </div>
                 )
               })}
-              {dropIndex === items.length && dropBar}
             </div>
             <div className="flex items-center gap-2 border-t border-border p-3">
               {savedTo ? (
