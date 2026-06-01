@@ -186,3 +186,18 @@ export function shuffleLines(text: string): string[] {
   }
   return lines
 }
+
+// Repeat each non-empty line `count` times, keeping a line's copies together
+// and preserving the original line order. count is clamped to >= 0.
+export function multiplyLines(text: string, count: number): string[] {
+  const n = Math.max(0, Math.floor(count))
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trimEnd())
+    .filter((l) => l.length > 0)
+  const out: string[] = []
+  for (const line of lines) {
+    for (let i = 0; i < n; i++) out.push(line)
+  }
+  return out
+}

@@ -47,6 +47,12 @@ const tools: ToolMeta[] = [
     accent: '#10b981'
   },
   {
+    id: 'multiply-lines',
+    title: 'Multiply Lines',
+    description: 'Repeat each line a set number of times.',
+    accent: '#a3e635'
+  },
+  {
     id: 'proxy-cleaner',
     title: 'Proxy Cleaner',
     description: 'Filter a proxy list down to residential and/or ISP proxies.',
@@ -226,6 +232,13 @@ const TargetIcon = () => (
   </svg>
 )
 
+const MultiplyLinesIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M4 6h10M4 12h10M4 18h7" />
+    <path d="M16 9l5 5M21 9l-5 5" />
+  </svg>
+)
+
 const MatchEmailPassIcon = () => (
   <svg {...SVG_PROPS}>
     <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -242,6 +255,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'find-duplicates': DuplicatesIcon,
   'find-non-duplicates': StarIcon,
   'match-email-pass': MatchEmailPassIcon,
+  'multiply-lines': MultiplyLinesIcon,
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,

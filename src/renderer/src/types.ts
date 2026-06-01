@@ -7,6 +7,7 @@ export type Route =
   | 'find-duplicates'
   | 'find-non-duplicates'
   | 'match-email-pass'
+  | 'multiply-lines'
   | 'proxy-cleaner'
   | 'proxy-tester'
   | 'randomize'
