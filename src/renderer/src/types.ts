@@ -6,6 +6,7 @@ export type Route =
   | 'email-unsubscribe'
   | 'find-duplicates'
   | 'find-non-duplicates'
+  | 'listify'
   | 'match-email-pass'
   | 'multiply-lines'
   | 'proxy-cleaner'

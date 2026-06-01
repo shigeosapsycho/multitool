@@ -41,6 +41,12 @@ const tools: ToolMeta[] = [
     accent: '#f59e0b'
   },
   {
+    id: 'listify',
+    title: 'Listify',
+    description: 'Paste a list, then select, mark, reorder, and delete rows.',
+    accent: '#e879f9'
+  },
+  {
     id: 'match-email-pass',
     title: 'Match Email:Password',
     description: 'Keep email:password rows whose email appears in a separate emails list.',
@@ -232,6 +238,13 @@ const TargetIcon = () => (
   </svg>
 )
 
+const ListifyIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M8 6h12M8 12h12M8 18h12" />
+    <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+  </svg>
+)
+
 const MultiplyLinesIcon = () => (
   <svg {...SVG_PROPS}>
     <path d="M4 6h10M4 12h10M4 18h7" />
@@ -254,6 +267,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'email-unsubscribe': EmailUnsubscribeIcon,
   'find-duplicates': DuplicatesIcon,
   'find-non-duplicates': StarIcon,
+  'listify': ListifyIcon,
   'match-email-pass': MatchEmailPassIcon,
   'multiply-lines': MultiplyLinesIcon,
   'proxy-cleaner': ProxyCleanerIcon,
