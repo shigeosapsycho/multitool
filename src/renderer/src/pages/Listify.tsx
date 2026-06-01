@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import {
   ToolLayout,
   FilePanel,
@@ -17,10 +17,12 @@ import {
   setMark,
   deleteItems,
   moveItems,
+  moveItemsToIndex,
   markCounts,
   type Item,
   type Mark
 } from '../lib/listify'
+import { loadListifyCache, saveListifyCache } from '../lib/listifyCache'
 
 type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
@@ -44,10 +46,27 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
   const [savedTo, setSavedTo] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [lineCount, setLineCount] = useState(0)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'all' | 'selected' | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
   const panelRef = useRef<FilePanelHandle>(null)
   const idRef = useRef(0)
   const anchorRef = useRef<number | null>(null)
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+  const saveTimer = useRef<number | null>(null)
+  const firstItemsRun = useRef(true)
+  const dragSelRef = useRef<Set<number>>(new Set())
+  const draggingRef = useRef(false)
+
+  // Persist input + list to webview localStorage (survives relaunch), the same
+  // approach Target SKUs / Proxy Tester use. Selection is transient, not cached.
+  function persist() {
+    saveListifyCache({
+      editorText: panelRef.current?.getValue() ?? '',
+      items: itemsRef.current,
+      idCounter: idRef.current
+    })
+  }
 
   function loadListFromText(text: string) {
     const parsed = parseToItems(text, idRef.current)
@@ -70,7 +89,39 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     loadListFromText(text)
   }
 
-  // Pick up a file dropped on the Tools landing card.
+  // Restore the previous session's input + list once on mount.
+  useEffect(() => {
+    const cached = loadListifyCache()
+    if (!cached) return
+    if (cached.items.length > 0) {
+      setItems(cached.items)
+      idRef.current = Math.max(
+        cached.idCounter,
+        cached.items.reduce((m, it) => Math.max(m, it.id + 1), 0)
+      )
+    }
+    if (cached.editorText) panelRef.current?.setValue(cached.editorText)
+  }, [])
+
+  // Persist whenever the list changes (load, mark, reorder, delete). Skips the
+  // initial empty render so it never clobbers a freshly restored cache.
+  useEffect(() => {
+    if (firstItemsRun.current) {
+      firstItemsRun.current = false
+      return
+    }
+    persist()
+  }, [items])
+
+  // Flush any pending debounced editor save on unmount.
+  useEffect(
+    () => () => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    },
+    []
+  )
+
+  // Pick up a file dropped on the Tools landing card (overrides restored cache).
   useEffect(() => {
     if (!active) return
     const pending = consumePendingFile()
@@ -103,18 +154,27 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [active, items, selected])
 
+  // Debounced save while typing/pasting into the editor (before "Load to list").
+  function handleEditorEdit() {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(() => persist(), 400)
+  }
+
   function handleLoad() {
     loadListFromText(panelRef.current?.getValue() ?? '')
   }
 
   function handleClear() {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
     setFilePath(null)
     panelRef.current?.setValue('')
     setItems([])
     setSelected(new Set())
     setSavedTo(null)
     setMenu(null)
+    setDropIndex(null)
     anchorRef.current = null
+    draggingRef.current = false
     onSetStatus('Ready')
   }
 
@@ -168,15 +228,23 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     setSavedTo(null)
   }
 
-  async function handleCopy() {
-    if (items.length === 0) return
+  async function copyText(text: string, which: 'all' | 'selected') {
+    if (!text) return
     try {
-      await navigator.clipboard.writeText(itemsToText(items))
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      await navigator.clipboard.writeText(text)
+      setCopied(which)
+      setTimeout(() => setCopied(null), 1500)
     } catch {
       // Clipboard can reject if the window isn't focused; the user can retry.
     }
+  }
+
+  function handleCopyAll() {
+    void copyText(itemsToText(items), 'all')
+  }
+
+  function handleCopySelected() {
+    void copyText(itemsToText(items.filter((it) => selected.has(it.id))), 'selected')
   }
 
   async function handleSave() {
@@ -186,10 +254,60 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
     onSetStatus(`Saved to ${shortOutputPath(path)}`)
   }
 
+  // --- Drag-and-drop reordering ------------------------------------------------
+
+  function handleDragStart(e: DragEvent<HTMLDivElement>, id: number, index: number) {
+    draggingRef.current = true
+    let sel = selected
+    if (!selected.has(id)) {
+      sel = new Set([id])
+      setSelected(sel)
+      anchorRef.current = index
+    }
+    dragSelRef.current = sel
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(id)) // Firefox needs data to start a drag.
+  }
+
+  function dropTargetIndex(e: DragEvent<HTMLDivElement>, index: number): number {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const after = e.clientY - rect.top > rect.height / 2
+    return after ? index + 1 : index
+  }
+
+  function handleRowDragOver(e: DragEvent<HTMLDivElement>, index: number) {
+    if (!draggingRef.current) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropIndex(dropTargetIndex(e, index))
+  }
+
+  function handleListDrop(e: DragEvent<HTMLDivElement>) {
+    if (!draggingRef.current) return
+    e.preventDefault()
+    const target = dropIndex ?? items.length
+    setItems((prev) => moveItemsToIndex(prev, dragSelRef.current, target))
+    setSavedTo(null)
+    setDropIndex(null)
+    draggingRef.current = false
+  }
+
+  function handleDragEnd() {
+    setDropIndex(null)
+    draggingRef.current = false
+  }
+
   const counts = markCounts(items)
   const hasItems = items.length > 0
+  const dropBar = <div className="mx-4 my-px h-0.5 rounded bg-accent" />
 
   const menuItems: ContextMenuItem[] = [
+    {
+      label: selected.size > 1 ? `Copy ${selected.size} items` : 'Copy',
+      icon: <Icons.Copy />,
+      onClick: handleCopySelected,
+      separatorAfter: true
+    },
     { label: 'Mark ★', icon: <span style={{ color: '#fbbf24' }}>★</span>, onClick: () => applyMark('star') },
     { label: 'Mark ✓', icon: <span style={{ color: '#34d399' }}>✓</span>, onClick: () => applyMark('check') },
     { label: 'Mark ✗', icon: <span style={{ color: '#f87171' }}>✗</span>, onClick: () => applyMark('cross') },
@@ -220,7 +338,7 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
             />
           </>
         ) : (
-          <span>Paste or load a list, then right-click rows to mark, reorder, or delete.</span>
+          <span>Paste or load a list, then drag or right-click rows to mark, reorder, or delete.</span>
         )
       }
       actions={
@@ -242,6 +360,7 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
         filePath={filePath}
         onPick={handlePick}
         onDropPath={loadFromPath}
+        onUserEdit={handleEditorEdit}
         onLineCountChange={setLineCount}
         placeholder={'Paste your list here (one item per line),\nor drop / choose a text file.'}
       />
@@ -249,28 +368,42 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
       <Card label="List" badge={hasItems ? items.length.toLocaleString() : '—'}>
         {!hasItems ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
-            Load a list to start. Right-click rows to mark, reorder, or delete.
+            Load a list to start. Drag or right-click rows to mark, reorder, or delete.
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
-            <div tabIndex={0} className="min-h-0 flex-1 overflow-auto py-1 outline-none">
+            <div
+              tabIndex={0}
+              onDragOver={(e) => {
+                if (draggingRef.current) e.preventDefault()
+              }}
+              onDrop={handleListDrop}
+              className="min-h-0 flex-1 overflow-auto py-1 outline-none"
+            >
               {items.map((it, i) => {
                 const isSel = selected.has(it.id)
                 return (
-                  <div
-                    key={it.id}
-                    onClick={(e) => handleRowClick(e, it.id, i)}
-                    onContextMenu={(e) => handleRowContextMenu(e, it.id, i)}
-                    className={`flex cursor-default select-none items-center gap-3 px-4 py-1 font-mono text-[12.5px] ${
-                      isSel ? 'bg-accent-soft text-accent' : 'text-text-primary hover:bg-surface-2'
-                    }`}
-                  >
-                    <span className="w-10 shrink-0 text-right tabular-nums text-text-muted">{i + 1}</span>
-                    <span className="flex w-4 shrink-0 justify-center">{markGlyph(it.mark)}</span>
-                    <span className="flex-1 truncate">{it.text}</span>
-                  </div>
+                  <Fragment key={it.id}>
+                    {dropIndex === i && dropBar}
+                    <div
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, it.id, i)}
+                      onDragOver={(e) => handleRowDragOver(e, i)}
+                      onDragEnd={handleDragEnd}
+                      onClick={(e) => handleRowClick(e, it.id, i)}
+                      onContextMenu={(e) => handleRowContextMenu(e, it.id, i)}
+                      className={`flex cursor-default select-none items-center gap-3 px-4 py-1 font-mono text-[12.5px] ${
+                        isSel ? 'bg-accent-soft text-accent' : 'text-text-primary hover:bg-surface-2'
+                      }`}
+                    >
+                      <span className="w-10 shrink-0 text-right tabular-nums text-text-muted">{i + 1}</span>
+                      <span className="flex w-4 shrink-0 justify-center">{markGlyph(it.mark)}</span>
+                      <span className="flex-1 truncate">{it.text}</span>
+                    </div>
+                  </Fragment>
                 )
               })}
+              {dropIndex === items.length && dropBar}
             </div>
             <div className="flex items-center gap-2 border-t border-border p-3">
               {savedTo ? (
@@ -282,9 +415,15 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
                   {selected.size > 0 ? `${selected.size} selected` : ''}
                 </span>
               )}
-              <Button onClick={handleCopy} variant="ghost">
+              {selected.size > 0 && (
+                <Button onClick={handleCopySelected} variant="ghost">
+                  <Icons.Copy />
+                  {copied === 'selected' ? 'Copied!' : 'Copy selected'}
+                </Button>
+              )}
+              <Button onClick={handleCopyAll} variant="ghost">
                 <Icons.Copy />
-                {copied ? 'Copied!' : 'Copy'}
+                {copied === 'all' ? 'Copied!' : 'Copy'}
               </Button>
               {savedTo ? (
                 <Button onClick={() => window.api.files.reveal(savedTo)} variant="ghost">

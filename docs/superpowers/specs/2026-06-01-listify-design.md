@@ -143,8 +143,13 @@ convention. Verify via:
 
 ## Out of scope (YAGNI)
 
-Drag-and-drop reorder; persistence across restart; marks in export; filter/sort
-by mark; undo/redo. All deferrable without reworking the data model.
+Marks in export; filter/sort by mark; undo/redo.
+
+**Added after the initial v3.8.0 release** (per follow-up requests): input + list
+(text, marks, order) are cached to webview localStorage and restored on
+relaunch (`lib/listifyCache.ts`); drag-and-drop row reordering
+(`moveItemsToIndex`); and a Copy-selected action (footer button + context-menu
+item) alongside Copy-all.
 
 ## Implementation steps
 

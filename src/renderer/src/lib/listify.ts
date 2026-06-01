@@ -85,3 +85,19 @@ export function moveItems(
   }
   return out
 }
+
+// Move the selected items as a block so they land at `targetIndex` (an index
+// into the ORIGINAL array; items.length means "end"). Preserves the moved
+// items' relative order. Used by drag-and-drop reordering.
+export function moveItemsToIndex(items: Item[], ids: Set<number>, targetIndex: number): Item[] {
+  if (ids.size === 0) return items
+  const selected = items.filter((it) => ids.has(it.id))
+  if (selected.length === 0 || selected.length === items.length) return items
+  const rest = items.filter((it) => !ids.has(it.id))
+  // Insertion point within `rest` = count of non-selected items before targetIndex.
+  let insertAt = 0
+  for (let i = 0; i < targetIndex && i < items.length; i++) {
+    if (!ids.has(items[i]!.id)) insertAt++
+  }
+  return [...rest.slice(0, insertAt), ...selected, ...rest.slice(insertAt)]
+}
