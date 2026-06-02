@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { PageHeader, Button } from '../components/PageHeader'
 import { Icons } from '../components/ToolShell'
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu'
@@ -23,6 +23,25 @@ function formatBytes(bytes: number): string {
 function formatTime(ms: number): string {
   const d = new Date(ms)
   return d.toLocaleString()
+}
+
+// Count non-empty lines in a single pass (matches how the tools report line
+// counts). Output files end with a trailing newline, so this yields the item
+// count rather than item-count + 1.
+function countLines(s: string): number {
+  let count = 0
+  let seen = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c === 10 || c === 13) {
+      if (seen) count++
+      seen = false
+    } else if (c !== 32 && c !== 9) {
+      seen = true
+    }
+  }
+  if (seen) count++
+  return count
 }
 
 const ShuffleIcon = () => (
@@ -50,6 +69,10 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
   const [previewText, setPreviewText] = useState<string>('')
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewCopied, setPreviewCopied] = useState(false)
+  // Per-file line counts shown in place of byte size while preview mode is on.
+  // Cached by path+mtime so unchanged files aren't re-read on every refresh.
+  const [lineCounts, setLineCounts] = useState<Record<string, number>>({})
+  const countCacheRef = useRef<Map<string, { mtime: number; lines: number }>>(new Map())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,6 +124,36 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
       cancelled = true
     }
   }, [filePreview, selected])
+
+  // In preview mode, compute each listed file's line count (cached by mtime).
+  useEffect(() => {
+    if (!filePreview) return
+    let cancelled = false
+    void (async () => {
+      const cache = countCacheRef.current
+      const next: Record<string, number> = {}
+      await Promise.all(
+        entries.map(async (e) => {
+          const hit = cache.get(e.path)
+          if (hit && hit.mtime === e.mtime) {
+            next[e.path] = hit.lines
+            return
+          }
+          try {
+            const lines = countLines(await window.api.files.read(e.path))
+            cache.set(e.path, { mtime: e.mtime, lines })
+            next[e.path] = lines
+          } catch {
+            // Unreadable file — leave it out so the row shows a placeholder.
+          }
+        })
+      )
+      if (!cancelled) setLineCounts(next)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [filePreview, entries])
 
   function handleSelect(entry: Entry) {
     if (!filePreview) return
@@ -162,7 +215,7 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
                   <thead className="sticky top-0 z-10 bg-surface-2 text-[11px] uppercase tracking-wider text-text-secondary shadow-[inset_0_-1px_0_var(--tw-shadow-color)] shadow-border">
                     <tr>
                       <th className="px-4 py-3 font-semibold">Name</th>
-                      <th className="px-4 py-3 font-semibold">Size</th>
+                      <th className="px-4 py-3 font-semibold">Lines</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -183,7 +236,9 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
                           }`}
                         >
                           <td className="px-4 py-2.5 font-mono text-text-primary">{e.name}</td>
-                          <td className="px-4 py-2.5 text-text-secondary">{formatBytes(e.size)}</td>
+                          <td className="px-4 py-2.5 text-text-secondary tabular-nums">
+                            {lineCounts[e.path] !== undefined ? lineCounts[e.path]!.toLocaleString() : '…'}
+                          </td>
                         </tr>
                       )
                     })}
@@ -205,7 +260,10 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
                         {selected.name}
                       </div>
                       <div className="mt-0.5 text-[11px] text-text-muted">
-                        {formatBytes(selected.size)} · {formatTime(selected.mtime)}
+                        {lineCounts[selected.path] !== undefined
+                          ? `${lineCounts[selected.path]!.toLocaleString()} lines`
+                          : '… lines'}{' '}
+                        · {formatTime(selected.mtime)}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
