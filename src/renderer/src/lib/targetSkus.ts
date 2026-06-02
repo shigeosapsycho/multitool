@@ -127,7 +127,8 @@ const POKEMON_SETS: PokemonSet[] = [
   { name: 'Phantasmal Flames', era: ME, keywords: ['phantasmal flames'] },
   { name: 'Ascended Heroes', era: ME, keywords: ['ascended heroes'] },
   { name: 'Perfect Order', era: ME, keywords: ['perfect order'] },
-  { name: 'Chaos Rising', era: ME, keywords: ['chaos rising'] }
+  { name: 'Chaos Rising', era: ME, keywords: ['chaos rising'] },
+  { name: '30th Anniversary', era: ME, keywords: ['30th anniversary'] }
 ]
 
 // Match specific sets before era base sets, so "Mega Evolution—Ascended Heroes"
