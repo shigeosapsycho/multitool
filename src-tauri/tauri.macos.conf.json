@@ -1,7 +1,5 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "//": "macOS-only overrides, merged onto tauri.conf.json via `tauri build --config`. Keeps the Windows config untouched. Only the macOS CI job uses this.",
-  "//bundle": "createUpdaterArtifacts is NOT set here on purpose — only the signed release build turns it on (via a second --config), so unsigned PR/push builds need no signing key.",
   "bundle": {
     "targets": ["app", "dmg"],
     "macOS": {
@@ -10,7 +8,6 @@
   },
   "plugins": {
     "updater": {
-      "//": "pubkey is the content of src-tauri/.tauri/updater.key.pub. The matching private key is the TAURI_SIGNING_PRIVATE_KEY GitHub Actions secret.",
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4RTkzMzZEMTM4OENGRUQKUldUdHo0Z1RiVFBwYUNVS21IaktheFo1OG5ycU9uc1FaOFE3NWt3djBIbEwwWGpYS1VPeitMaG4K",
       "endpoints": [
         "https://github.com/shigeosapsycho/multitool/releases/latest/download/latest.json"
