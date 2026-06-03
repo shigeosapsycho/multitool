@@ -49,6 +49,7 @@ const TOOL_ROUTES = new Set<Route>([
   'find-non-duplicates',
   'listify',
   'multiply-lines',
+  'numbered-list-generator',
   'proxy-cleaner',
   'randomize',
   'remove-passwords',

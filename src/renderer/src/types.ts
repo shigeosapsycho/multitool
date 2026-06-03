@@ -9,6 +9,7 @@ export type Route =
   | 'listify'
   | 'match-email-pass'
   | 'multiply-lines'
+  | 'numbered-list-generator'
   | 'proxy-cleaner'
   | 'proxy-tester'
   | 'randomize'

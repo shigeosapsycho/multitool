@@ -59,6 +59,12 @@ const tools: ToolMeta[] = [
     accent: '#a3e635'
   },
   {
+    id: 'numbered-list-generator',
+    title: 'Numbered List Generator',
+    description: 'Generate a sequential numbered list with a custom prefix.',
+    accent: '#fb923c'
+  },
+  {
     id: 'proxy-cleaner',
     title: 'Proxy Cleaner',
     description: 'Filter a proxy list down to residential and/or ISP proxies.',
@@ -270,6 +276,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'listify': ListifyIcon,
   'match-email-pass': MatchEmailPassIcon,
   'multiply-lines': MultiplyLinesIcon,
+  'numbered-list-generator': SplitByNumberIcon,
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,

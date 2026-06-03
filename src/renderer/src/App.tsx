@@ -15,6 +15,7 @@ import { FindNonDuplicatesPage } from './pages/FindNonDuplicates'
 import { ListifyPage } from './pages/Listify'
 import { MatchEmailPassPage } from './pages/MatchEmailPass'
 import { MultiplyLinesPage } from './pages/MultiplyLines'
+import { NumberedListGeneratorPage } from './pages/NumberedListGenerator'
 import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
@@ -39,6 +40,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'listify',
   'match-email-pass',
   'multiply-lines',
+  'numbered-list-generator',
   'proxy-cleaner',
   'proxy-tester',
   'randomize',
@@ -292,6 +294,8 @@ export default function App() {
         return <MatchEmailPassPage {...props} />
       case 'multiply-lines':
         return <MultiplyLinesPage {...props} />
+      case 'numbered-list-generator':
+        return <NumberedListGeneratorPage {...props} />
       case 'proxy-cleaner':
         return <ProxyCleanerPage {...props} />
       case 'proxy-tester':
