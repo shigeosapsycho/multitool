@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4RTkzMzZEMTM4OENGRUQKUldUdHo0Z1RiVFBwYUNVS21IaktheFo1OG5ycU9uc1FaOFE3NWt3djBIbEwwWGpYS1VPeitMaG4K",
+      "endpoints": [
+        "https://github.com/shigeosapsycho/multitool/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

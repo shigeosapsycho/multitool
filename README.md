@@ -26,6 +26,8 @@ All output lands in a single `output/` folder with timestamped filenames, config
 
 ## Install
 
+### Windows
+
 Two builds are produced for every release:
 
 | File | What it is |
@@ -34,6 +36,26 @@ Two builds are produced for every release:
 | `BeuMultiTool.exe` | Portable single-file. Just double-click. Output lands next to the `.exe`. |
 
 Either way you can change the output folder from **Settings**.
+
+### macOS (Apple Silicon)
+
+Download `BeuMultiTool_x.y.z_aarch64.dmg`, open it, and drag the app to
+**Applications**.
+
+> **One-time step:** the app is **not** Apple-notarised (no paid Developer ID),
+> so macOS quarantines it on download and refuses to open it
+> (*"BeuMultiTool is damaged and can't be opened"*). Clear the quarantine flag
+> once, in **Terminal**:
+>
+> ```sh
+> xattr -dr com.apple.quarantine /Applications/BeuMultiTool.app
+> ```
+>
+> After that it launches normally and **auto-updates in-app** (no re-download
+> and no repeat of this step for future versions).
+
+Requires macOS 11 (Big Sur) or newer, Apple Silicon (M1/M2/M3/M4). Intel Macs
+are not built.
 
 ## Build from source
 

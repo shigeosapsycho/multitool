@@ -31,13 +31,16 @@ ureq = { version = "2", features = ["json", "socks-proxy"] }
 base64 = "0.22"
 url = "2"
 # Email Cleaner module: IMAP client + OS credential storage.
+# `keyring` is platform-specific — see the per-OS [target.*.dependencies] tables
+# below (windows-native on Windows, apple-native on macOS).
 imap = "2.4"
 native-tls = "0.2"
-keyring = { version = "3", features = ["windows-native"] }
 rfc2047-decoder = "1"
 mailparse = "0.15"
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
+# OS credential store for the Email Cleaner module (Windows Credential Manager).
+keyring = { version = "3", features = ["windows-native"] }
 # Registry walk for detecting the legacy Electron install (see uninstall_old.rs).
 winreg = "0.52"
 windows = { version = "0.59", features = [
@@ -48,6 +51,14 @@ windows = { version = "0.59", features = [
   "Win32_System_Threading",
   "Win32_System_Diagnostics_ToolHelp",
 ] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# OS credential store for the Email Cleaner module (macOS Keychain).
+keyring = { version = "3", features = ["apple-native"] }
+# Self-update on macOS. The Windows build uses the hand-rolled exe-swap in
+# update.rs; .app bundles can't be swapped that way, so macOS goes through the
+# official plugin (downloads a signed .app.tar.gz and replaces the bundle).
+tauri-plugin-updater = "2"
 
 [profile.release]
 panic = "abort"
