@@ -9,6 +9,9 @@ release/
 # Legacy Electron build artifacts (no longer produced; ignored in case they linger)
 out/
 
+# Superpowers working docs (plans/specs) — local only, not part of the build
+docs/superpowers/
+
 # Tauri build artifacts
 src-tauri/target/
 src-tauri/gen/schemas/
