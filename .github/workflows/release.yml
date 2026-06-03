@@ -120,6 +120,13 @@ jobs:
     name: Build macOS app (Apple Silicon)
     needs: build
     runs-on: macos-14
+    # src-tauri/rust-toolchain.toml pins channel "stable-x86_64-pc-windows-msvc"
+    # (a Windows-host-locked toolchain, chosen to avoid the mingw linker). That
+    # channel name is invalid on a macOS host, so override it to plain "stable"
+    # (the runner's native arm64 host) here. RUSTUP_TOOLCHAIN takes precedence
+    # over rust-toolchain.toml, so the Windows pin is left untouched everywhere.
+    env:
+      RUSTUP_TOOLCHAIN: stable
 
     steps:
       - name: Checkout
