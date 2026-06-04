@@ -70,6 +70,35 @@ export function isIspProxy(host: string | null, port: string | null): boolean {
   return !!host && IPV4_RE.test(host) && !!port && PORT_RE.test(port)
 }
 
+// Two-label public suffixes we must keep together when deriving the registrable
+// domain, so x.proxies.co.uk -> proxies.co.uk rather than the meaningless co.uk.
+const MULTI_LABEL_SUFFIXES = new Set([
+  'co.uk', 'org.uk', 'net.uk', 'gov.uk', 'ac.uk',
+  'com.au', 'net.au', 'org.au',
+  'co.jp', 'co.kr', 'co.in', 'co.za', 'co.nz',
+  'com.br', 'com.mx', 'com.tr', 'com.cn', 'com.sg', 'com.hk'
+])
+
+/**
+ * Collapse a proxy host to its provider's registrable domain. Subdomains of one
+ * provider collapse together (b2b-s10.liveproxies.io -> liveproxies.io). Returns
+ * null when the host has no provider identity: raw IPv4, IPv6/bracketed, all-numeric,
+ * or empty.
+ */
+export function providerOf(host: string | null): string | null {
+  if (!host) return null
+  if (host.includes(':')) return null // IPv6 / bracketed
+  if (IPV4_RE.test(host)) return null
+  if (!/[a-z]/i.test(host)) return null
+  const labels = host.toLowerCase().replace(/\.$/, '').split('.').filter(Boolean)
+  if (labels.length < 2) return labels[0] ?? null
+  const lastTwo = labels.slice(-2).join('.')
+  if (labels.length >= 3 && MULTI_LABEL_SUFFIXES.has(lastTwo)) {
+    return labels.slice(-3).join('.')
+  }
+  return lastTwo
+}
+
 /**
  * Keep only the proxy lines matching the selected filters. A line is kept
  * when it matches ANY checked filter (residential OR isp). Original line
