@@ -100,6 +100,25 @@ export function providerOf(host: string | null): string | null {
 }
 
 /**
+ * Group a proxy list by provider (registrable domain of the host) and count the
+ * lines for each. Blank, comment (#), and raw-IP lines are ignored. Result is
+ * sorted by count descending, then provider name ascending.
+ */
+export function detectProviders(text: string): { provider: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const provider = providerOf(parseProxyLine(line).host)
+    if (!provider) continue
+    counts.set(provider, (counts.get(provider) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([provider, count]) => ({ provider, count }))
+    .sort((a, b) => b.count - a.count || a.provider.localeCompare(b.provider))
+}
+
+/**
  * Keep only the proxy lines matching the selected filters. A line is kept
  * when it matches ANY checked filter (residential OR isp). Original line
  * text and order are preserved; no deduplication.
