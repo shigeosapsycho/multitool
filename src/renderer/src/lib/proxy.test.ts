@@ -19,8 +19,8 @@ describe('providerOf', () => {
   it('keeps two-label public suffixes together', () => {
     expect(providerOf('gate.proxies.co.uk')).toBe('proxies.co.uk')
   })
-  it('returns a bare single-label host unchanged', () => {
-    expect(providerOf('localhost')).toBe('localhost')
+  it('returns null for a single-label host', () => {
+    expect(providerOf('localhost')).toBeNull()
   })
 })
 
@@ -40,6 +40,13 @@ describe('detectProviders', () => {
       { provider: 'nexaproxies.com', count: 1 }
     ])
   })
+  it('sorts alphabetically when counts are equal', () => {
+    const tie = ['a.bravo.com:80:u:p', 'a.alpha.com:80:u:p'].join('\n')
+    expect(detectProviders(tie)).toEqual([
+      { provider: 'alpha.com', count: 1 },
+      { provider: 'bravo.com', count: 1 }
+    ])
+  })
 })
 
 describe('filterProxies with removed providers', () => {
@@ -55,5 +62,10 @@ describe('filterProxies with removed providers', () => {
       'b2b-s10.liveproxies.io:7383:u:p',
       'mix.nexaproxies.com:8888:u:p'
     ])
+  })
+  it('applies the type filter before the removed-provider check', () => {
+    expect(
+      filterProxies('gate.smartproxy.com:8080:u:p', { residential: false, isp: true }, new Set())
+    ).toEqual([])
   })
 })

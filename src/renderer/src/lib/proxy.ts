@@ -72,6 +72,8 @@ export function isIspProxy(host: string | null, port: string | null): boolean {
 
 // Two-label public suffixes we must keep together when deriving the registrable
 // domain, so x.proxies.co.uk -> proxies.co.uk rather than the meaningless co.uk.
+// This is intentionally a small curated subset, not the full Public Suffix List
+// (avoiding a PSL dependency). Extend it if providers with unlisted suffixes appear.
 const MULTI_LABEL_SUFFIXES = new Set([
   'co.uk', 'org.uk', 'net.uk', 'gov.uk', 'ac.uk',
   'com.au', 'net.au', 'org.au',
@@ -91,7 +93,7 @@ export function providerOf(host: string | null): string | null {
   if (IPV4_RE.test(host)) return null
   if (!/[a-z]/i.test(host)) return null
   const labels = host.toLowerCase().replace(/\.$/, '').split('.').filter(Boolean)
-  if (labels.length < 2) return labels[0] ?? null
+  if (labels.length < 2) return null // single label has no registrable domain / provider identity
   const lastTwo = labels.slice(-2).join('.')
   if (labels.length >= 3 && MULTI_LABEL_SUFFIXES.has(lastTwo)) {
     return labels.slice(-3).join('.')
@@ -138,6 +140,7 @@ export function filterProxies(
       (filters.isp && isIspProxy(host, port))
     if (!typeMatch) continue
     if (removed && removed.size > 0) {
+      // null provider (raw IP, etc.) means there's nothing to match against — keep the line.
       const provider = providerOf(host)
       if (provider && removed.has(provider)) continue
     }
