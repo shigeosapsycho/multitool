@@ -24,6 +24,8 @@ export type SingleFileToolProps = {
   pickerTitle?: string
   pickerFilters?: { name: string; extensions: string[] }[]
   toolbar?: ReactNode
+  /** Fired with the current input text on load/drop/clear and (debounced) on edit. */
+  onContentChange?: (text: string) => void
   /** Extra action(s) rendered in the result panel footer when there are results. */
   resultActions?: (results: string[]) => ReactNode
   active?: boolean
@@ -45,6 +47,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
     pickerTitle,
     pickerFilters,
     toolbar,
+    onContentChange,
     resultActions,
     active = true,
     onBack,
@@ -57,11 +60,13 @@ export function SingleFileTool(props: SingleFileToolProps) {
   const [savedTo, setSavedTo] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const panelRef = useRef<FilePanelHandle>(null)
+  const editDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function loadFromPath(path: string) {
     const text = await window.api.files.read(path)
     setFilePath(path)
     panelRef.current?.setValue(text)
+    onContentChange?.(text)
     setResults(null)
     setSavedTo(null)
     onSetStatus(`Loaded ${path}`)
@@ -75,6 +80,12 @@ export function SingleFileTool(props: SingleFileToolProps) {
     if (pending) void loadFromPath(pending)
   }, [active])
 
+  useEffect(() => {
+    return () => {
+      if (editDebounce.current) clearTimeout(editDebounce.current)
+    }
+  }, [])
+
   async function handlePick() {
     const paths = await window.api.files.open({
       title: pickerTitle ?? 'Select a text file',
@@ -87,6 +98,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
   function handleClear() {
     setFilePath(null)
     panelRef.current?.setValue('')
+    onContentChange?.('')
     setResults(null)
     setSavedTo(null)
     onSetStatus('Ready')
@@ -160,6 +172,11 @@ export function SingleFileTool(props: SingleFileToolProps) {
         onUserEdit={() => {
           setResults(null)
           setSavedTo(null)
+          if (!onContentChange) return
+          if (editDebounce.current) clearTimeout(editDebounce.current)
+          editDebounce.current = setTimeout(() => {
+            onContentChange(panelRef.current?.getValue() ?? '')
+          }, 250)
         }}
       />
       <ResultPanel
