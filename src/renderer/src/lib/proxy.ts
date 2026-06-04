@@ -119,22 +119,29 @@ export function detectProviders(text: string): { provider: string; count: number
 }
 
 /**
- * Keep only the proxy lines matching the selected filters. A line is kept
- * when it matches ANY checked filter (residential OR isp). Original line
- * text and order are preserved; no deduplication.
+ * Keep only the proxy lines matching the selected filters. A line is kept when it
+ * matches ANY checked type filter (residential OR isp) AND its provider is not in
+ * `removed`. Original line text and order are preserved; no deduplication.
  */
-export function filterProxies(text: string, filters: ProxyFilters): string[] {
+export function filterProxies(
+  text: string,
+  filters: ProxyFilters,
+  removed?: Set<string>
+): string[] {
   const out: string[] = []
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
     const { host, port } = parseProxyLine(line)
-    if (
+    const typeMatch =
       (filters.residential && isResidentialHost(host)) ||
       (filters.isp && isIspProxy(host, port))
-    ) {
-      out.push(line)
+    if (!typeMatch) continue
+    if (removed && removed.size > 0) {
+      const provider = providerOf(host)
+      if (provider && removed.has(provider)) continue
     }
+    out.push(line)
   }
   return out
 }
