@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SingleFileTool } from './SingleFileTool'
 import { Button } from '../components/ToolShell'
-import { filterProxies, type ProxyFilters } from '../lib/proxy'
+import { filterProxies, detectProviders, type ProxyFilters } from '../lib/proxy'
 import { setPendingProxies } from '../lib/pending'
 import type { Route } from '../types'
 
@@ -54,37 +54,67 @@ function FilterChip({
 
 export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Props) {
   const [filters, setFilters] = useState<ProxyFilters>({ residential: true, isp: true })
+  const [content, setContent] = useState('')
+  const [removed, setRemoved] = useState<Set<string>>(() => new Set())
+
+  const providers = useMemo(() => detectProviders(content), [content])
+
+  function toggleProvider(provider: string) {
+    setRemoved((prev) => {
+      const next = new Set(prev)
+      if (next.has(provider)) next.delete(provider)
+      else next.add(provider)
+      return next
+    })
+  }
 
   const toolbar = (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
-      <FilterChip
-        active={filters.residential}
-        onToggle={() => setFilters((f) => ({ ...f, residential: !f.residential }))}
-      >
-        Residential
-      </FilterChip>
-      <FilterChip
-        active={filters.isp}
-        onToggle={() => setFilters((f) => ({ ...f, isp: !f.isp }))}
-      >
-        ISPs
-      </FilterChip>
+    <div className="flex flex-col gap-2">
+      <div className="inline-flex items-center gap-1 self-start rounded-lg border border-border bg-surface p-1">
+        <FilterChip
+          active={filters.residential}
+          onToggle={() => setFilters((f) => ({ ...f, residential: !f.residential }))}
+        >
+          Residential
+        </FilterChip>
+        <FilterChip
+          active={filters.isp}
+          onToggle={() => setFilters((f) => ({ ...f, isp: !f.isp }))}
+        >
+          ISPs
+        </FilterChip>
+      </div>
+      {providers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="pr-1 text-[12px] text-text-muted">Providers:</span>
+          {providers.map(({ provider, count }) => (
+            <FilterChip
+              key={provider}
+              active={!removed.has(provider)}
+              onToggle={() => toggleProvider(provider)}
+            >
+              {provider} · {count.toLocaleString()}
+            </FilterChip>
+          ))}
+        </div>
+      )}
     </div>
   )
 
   return (
     <SingleFileTool
       title="Proxy Cleaner"
-      hint="Keep only Residential and/or ISP proxies. Toggle filters in the header."
+      hint="Keep only Residential and/or ISP proxies. Remove specific providers with the chips in the header."
       taskName="filtered-proxies"
       inputLabel="Proxy List"
       resultLabel="Filtered Proxies"
       resultUnit="proxies"
       emptyResultMessage="No proxies matched the selected filters."
       runLabel="Filter Proxies"
-      transform={(text) => filterProxies(text, filters)}
+      transform={(text) => filterProxies(text, filters, removed)}
       pickerTitle="Select a proxy list"
       toolbar={toolbar}
+      onContentChange={setContent}
       resultActions={(results) => (
         <Button
           variant="secondary"

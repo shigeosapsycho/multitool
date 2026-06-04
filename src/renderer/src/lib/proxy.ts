@@ -70,23 +70,81 @@ export function isIspProxy(host: string | null, port: string | null): boolean {
   return !!host && IPV4_RE.test(host) && !!port && PORT_RE.test(port)
 }
 
+// Two-label public suffixes we must keep together when deriving the registrable
+// domain, so x.proxies.co.uk -> proxies.co.uk rather than the meaningless co.uk.
+// This is intentionally a small curated subset, not the full Public Suffix List
+// (avoiding a PSL dependency). Extend it if providers with unlisted suffixes appear.
+const MULTI_LABEL_SUFFIXES = new Set([
+  'co.uk', 'org.uk', 'net.uk', 'gov.uk', 'ac.uk',
+  'com.au', 'net.au', 'org.au',
+  'co.jp', 'co.kr', 'co.in', 'co.za', 'co.nz',
+  'com.br', 'com.mx', 'com.tr', 'com.cn', 'com.sg', 'com.hk'
+])
+
 /**
- * Keep only the proxy lines matching the selected filters. A line is kept
- * when it matches ANY checked filter (residential OR isp). Original line
- * text and order are preserved; no deduplication.
+ * Collapse a proxy host to its provider's registrable domain. Subdomains of one
+ * provider collapse together (b2b-s10.liveproxies.io -> liveproxies.io). Returns
+ * null when the host has no provider identity: raw IPv4, IPv6/bracketed, all-numeric,
+ * or empty.
  */
-export function filterProxies(text: string, filters: ProxyFilters): string[] {
+export function providerOf(host: string | null): string | null {
+  if (!host) return null
+  if (host.includes(':')) return null // IPv6 / bracketed
+  if (IPV4_RE.test(host)) return null
+  if (!/[a-z]/i.test(host)) return null
+  const labels = host.toLowerCase().replace(/\.$/, '').split('.').filter(Boolean)
+  if (labels.length < 2) return null // single label has no registrable domain / provider identity
+  const lastTwo = labels.slice(-2).join('.')
+  if (labels.length >= 3 && MULTI_LABEL_SUFFIXES.has(lastTwo)) {
+    return labels.slice(-3).join('.')
+  }
+  return lastTwo
+}
+
+/**
+ * Group a proxy list by provider (registrable domain of the host) and count the
+ * lines for each. Blank, comment (#), and raw-IP lines are ignored. Result is
+ * sorted by count descending, then provider name ascending.
+ */
+export function detectProviders(text: string): { provider: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const provider = providerOf(parseProxyLine(line).host)
+    if (!provider) continue
+    counts.set(provider, (counts.get(provider) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([provider, count]) => ({ provider, count }))
+    .sort((a, b) => b.count - a.count || a.provider.localeCompare(b.provider))
+}
+
+/**
+ * Keep only the proxy lines matching the selected filters. A line is kept when it
+ * matches ANY checked type filter (residential OR isp) AND its provider is not in
+ * `removed`. Original line text and order are preserved; no deduplication.
+ */
+export function filterProxies(
+  text: string,
+  filters: ProxyFilters,
+  removed?: Set<string>
+): string[] {
   const out: string[] = []
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
     const { host, port } = parseProxyLine(line)
-    if (
+    const typeMatch =
       (filters.residential && isResidentialHost(host)) ||
       (filters.isp && isIspProxy(host, port))
-    ) {
-      out.push(line)
+    if (!typeMatch) continue
+    if (removed && removed.size > 0) {
+      // null provider (raw IP, etc.) means there's nothing to match against — keep the line.
+      const provider = providerOf(host)
+      if (provider && removed.has(provider)) continue
     }
+    out.push(line)
   }
   return out
 }
