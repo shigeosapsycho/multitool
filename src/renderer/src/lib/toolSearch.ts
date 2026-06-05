@@ -7,7 +7,11 @@ export function filterTools(query: string, tools: ToolMeta[]): ToolMeta[] {
   return tools.filter((t) => `${t.title} ${t.description}`.toLowerCase().includes(q))
 }
 
-/** Count grid tracks from a computed `grid-template-columns` string. Min 1. */
+/**
+ * Count grid tracks from a `grid-template-columns` value. Min 1.
+ * Expects a browser-resolved value (e.g. "200px 200px 200px" from
+ * getComputedStyle), not a shorthand like `repeat(3, 1fr)`.
+ */
 export function parseColumnCount(templateColumns: string): number {
   const tracks = templateColumns.trim().split(/\s+/).filter((s) => s && s !== 'none')
   return Math.max(1, tracks.length)
