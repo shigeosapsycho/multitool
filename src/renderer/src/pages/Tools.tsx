@@ -400,7 +400,7 @@ export function ToolsPage({ onNavigate }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const columnCount = () => {
+  const readColumnCount = () => {
     const grid = gridRef.current
     if (!grid) return 1
     return parseColumnCount(getComputedStyle(grid).gridTemplateColumns)
@@ -425,8 +425,16 @@ export function ToolsPage({ onNavigate }: Props) {
     }
     const dir = arrows[e.key]
     if (dir) {
+      // Left/Right only drive grid nav when the caret sits at the matching
+      // edge with no selection, so mid-string caret editing still works.
+      const input = e.currentTarget
+      const atStart = input.selectionStart === 0 && input.selectionEnd === 0
+      const atEnd =
+        input.selectionStart === query.length && input.selectionEnd === query.length
+      if (dir === 'left' && !atStart) return
+      if (dir === 'right' && !atEnd) return
       e.preventDefault()
-      setSelected((s) => nextSelection(s, matches.length, columnCount(), dir))
+      setSelected((s) => nextSelection(s, matches.length, readColumnCount(), dir))
     }
   }
 
