@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import type * as React from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { filterTools, nextSelection, parseColumnCount, type ArrowDirection } from '../lib/toolSearch'
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
 import { setPendingFile } from '../lib/pending'
+import { useFlip } from '../lib/useFlip'
+
+// Exit transition duration (matches `.tool-card` transition in globals.css, 150ms)
+// plus a small buffer before the card unmounts.
+const EXIT_MS = 170
 
 const tools: ToolMeta[] = [
   {
@@ -117,6 +124,20 @@ const tools: ToolMeta[] = [
 const ChevronIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
     <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
+
+const ClearIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
+const SearchBarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <circle cx="11" cy="11" r="6.5" />
+    <line x1="20" y1="20" x2="16" y2="16" />
   </svg>
 )
 
@@ -289,10 +310,12 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
 
 function ToolCard({
   tool,
-  onNavigate
+  onNavigate,
+  highlighted
 }: {
   tool: ToolMeta
   onNavigate: (route: Route) => void
+  highlighted?: boolean
 }) {
   const [dragOver, setDragOver] = useState(false)
   const dropRef = useRef<HTMLButtonElement>(null)
@@ -317,11 +340,11 @@ function ToolCard({
     <button
       ref={dropRef}
       onClick={() => onNavigate(tool.id)}
-      className={`group relative flex flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
+      className={`group relative flex h-full w-full flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
         dragOver
           ? 'border-accent shadow-glow-accent'
           : 'border-border hover:border-border-strong'
-      }`}
+      } ${highlighted ? 'ring-2 ring-accent' : ''}`}
     >
       <span
         className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-lg"
@@ -355,17 +378,229 @@ type Props = {
 }
 
 export function ToolsPage({ onNavigate }: Props) {
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState(0)
+  // The highlight ring stays hidden until the user navigates with the arrow
+  // keys — typing alone never highlights a card.
+  const [highlightActive, setHighlightActive] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  const matches = useMemo(() => filterTools(query, tools), [query])
+
+  // Reset the highlight to the first match (and hide it) whenever the query changes.
+  useEffect(() => {
+    setSelected(0)
+    setHighlightActive(false)
+  }, [query])
+
+  // Cards kept in the DOM while they animate out (ids mid-exit).
+  const [exiting, setExiting] = useState<Set<string>>(new Set())
+  // Mirror of `exiting` so the effect can read it without listing it as a dep —
+  // depending on the state the effect writes would tear down its own timers.
+  const exitingRef = useRef(exiting)
+  exitingRef.current = exiting
+  const prevMatchIds = useRef<Set<string>>(new Set(matches.map((t) => t.id)))
+  // Pending unmount timers, keyed by card id. Held in a ref so a re-render
+  // never cancels them — only re-entry or page unmount does.
+  const exitTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  const reducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  useEffect(() => {
+    const matchIds = new Set(matches.map((t) => t.id))
+    const prev = prevMatchIds.current
+    prevMatchIds.current = matchIds
+
+    if (reducedMotion) {
+      // No exit animation — drop any leaving cards immediately.
+      if (exitingRef.current.size) setExiting(new Set())
+      return
+    }
+
+    const current = exitingRef.current
+    // Cards that just left the matched set start their exit animation.
+    const justLeft = [...prev].filter((id) => !matchIds.has(id) && !current.has(id))
+    // Cards that re-entered while still exiting: cancel their exit.
+    const reentered = [...current].filter((id) => matchIds.has(id))
+
+    if (reentered.length || justLeft.length) {
+      setExiting((cur) => {
+        const next = new Set(cur)
+        reentered.forEach((id) => next.delete(id))
+        justLeft.forEach((id) => next.add(id))
+        return next
+      })
+    }
+
+    // Cancel the pending unmount for any card that came back.
+    reentered.forEach((id) => {
+      const t = exitTimers.current.get(id)
+      if (t) {
+        clearTimeout(t)
+        exitTimers.current.delete(id)
+      }
+    })
+
+    // Schedule each newly-left card to unmount after its exit transition.
+    justLeft.forEach((id) => {
+      const timer = setTimeout(() => {
+        exitTimers.current.delete(id)
+        setExiting((cur) => {
+          if (!cur.has(id)) return cur
+          const next = new Set(cur)
+          next.delete(id)
+          return next
+        })
+      }, EXIT_MS)
+      exitTimers.current.set(id, timer)
+    })
+  }, [matches, reducedMotion])
+
+  // Clear any outstanding timers when the page unmounts.
+  useEffect(() => {
+    const timers = exitTimers.current
+    return () => timers.forEach((t) => clearTimeout(t))
+  }, [])
+
+  // Cards to render: current matches, in tools order, plus any still exiting.
+  const matchIdSet = new Set(matches.map((t) => t.id))
+  const rendered = tools.filter((t) => matchIdSet.has(t.id) || exiting.has(t.id))
+
+  const { setRef } = useFlip(rendered.map((t) => t.id).join('|'), !reducedMotion)
+
+  // Type-anywhere: a printable key (no modifier) routes into the search box,
+  // even if focus drifted. Scoped to this page — it unmounts on navigation.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key.length !== 1) return
+      const active = document.activeElement
+      if (active === inputRef.current) return
+      // Yield to other focused controls (e.g. Space/Enter on a Tab-focused card).
+      if (
+        active instanceof HTMLElement &&
+        ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)
+      )
+        return
+      e.preventDefault()
+      setQuery((q) => q + e.key)
+      inputRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const readColumnCount = () => {
+    const grid = gridRef.current
+    if (!grid) return 1
+    return parseColumnCount(getComputedStyle(grid).gridTemplateColumns)
+  }
+
+  const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const target = matches[selected] ?? matches[0]
+      if (target) onNavigate(target.id)
+      return
+    }
+    if (e.key === 'Escape') {
+      setQuery('')
+      setSelected(0)
+      setHighlightActive(false)
+      return
+    }
+    const arrows: Record<string, ArrowDirection> = {
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      ArrowDown: 'down'
+    }
+    const dir = arrows[e.key]
+    if (dir) {
+      // Left/Right only drive grid nav when the caret sits at the matching
+      // edge with no selection, so mid-string caret editing still works.
+      const input = e.currentTarget
+      const atStart = input.selectionStart === 0 && input.selectionEnd === 0
+      const atEnd =
+        input.selectionStart === query.length && input.selectionEnd === query.length
+      if (dir === 'left' && !atStart) return
+      if (dir === 'right' && !atEnd) return
+      e.preventDefault()
+      setHighlightActive(true)
+      setSelected((s) => nextSelection(s, matches.length, readColumnCount(), dir))
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title="Tools"
         subtitle="Drag and drop a file on a module or choose a module."
       />
-      <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8">
-        {tools.map((t) => (
-          <ToolCard key={t.id} tool={t} onNavigate={onNavigate} />
-        ))}
+
+      <div className="px-8 pb-4">
+        <div className="relative max-w-md">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+            <SearchBarIcon />
+          </span>
+          <input
+            ref={inputRef}
+            autoFocus
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onInputKeyDown}
+            placeholder="Search tools…"
+            aria-label="Search tools"
+            className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-accent"
+          />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => {
+                setQuery('')
+                inputRef.current?.focus()
+              }}
+              className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-text-muted transition hover:bg-surface-2 hover:text-text-primary"
+            >
+              <ClearIcon />
+            </button>
+          )}
+        </div>
       </div>
+
+      {rendered.length === 0 ? (
+        <div role="status" className="px-8 pb-8 text-[13px] text-text-muted">
+          No tools match &ldquo;{query}&rdquo;
+        </div>
+      ) : (
+        <div
+          ref={gridRef}
+          className="grid auto-rows-[160px] grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 px-8 pb-8"
+        >
+          {rendered.map((t) => {
+            const matchIndex = matches.findIndex((m) => m.id === t.id)
+            const isExiting = exiting.has(t.id) && matchIndex === -1
+            return (
+              <div
+                key={t.id}
+                ref={setRef(t.id)}
+                className={`tool-card h-full${isExiting ? ' tool-card--exit' : ''}`}
+                style={{ animationDelay: `${Math.min(matchIndex < 0 ? 0 : matchIndex * 15, 90)}ms` }}
+              >
+                <ToolCard
+                  tool={t}
+                  onNavigate={onNavigate}
+                  highlighted={highlightActive && matchIndex === selected && matchIndex !== -1}
+                />
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
