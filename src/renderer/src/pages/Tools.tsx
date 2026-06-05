@@ -4,6 +4,7 @@ import { filterTools, nextSelection, parseColumnCount, type ArrowDirection } fro
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
 import { setPendingFile } from '../lib/pending'
+import { useFlip } from '../lib/useFlip'
 
 const tools: ToolMeta[] = [
   {
@@ -335,7 +336,7 @@ function ToolCard({
     <button
       ref={dropRef}
       onClick={() => onNavigate(tool.id)}
-      className={`group relative flex flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
+      className={`group relative flex h-full w-full flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
         dragOver
           ? 'border-accent shadow-glow-accent'
           : 'border-border hover:border-border-strong'
@@ -384,6 +385,59 @@ export function ToolsPage({ onNavigate }: Props) {
   useEffect(() => {
     setSelected(0)
   }, [query])
+
+  // Cards kept in the DOM while they animate out (id -> animating exit).
+  const [exiting, setExiting] = useState<Set<string>>(new Set())
+  const prevMatchIds = useRef<Set<string>>(new Set(matches.map((t) => t.id)))
+
+  const reducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  useEffect(() => {
+    const matchIds = new Set(matches.map((t) => t.id))
+    const prev = prevMatchIds.current
+
+    // Cards that just left the matched set start their exit animation.
+    const justLeft = [...prev].filter((id) => !matchIds.has(id) && !exiting.has(id))
+    // Cards that re-entered while still exiting: cancel their exit.
+    const reentered = [...exiting].filter((id) => matchIds.has(id))
+
+    if (reducedMotion) {
+      // No exit animation — drop leaving cards immediately.
+      if (exiting.size) setExiting(new Set())
+    } else {
+      if (reentered.length || justLeft.length) {
+        setExiting((cur) => {
+          const next = new Set(cur)
+          reentered.forEach((id) => next.delete(id))
+          justLeft.forEach((id) => next.add(id))
+          return next
+        })
+      }
+      if (justLeft.length) {
+        // After the exit transition, unmount the left cards.
+        const timer = setTimeout(() => {
+          setExiting((cur) => {
+            const next = new Set(cur)
+            justLeft.forEach((id) => next.delete(id))
+            return next
+          })
+        }, 170)
+        prevMatchIds.current = matchIds
+        return () => clearTimeout(timer)
+      }
+    }
+
+    prevMatchIds.current = matchIds
+    return undefined
+  }, [matches, exiting, reducedMotion])
+
+  // Cards to render: current matches, in tools order, plus any still exiting.
+  const matchIdSet = new Set(matches.map((t) => t.id))
+  const rendered = tools.filter((t) => matchIdSet.has(t.id) || exiting.has(t.id))
+
+  const { setRef } = useFlip(rendered.map((t) => t.id).join('|'), !reducedMotion)
 
   // Type-anywhere: a printable key (no modifier) routes into the search box,
   // even if focus drifted. Scoped to this page — it unmounts on navigation.
@@ -486,14 +540,24 @@ export function ToolsPage({ onNavigate }: Props) {
           ref={gridRef}
           className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8"
         >
-          {matches.map((t, i) => (
-            <ToolCard
-              key={t.id}
-              tool={t}
-              onNavigate={onNavigate}
-              highlighted={i === selected}
-            />
-          ))}
+          {rendered.map((t) => {
+            const matchIndex = matches.findIndex((m) => m.id === t.id)
+            const isExiting = exiting.has(t.id) && matchIndex === -1
+            return (
+              <div
+                key={t.id}
+                ref={setRef(t.id)}
+                className={`tool-card h-full${isExiting ? ' tool-card--exit' : ''}`}
+                style={{ animationDelay: `${Math.min(matchIndex < 0 ? 0 : matchIndex * 15, 90)}ms` }}
+              >
+                <ToolCard
+                  tool={t}
+                  onNavigate={onNavigate}
+                  highlighted={matchIndex === selected && matchIndex !== -1}
+                />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
