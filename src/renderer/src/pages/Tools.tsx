@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { filterTools } from '../lib/toolSearch'
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
 import { setPendingFile } from '../lib/pending'
@@ -117,6 +118,20 @@ const tools: ToolMeta[] = [
 const ChevronIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
     <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
+
+const ClearIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
+const SearchBarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <circle cx="11" cy="11" r="6.5" />
+    <line x1="20" y1="20" x2="16" y2="16" />
   </svg>
 )
 
@@ -355,17 +370,60 @@ type Props = {
 }
 
 export function ToolsPage({ onNavigate }: Props) {
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const matches = useMemo(() => filterTools(query, tools), [query])
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title="Tools"
         subtitle="Drag and drop a file on a module or choose a module."
       />
-      <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8">
-        {tools.map((t) => (
-          <ToolCard key={t.id} tool={t} onNavigate={onNavigate} />
-        ))}
+
+      <div className="px-8 pb-4">
+        <div className="relative max-w-md">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+            <SearchBarIcon />
+          </span>
+          <input
+            ref={inputRef}
+            autoFocus
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tools…"
+            aria-label="Search tools"
+            className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/40"
+          />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => {
+                setQuery('')
+                inputRef.current?.focus()
+              }}
+              className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-text-muted transition hover:bg-surface-2 hover:text-text-primary"
+            >
+              <ClearIcon />
+            </button>
+          )}
+        </div>
       </div>
+
+      {matches.length === 0 ? (
+        <div className="px-8 pb-8 text-[13px] text-text-muted">
+          No tools match &ldquo;{query}&rdquo;
+        </div>
+      ) : (
+        <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8">
+          {matches.map((t) => (
+            <ToolCard key={t.id} tool={t} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
