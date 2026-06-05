@@ -579,7 +579,7 @@ export function ToolsPage({ onNavigate }: Props) {
       ) : (
         <div
           ref={gridRef}
-          className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8"
+          className="grid auto-rows-[160px] grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 px-8 pb-8"
         >
           {rendered.map((t) => {
             const matchIndex = matches.findIndex((m) => m.id === t.id)
