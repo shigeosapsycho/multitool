@@ -39,10 +39,18 @@ export function useFlip(key: string, enabled: boolean) {
         // Invert: jump back to the old spot with no transition.
         el.style.transition = 'none'
         el.style.transform = `translate(${dx}px, ${dy}px)`
-        // Play: next frame, animate the transform away.
+        // Play: next frame, animate the transform away, then drop the inline
+        // transition so a later exit uses the CSS opacity/transform transition.
         requestAnimationFrame(() => {
           el.style.transition = `transform ${DURATION_MS}ms ease-out`
           el.style.transform = ''
+          el.addEventListener(
+            'transitionend',
+            () => {
+              el.style.transition = ''
+            },
+            { once: true }
+          )
         })
       })
     }

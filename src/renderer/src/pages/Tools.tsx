@@ -473,7 +473,14 @@ export function ToolsPage({ onNavigate }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key.length !== 1) return
-      if (document.activeElement === inputRef.current) return
+      const active = document.activeElement
+      if (active === inputRef.current) return
+      // Yield to other focused controls (e.g. Space/Enter on a Tab-focused card).
+      if (
+        active instanceof HTMLElement &&
+        ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)
+      )
+        return
       e.preventDefault()
       setQuery((q) => q + e.key)
       inputRef.current?.focus()
@@ -559,7 +566,7 @@ export function ToolsPage({ onNavigate }: Props) {
         </div>
       </div>
 
-      {matches.length === 0 ? (
+      {rendered.length === 0 ? (
         <div role="status" className="px-8 pb-8 text-[13px] text-text-muted">
           No tools match &ldquo;{query}&rdquo;
         </div>
