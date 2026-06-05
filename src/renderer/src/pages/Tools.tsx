@@ -395,7 +395,7 @@ export function ToolsPage({ onNavigate }: Props) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tools…"
             aria-label="Search tools"
-            className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/40"
+            className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-accent"
           />
           {query && (
             <button
@@ -414,7 +414,7 @@ export function ToolsPage({ onNavigate }: Props) {
       </div>
 
       {matches.length === 0 ? (
-        <div className="px-8 pb-8 text-[13px] text-text-muted">
+        <div role="status" className="px-8 pb-8 text-[13px] text-text-muted">
           No tools match &ldquo;{query}&rdquo;
         </div>
       ) : (
