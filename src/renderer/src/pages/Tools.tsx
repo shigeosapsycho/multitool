@@ -6,6 +6,10 @@ import { PageHeader } from '../components/PageHeader'
 import { setPendingFile } from '../lib/pending'
 import { useFlip } from '../lib/useFlip'
 
+// Exit transition duration (matches `.tool-card` transition in globals.css, 150ms)
+// plus a small buffer before the card unmounts.
+const EXIT_MS = 170
+
 const tools: ToolMeta[] = [
   {
     id: 'csv-email-pass',
@@ -386,9 +390,16 @@ export function ToolsPage({ onNavigate }: Props) {
     setSelected(0)
   }, [query])
 
-  // Cards kept in the DOM while they animate out (id -> animating exit).
+  // Cards kept in the DOM while they animate out (ids mid-exit).
   const [exiting, setExiting] = useState<Set<string>>(new Set())
+  // Mirror of `exiting` so the effect can read it without listing it as a dep —
+  // depending on the state the effect writes would tear down its own timers.
+  const exitingRef = useRef(exiting)
+  exitingRef.current = exiting
   const prevMatchIds = useRef<Set<string>>(new Set(matches.map((t) => t.id)))
+  // Pending unmount timers, keyed by card id. Held in a ref so a re-render
+  // never cancels them — only re-entry or page unmount does.
+  const exitTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const reducedMotion =
     typeof window !== 'undefined' &&
@@ -397,41 +408,58 @@ export function ToolsPage({ onNavigate }: Props) {
   useEffect(() => {
     const matchIds = new Set(matches.map((t) => t.id))
     const prev = prevMatchIds.current
-
-    // Cards that just left the matched set start their exit animation.
-    const justLeft = [...prev].filter((id) => !matchIds.has(id) && !exiting.has(id))
-    // Cards that re-entered while still exiting: cancel their exit.
-    const reentered = [...exiting].filter((id) => matchIds.has(id))
+    prevMatchIds.current = matchIds
 
     if (reducedMotion) {
-      // No exit animation — drop leaving cards immediately.
-      if (exiting.size) setExiting(new Set())
-    } else {
-      if (reentered.length || justLeft.length) {
-        setExiting((cur) => {
-          const next = new Set(cur)
-          reentered.forEach((id) => next.delete(id))
-          justLeft.forEach((id) => next.add(id))
-          return next
-        })
-      }
-      if (justLeft.length) {
-        // After the exit transition, unmount the left cards.
-        const timer = setTimeout(() => {
-          setExiting((cur) => {
-            const next = new Set(cur)
-            justLeft.forEach((id) => next.delete(id))
-            return next
-          })
-        }, 170)
-        prevMatchIds.current = matchIds
-        return () => clearTimeout(timer)
-      }
+      // No exit animation — drop any leaving cards immediately.
+      if (exitingRef.current.size) setExiting(new Set())
+      return
     }
 
-    prevMatchIds.current = matchIds
-    return undefined
-  }, [matches, exiting, reducedMotion])
+    const current = exitingRef.current
+    // Cards that just left the matched set start their exit animation.
+    const justLeft = [...prev].filter((id) => !matchIds.has(id) && !current.has(id))
+    // Cards that re-entered while still exiting: cancel their exit.
+    const reentered = [...current].filter((id) => matchIds.has(id))
+
+    if (reentered.length || justLeft.length) {
+      setExiting((cur) => {
+        const next = new Set(cur)
+        reentered.forEach((id) => next.delete(id))
+        justLeft.forEach((id) => next.add(id))
+        return next
+      })
+    }
+
+    // Cancel the pending unmount for any card that came back.
+    reentered.forEach((id) => {
+      const t = exitTimers.current.get(id)
+      if (t) {
+        clearTimeout(t)
+        exitTimers.current.delete(id)
+      }
+    })
+
+    // Schedule each newly-left card to unmount after its exit transition.
+    justLeft.forEach((id) => {
+      const timer = setTimeout(() => {
+        exitTimers.current.delete(id)
+        setExiting((cur) => {
+          if (!cur.has(id)) return cur
+          const next = new Set(cur)
+          next.delete(id)
+          return next
+        })
+      }, EXIT_MS)
+      exitTimers.current.set(id, timer)
+    })
+  }, [matches, reducedMotion])
+
+  // Clear any outstanding timers when the page unmounts.
+  useEffect(() => {
+    const timers = exitTimers.current
+    return () => timers.forEach((t) => clearTimeout(t))
+  }, [])
 
   // Cards to render: current matches, in tools order, plus any still exiting.
   const matchIdSet = new Set(matches.map((t) => t.id))
