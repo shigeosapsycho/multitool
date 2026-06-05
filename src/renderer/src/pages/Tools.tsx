@@ -380,14 +380,18 @@ type Props = {
 export function ToolsPage({ onNavigate }: Props) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
+  // The highlight ring stays hidden until the user navigates with the arrow
+  // keys — typing alone never highlights a card.
+  const [highlightActive, setHighlightActive] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const matches = useMemo(() => filterTools(query, tools), [query])
 
-  // Reset the highlight to the first match whenever the result set changes.
+  // Reset the highlight to the first match (and hide it) whenever the query changes.
   useEffect(() => {
     setSelected(0)
+    setHighlightActive(false)
   }, [query])
 
   // Cards kept in the DOM while they animate out (ids mid-exit).
@@ -504,6 +508,7 @@ export function ToolsPage({ onNavigate }: Props) {
     if (e.key === 'Escape') {
       setQuery('')
       setSelected(0)
+      setHighlightActive(false)
       return
     }
     const arrows: Record<string, ArrowDirection> = {
@@ -523,6 +528,7 @@ export function ToolsPage({ onNavigate }: Props) {
       if (dir === 'left' && !atStart) return
       if (dir === 'right' && !atEnd) return
       e.preventDefault()
+      setHighlightActive(true)
       setSelected((s) => nextSelection(s, matches.length, readColumnCount(), dir))
     }
   }
@@ -588,7 +594,7 @@ export function ToolsPage({ onNavigate }: Props) {
                 <ToolCard
                   tool={t}
                   onNavigate={onNavigate}
-                  highlighted={matchIndex === selected && matchIndex !== -1}
+                  highlighted={highlightActive && matchIndex === selected && matchIndex !== -1}
                 />
               </div>
             )
