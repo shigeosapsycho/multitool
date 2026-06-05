@@ -1,5 +1,6 @@
+import type * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { filterTools } from '../lib/toolSearch'
+import { filterTools, nextSelection, parseColumnCount, type ArrowDirection } from '../lib/toolSearch'
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
 import { setPendingFile } from '../lib/pending'
@@ -304,10 +305,12 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
 
 function ToolCard({
   tool,
-  onNavigate
+  onNavigate,
+  highlighted
 }: {
   tool: ToolMeta
   onNavigate: (route: Route) => void
+  highlighted?: boolean
 }) {
   const [dragOver, setDragOver] = useState(false)
   const dropRef = useRef<HTMLButtonElement>(null)
@@ -336,7 +339,7 @@ function ToolCard({
         dragOver
           ? 'border-accent shadow-glow-accent'
           : 'border-border hover:border-border-strong'
-      }`}
+      } ${highlighted ? 'ring-2 ring-accent' : ''}`}
     >
       <span
         className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-lg"
@@ -371,9 +374,61 @@ type Props = {
 
 export function ToolsPage({ onNavigate }: Props) {
   const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
 
   const matches = useMemo(() => filterTools(query, tools), [query])
+
+  // Reset the highlight to the first match whenever the result set changes.
+  useEffect(() => {
+    setSelected(0)
+  }, [query])
+
+  // Type-anywhere: a printable key (no modifier) routes into the search box,
+  // even if focus drifted. Scoped to this page — it unmounts on navigation.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key.length !== 1) return
+      if (document.activeElement === inputRef.current) return
+      e.preventDefault()
+      setQuery((q) => q + e.key)
+      inputRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const columnCount = () => {
+    const grid = gridRef.current
+    if (!grid) return 1
+    return parseColumnCount(getComputedStyle(grid).gridTemplateColumns)
+  }
+
+  const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const target = matches[selected] ?? matches[0]
+      if (target) onNavigate(target.id)
+      return
+    }
+    if (e.key === 'Escape') {
+      setQuery('')
+      setSelected(0)
+      return
+    }
+    const arrows: Record<string, ArrowDirection> = {
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      ArrowDown: 'down'
+    }
+    const dir = arrows[e.key]
+    if (dir) {
+      e.preventDefault()
+      setSelected((s) => nextSelection(s, matches.length, columnCount(), dir))
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -393,6 +448,7 @@ export function ToolsPage({ onNavigate }: Props) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onInputKeyDown}
             placeholder="Search tools…"
             aria-label="Search tools"
             className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-accent"
@@ -418,9 +474,17 @@ export function ToolsPage({ onNavigate }: Props) {
           No tools match &ldquo;{query}&rdquo;
         </div>
       ) : (
-        <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8">
-          {matches.map((t) => (
-            <ToolCard key={t.id} tool={t} onNavigate={onNavigate} />
+        <div
+          ref={gridRef}
+          className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 px-8 pb-8"
+        >
+          {matches.map((t, i) => (
+            <ToolCard
+              key={t.id}
+              tool={t}
+              onNavigate={onNavigate}
+              highlighted={i === selected}
+            />
           ))}
         </div>
       )}
