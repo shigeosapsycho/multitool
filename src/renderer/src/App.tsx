@@ -263,6 +263,24 @@ export default function App() {
     }
   }, [goBack, goForward])
 
+  // Escape while on a module returns to the Tools grid (mirrors the back arrow).
+  // Yields to an open dialog or dropdown so it can consume Escape first.
+  useEffect(() => {
+    if (!isToolRoute(route)) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (
+        document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        document.querySelector('[role="listbox"]')
+      )
+        return
+      e.preventDefault()
+      navigate('tools')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [route, navigate])
+
   function renderTool(r: Route, active: boolean): JSX.Element | null {
     const props = {
       // A tool's back arrow always returns to the Tools grid. History-based
