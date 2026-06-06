@@ -16,6 +16,7 @@ import { ListifyPage } from './pages/Listify'
 import { MatchEmailPassPage } from './pages/MatchEmailPass'
 import { MultiplyLinesPage } from './pages/MultiplyLines'
 import { NumberedListGeneratorPage } from './pages/NumberedListGenerator'
+import { OrderEmailByPage } from './pages/OrderEmailBy'
 import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
@@ -41,6 +42,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'match-email-pass',
   'multiply-lines',
   'numbered-list-generator',
+  'order-email-by',
   'proxy-cleaner',
   'proxy-tester',
   'randomize',
@@ -281,6 +283,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [route, navigate])
 
+  // Disable the native (WebView2) right-click context menu app-wide. The app's
+  // own right-click menus (Listify, Target SKUs) use React onContextMenu and are
+  // unaffected — this only suppresses the default browser menu everywhere else.
+  useEffect(() => {
+    const onContextMenu = (e: MouseEvent) => e.preventDefault()
+    window.addEventListener('contextmenu', onContextMenu)
+    return () => window.removeEventListener('contextmenu', onContextMenu)
+  }, [])
+
   function renderTool(r: Route, active: boolean): JSX.Element | null {
     const props = {
       // A tool's back arrow always returns to the Tools grid. History-based
@@ -314,6 +325,8 @@ export default function App() {
         return <MultiplyLinesPage {...props} />
       case 'numbered-list-generator':
         return <NumberedListGeneratorPage {...props} />
+      case 'order-email-by':
+        return <OrderEmailByPage {...props} />
       case 'proxy-cleaner':
         return <ProxyCleanerPage {...props} />
       case 'proxy-tester':

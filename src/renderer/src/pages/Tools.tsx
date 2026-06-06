@@ -72,6 +72,12 @@ const tools: ToolMeta[] = [
     accent: '#fb923c'
   },
   {
+    id: 'order-email-by',
+    title: 'Order Email By',
+    description: 'Sort a list of emails by provider — drag icloud, gmail, yahoo… into your order.',
+    accent: '#0ea5e9'
+  },
+  {
     id: 'proxy-cleaner',
     title: 'Proxy Cleaner',
     description: 'Filter a proxy list down to residential and/or ISP proxies.',
@@ -287,6 +293,15 @@ const MatchEmailPassIcon = () => (
   </svg>
 )
 
+const OrderEmailByIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="5" width="13" height="11" rx="2" />
+    <path d="M3 7l6.5 4.5L16 7" />
+    <path d="M19 9v11" />
+    <path d="M16.5 17.5 19 20l2.5-2.5" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
@@ -298,6 +313,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'match-email-pass': MatchEmailPassIcon,
   'multiply-lines': MultiplyLinesIcon,
   'numbered-list-generator': SplitByNumberIcon,
+  'order-email-by': OrderEmailByIcon,
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
