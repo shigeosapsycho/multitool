@@ -10,6 +10,7 @@ export type Route =
   | 'match-email-pass'
   | 'multiply-lines'
   | 'numbered-list-generator'
+  | 'order-email-by'
   | 'proxy-cleaner'
   | 'proxy-tester'
   | 'randomize'
