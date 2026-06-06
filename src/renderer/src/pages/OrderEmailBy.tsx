@@ -194,6 +194,9 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
             }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => onChipDrop(d)}
+            onDragEnd={() => {
+              dragItem.current = null
+            }}
             className="inline-flex cursor-grab items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-text-primary transition hover:border-border-strong active:cursor-grabbing"
           >
             <span className="text-text-muted">
@@ -211,9 +214,17 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
             </button>
           </div>
         ))}
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-1.5 text-[12.5px] text-text-secondary">
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={() => {
+            const src = dragItem.current
+            dragItem.current = null
+            if (src) exclude(src)
+          }}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-1.5 text-[12.5px] text-text-secondary"
+        >
           Other ({otherCount.toLocaleString()})
-        </span>
+        </div>
         {excludedDomains.map((d) => (
           <button
             key={d}
