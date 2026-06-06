@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   ToolLayout,
   FilePanel,
@@ -39,16 +39,6 @@ const PlusIcon = () => (
   </svg>
 )
 
-// Move `src` to the position immediately before `target` within `arr`.
-function moveBefore(arr: string[], src: string, target: string): string[] {
-  if (src === target) return arr
-  const next = arr.filter((d) => d !== src)
-  const at = next.indexOf(target)
-  if (at === -1) return arr
-  next.splice(at, 0, src)
-  return next
-}
-
 export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) {
   const [filePath, setFilePath] = useState<string | null>(null)
   const [lineCount, setLineCount] = useState(0)
@@ -62,7 +52,16 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
   const [providers, setProviders] = useState<ProviderCount[]>([])
   const panelRef = useRef<FilePanelHandle>(null)
   const editDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const dragItem = useRef<string | null>(null)
+  // Pointer-based drag reorder for provider chips. HTML5 drag events don't fire
+  // under Tauri's OS-level drag-drop (dragDropEnabled), so we hold the dragged
+  // chip and reorder live by pointer position — same approach as Listify / Target SKUs.
+  const [dragDomain, setDragDomain] = useState<string | null>(null)
+  const dragDomainRef = useRef<string | null>(null)
+  const chipsRef = useRef<HTMLDivElement>(null)
+  const orderRef = useRef(order)
+  orderRef.current = order
+  const excludedRef = useRef(excluded)
+  excludedRef.current = excluded
 
   // Re-detect providers and reconcile with the current order/exclusions:
   // keep known positions, append new domains (frequency order), drop vanished ones.
@@ -150,13 +149,60 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
     }
   }
 
-  function onChipDrop(target: string) {
-    const src = dragItem.current
-    dragItem.current = null
-    if (!src) return
-    setOrder((prev) => moveBefore(prev, src, target))
-    invalidateResults()
+  function startChipDrag(e: ReactPointerEvent, domain: string) {
+    e.preventDefault()
+    dragDomainRef.current = domain
+    setDragDomain(domain)
   }
+
+  // Live reorder while a chip is held: find the insertion slot from the pointer
+  // position across the (possibly wrapped) chip row, then splice the ranked list.
+  useEffect(() => {
+    if (dragDomain === null) return
+    const onMove = (e: PointerEvent) => {
+      const dom = dragDomainRef.current
+      const container = chipsRef.current
+      if (!dom || !container) return
+      const chips = Array.from(container.querySelectorAll<HTMLElement>('[data-domain]'))
+      if (chips.length === 0) return
+      // Insertion slot: first chip the pointer sits before in reading order
+      // (earlier row, or same row and left of the chip's horizontal midpoint).
+      let target = chips.length
+      for (let i = 0; i < chips.length; i++) {
+        const r = chips[i]!.getBoundingClientRect()
+        if (e.clientY < r.top || (e.clientY <= r.bottom && e.clientX < r.left + r.width / 2)) {
+          target = i
+          break
+        }
+      }
+      const ranked = orderRef.current.filter((d) => !excludedRef.current.has(d))
+      const from = ranked.indexOf(dom)
+      if (from === -1) return
+      const insertAt = from < target ? target - 1 : target
+      if (insertAt === from) return
+      const next = [...ranked]
+      const [moved] = next.splice(from, 1)
+      next.splice(insertAt, 0, moved!)
+      const excludedList = orderRef.current.filter((d) => excludedRef.current.has(d))
+      setOrder([...next, ...excludedList])
+      invalidateResults()
+    }
+    const onUp = (e: PointerEvent) => {
+      const dom = dragDomainRef.current
+      dragDomainRef.current = null
+      setDragDomain(null)
+      if (!dom) return
+      // Released over the "Other" box → exclude the dragged provider.
+      const el = document.elementFromPoint(e.clientX, e.clientY)
+      if (el && el.closest('[data-other]')) exclude(dom)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [dragDomain])
 
   function exclude(domain: string) {
     setExcluded((prev) => new Set(prev).add(domain))
@@ -184,20 +230,17 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
         Load a list of emails to detect providers, then drag them into your order.
       </span>
     ) : (
-      <div className="flex flex-wrap items-center gap-2">
+      <div ref={chipsRef} className="flex flex-wrap items-center gap-2">
         {rankedDomains.map((d) => (
           <div
             key={d}
-            draggable
-            onDragStart={() => {
-              dragItem.current = d
-            }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => onChipDrop(d)}
-            onDragEnd={() => {
-              dragItem.current = null
-            }}
-            className="inline-flex cursor-grab items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-text-primary transition hover:border-border-strong active:cursor-grabbing"
+            data-domain={d}
+            onPointerDown={(e) => startChipDrag(e, d)}
+            className={`inline-flex cursor-grab touch-none select-none items-center gap-1.5 rounded-lg border bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-text-primary transition active:cursor-grabbing ${
+              dragDomain === d
+                ? 'border-accent shadow-glow-accent'
+                : 'border-border hover:border-border-strong'
+            }`}
           >
             <span className="text-text-muted">
               <GripIcon />
@@ -207,6 +250,7 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
             <button
               type="button"
               aria-label={`Move ${d} to Other`}
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={() => exclude(d)}
               className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-text-muted transition hover:bg-surface-3 hover:text-text-primary"
             >
@@ -215,12 +259,7 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
           </div>
         ))}
         <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={() => {
-            const src = dragItem.current
-            dragItem.current = null
-            if (src) exclude(src)
-          }}
+          data-other
           className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-1.5 text-[12.5px] text-text-secondary"
         >
           Other ({otherCount.toLocaleString()})
