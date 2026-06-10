@@ -6,7 +6,12 @@
 //   - ISP: the host is a raw numeric IPv4 address with a numeric port.
 // Classification is fully offline — no network calls.
 
-export type ParsedProxy = { scheme: string | null; host: string | null; port: string | null }
+export type ParsedProxy = {
+  scheme: string | null
+  host: string | null
+  port: string | null
+  user: string | null
+}
 
 export type ProxyFilters = { residential: boolean; isp: boolean }
 
@@ -22,7 +27,7 @@ const PORT_RE = /^\d{1,5}$/
  */
 export function parseProxyLine(raw: string): ParsedProxy {
   const line = raw.trim()
-  if (!line) return { scheme: null, host: null, port: null }
+  if (!line) return { scheme: null, host: null, port: null, user: null }
 
   let scheme: string | null = null
   let rest = line
@@ -36,22 +41,33 @@ export function parseProxyLine(raw: string): ParsedProxy {
   const at = rest.lastIndexOf('@')
   if (at !== -1) {
     const seg = rest.slice(at + 1).split(':')
-    return { scheme, host: seg[0]?.trim() || null, port: seg[1]?.trim() || null }
+    const user = rest.slice(0, at).split(':')[0]?.trim() || null
+    return { scheme, host: seg[0]?.trim() || null, port: seg[1]?.trim() || null, user }
   }
 
   const parts = rest.split(':')
   if (parts.length <= 2) {
-    return { scheme, host: parts[0]!.trim() || null, port: parts[1]?.trim() || null }
+    return { scheme, host: parts[0]!.trim() || null, port: parts[1]?.trim() || null, user: null }
   }
   // 3+ parts is ambiguous: `host:port:user:pass` vs `user:pass:host:port`.
   // Pick the form where the field after the host is a numeric port.
   if (PORT_RE.test(parts[1]!.trim())) {
-    return { scheme, host: parts[0]!.trim() || null, port: parts[1]!.trim() }
+    return {
+      scheme,
+      host: parts[0]!.trim() || null,
+      port: parts[1]!.trim(),
+      user: parts[2]?.trim() || null
+    }
   }
   if (parts.length >= 4 && PORT_RE.test(parts[3]!.trim())) {
-    return { scheme, host: parts[2]!.trim() || null, port: parts[3]!.trim() }
+    return {
+      scheme,
+      host: parts[2]!.trim() || null,
+      port: parts[3]!.trim(),
+      user: parts[0]!.trim() || null
+    }
   }
-  return { scheme, host: parts[0]!.trim() || null, port: parts[1]?.trim() || null }
+  return { scheme, host: parts[0]!.trim() || null, port: parts[1]?.trim() || null, user: null }
 }
 
 /**
@@ -102,6 +118,43 @@ export function providerOf(host: string | null): string | null {
 }
 
 /**
+ * Collapse an ISP proxy username to its account stem. Providers issue username
+ * batches that share an alpha prefix and vary only in a numeric (or separator +
+ * numeric) tail — `xyz377`, `xyz6028`, `xyz1970` are all one purchase, `xyz`.
+ * The stem is the lowercased username with that variable tail stripped. A
+ * username with no alpha part (or none left after stripping) keeps its full
+ * lowercased form so distinct numeric accounts don't collapse to ''.
+ */
+export function ispUserStemOf(user: string | null): string | null {
+  if (!user) return null
+  const u = user.trim().toLowerCase()
+  if (!u) return null
+  const stem = u.replace(/[\d\-_.]+$/, '')
+  return stem || u
+}
+
+/**
+ * Group ISP proxy lines (raw-IPv4 hosts) by username stem and count the lines
+ * for each. Lines without a username, and residential/comment/blank lines, are
+ * ignored. Result is sorted by count descending, then stem ascending.
+ */
+export function detectIspUsers(text: string): { user: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const { host, port, user } = parseProxyLine(line)
+    if (!isIspProxy(host, port)) continue
+    const stem = ispUserStemOf(user)
+    if (!stem) continue
+    counts.set(stem, (counts.get(stem) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([user, count]) => ({ user, count }))
+    .sort((a, b) => b.count - a.count || a.user.localeCompare(b.user))
+}
+
+/**
  * Group a proxy list by provider (registrable domain of the host) and count the
  * lines for each. Blank, comment (#), and raw-IP lines are ignored. Result is
  * sorted by count descending, then provider name ascending.
@@ -121,28 +174,35 @@ export function detectProviders(text: string): { provider: string; count: number
 }
 
 /**
- * Keep only the proxy lines matching the selected filters. A line is kept when it
- * matches ANY checked type filter (residential OR isp) AND its provider is not in
- * `removed`. Original line text and order are preserved; no deduplication.
+ * Keep only the proxy lines matching the selected filters. A line is kept when
+ * it matches ANY checked type filter (residential OR isp), its provider is not
+ * in `removed`, and — for ISP lines — its username stem is not in
+ * `removedUsers`. Original line text and order are preserved; no deduplication.
  */
 export function filterProxies(
   text: string,
   filters: ProxyFilters,
-  removed?: Set<string>
+  removed?: Set<string>,
+  removedUsers?: Set<string>
 ): string[] {
   const out: string[] = []
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
-    const { host, port } = parseProxyLine(line)
+    const { host, port, user } = parseProxyLine(line)
+    const isIsp = isIspProxy(host, port)
     const typeMatch =
-      (filters.residential && isResidentialHost(host)) ||
-      (filters.isp && isIspProxy(host, port))
+      (filters.residential && isResidentialHost(host)) || (filters.isp && isIsp)
     if (!typeMatch) continue
     if (removed && removed.size > 0) {
       // null provider (raw IP, etc.) means there's nothing to match against — keep the line.
       const provider = providerOf(host)
       if (provider && removed.has(provider)) continue
+    }
+    if (isIsp && removedUsers && removedUsers.size > 0) {
+      // null stem (no username on the line) means nothing to match — keep the line.
+      const stem = ispUserStemOf(user)
+      if (stem && removedUsers.has(stem)) continue
     }
     out.push(line)
   }
