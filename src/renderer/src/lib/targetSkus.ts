@@ -326,15 +326,17 @@ export const SKUS_REMOTE_URL =
 /**
  * Fetch and parse the remote SKU catalog. Rejects when no URL is configured,
  * the request fails, or the file yields no entries — callers fall back to
- * BUNDLED_SKUS on rejection.
+ * BUNDLED_SKUS on rejection. Returns the raw CSV text alongside the parsed
+ * entries so callers can cheaply skip identical re-fetches.
  */
-export async function fetchRemoteSkus(): Promise<SkuEntry[]> {
+export async function fetchRemoteSkus(): Promise<{ text: string; entries: SkuEntry[] }> {
   if (!SKUS_REMOTE_URL) throw new Error('No remote SKU URL configured')
   const res = await fetch(SKUS_REMOTE_URL, { cache: 'no-store' })
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
-  const parsed = parseSkuCsv(await res.text())
-  if (parsed.length === 0) throw new Error('Remote SKU file is empty')
-  return parsed
+  const text = await res.text()
+  const entries = parseSkuCsv(text)
+  if (entries.length === 0) throw new Error('Remote SKU file is empty')
+  return { text, entries }
 }
 
 // ---------- checklist grouping ----------

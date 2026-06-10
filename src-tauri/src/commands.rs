@@ -792,7 +792,9 @@ fn test_socks(target_url_str: &str, spec: &ProxySpec) -> (Option<u128>, Option<u
         Ok(p) => p,
         Err(e) => return (None, None, Some(format!("Invalid SOCKS proxy: {e}"))),
     };
-    let agent = ureq::AgentBuilder::new()
+    // agent_builder (not a bare AgentBuilder) — wires the native-tls
+    // connector, without which an https target fails (no rustls in this build).
+    let agent = crate::http::agent_builder()
         .timeout_connect(Duration::from_secs(15))
         .timeout_read(Duration::from_secs(20))
         .proxy(proxy)

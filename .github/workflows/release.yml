@@ -10,10 +10,10 @@ name: build
 # and the in-app self-updater (queries releases/latest) picks the new version
 # up on the next launch.
 #
-# A release pushes main and a v* tag at the same commit, which would fire two
-# runs. The `concurrency` block below groups runs by commit SHA and cancels the
-# older one, so a release collapses to a single run — the tag run, which
-# publishes — and an ordinary PR merge still gets its own build.
+# A release pushes main and a v* tag at the same commit, which fires two runs.
+# The `concurrency` block below groups runs by ref, so the two land in separate
+# groups and both complete: the main run saves the cargo cache future runs
+# restore, and the tag run publishes the release.
 #
 # To cut a release:
 #   1. Bump the version in package.json, src-tauri/Cargo.toml and
@@ -32,12 +32,14 @@ on:
       - main
   workflow_dispatch:
 
-# Collapse the duplicate run a release creates (main push + tag push at the
-# same commit) into one. Runs for different commits have different SHAs, so an
-# ordinary PR merge is never cancelled by an unrelated build.
+# Group runs by ref. Only superseded PR runs are cancelled mid-run; in-progress
+# push runs (main and tags) run to completion — the main run must finish to
+# save the cargo cache that future runs restore, and the tag run must finish to
+# publish. (A main run still QUEUED when another main push lands is replaced by
+# the newer one, which is fine — the newer commit's cache supersedes it.)
 concurrency:
-  group: build-${{ github.sha }}
-  cancel-in-progress: true
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
@@ -66,10 +68,15 @@ jobs:
       # The MSVC toolchain is the default on windows-latest runners, and
       # src-tauri/rust-toolchain.toml pins stable-x86_64-pc-windows-msvc —
       # rustup auto-installs it on the first cargo invocation.
+      #
+      # Tag runs restore the main-branch cache but skip saving: a refs/tags/*
+      # cache scope is never restorable by later runs, so saving one only
+      # wastes time and the 10GB cache quota.
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          save-if: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
       - name: Install dependencies
         run: npm ci
@@ -153,13 +160,21 @@ jobs:
       - name: Add macOS arm64 Rust target
         run: rustup target add aarch64-apple-darwin
 
+      # Tag runs restore but don't save — see the Windows job's cache step.
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          save-if: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
       - name: Install dependencies
         run: npm ci
+
+      # Same quality gate as the Windows job — and the only place the
+      # native-tls (SecureTransport) code paths are actually executed on
+      # macOS; `tauri build` alone never compiles the test profile.
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       # PR / push: build unsigned so a macOS-breaking change is caught without
       # needing the signing secret. No updater artifacts are produced here.
