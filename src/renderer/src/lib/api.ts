@@ -248,6 +248,7 @@ export const api = {
         pokemonGrouping: PokemonGrouping
         restoreLastModule: boolean
         orderBySelectDate: boolean
+        autoFocusInput: boolean
       }>('config_get'),
     setFilePreview: (enabled: boolean) =>
       invoke<boolean>('config_set_file_preview', { enabled }),
@@ -260,7 +261,9 @@ export const api = {
     setRestoreLastModule: (enabled: boolean) =>
       invoke<boolean>('config_set_restore_last_module', { enabled }),
     setOrderBySelectDate: (enabled: boolean) =>
-      invoke<boolean>('config_set_order_by_select_date', { enabled })
+      invoke<boolean>('config_set_order_by_select_date', { enabled }),
+    setAutoFocusInput: (enabled: boolean) =>
+      invoke<boolean>('config_set_auto_focus_input', { enabled })
   },
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),
