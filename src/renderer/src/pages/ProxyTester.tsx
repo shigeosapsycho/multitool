@@ -4,6 +4,7 @@ import { Card } from '../components/Card'
 import { consumePendingFile, consumePendingProxies } from '../lib/pending'
 import type { ProxyTestEntry } from '../lib/api'
 import { shortOutputPath } from '../lib/paths'
+import { normalizeTargetUrl } from '../lib/url'
 
 type Props = {
   onBack: () => void
@@ -88,6 +89,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
   async function handleRun() {
     const trimmedUrl = url.trim()
     if (!trimmedUrl) return
+    const targetUrl = normalizeTargetUrl(trimmedUrl)
     const content = panelRef.current?.getValue() ?? ''
     const proxies = content.split(/\r?\n/).map((s) => s.trim()).filter((s) => s.length > 0 && !s.startsWith('#'))
     if (proxies.length === 0) return
@@ -96,10 +98,10 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
     setStopping(false)
     setResults(null)
     setSavedTo(null)
-    onSetStatus(`Testing ${proxies.length.toLocaleString()} proxies against ${trimmedUrl}...`)
+    onSetStatus(`Testing ${proxies.length.toLocaleString()} proxies against ${targetUrl}...`)
     const start = Date.now()
     try {
-      const res = await window.api.net.testProxies({ url: trimmedUrl, proxies, concurrency: 10 })
+      const res = await window.api.net.testProxies({ url: targetUrl, proxies, concurrency: 10 })
       setResults(res)
       const ok = res.filter((r) => r.error == null).length
       const canceled = res.filter((r) => r.error === 'Canceled').length
@@ -205,10 +207,10 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
         <label className="flex flex-col gap-1.5 text-[12px] text-text-secondary">
           <span className="font-semibold uppercase tracking-[0.06em]">Target URL</span>
           <input
-            type="url"
+            type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://btcollectibles.com"
+            placeholder="btcollectibles.com"
             spellCheck={false}
             className="h-10 rounded-lg border border-border bg-surface px-3 font-mono text-[12.5px] text-text-primary outline-none transition focus:border-accent"
           />

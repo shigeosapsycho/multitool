@@ -837,6 +837,21 @@ fn test_one(url_str: &str, raw: &str) -> ProxyTestEntry {
     }
 }
 
+/// Prepend `https://` when the target URL has no scheme, so bare hosts like
+/// `google.com` are accepted.
+fn normalize_target_url(url: &str) -> String {
+    let has_scheme = url.split_once("://").is_some_and(|(scheme, _)| {
+        let mut chars = scheme.chars();
+        chars.next().is_some_and(|c| c.is_ascii_alphabetic())
+            && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))
+    });
+    if has_scheme {
+        url.to_string()
+    } else {
+        format!("https://{url}")
+    }
+}
+
 #[tauri::command]
 pub async fn net_test_proxies(
     app: AppHandle,
@@ -846,10 +861,11 @@ pub async fn net_test_proxies(
     use std::sync::{Arc, Mutex};
     use std::thread;
 
-    let url = args.url.trim().to_string();
+    let url = args.url.trim();
     if url.is_empty() {
         return Err("URL is empty".into());
     }
+    let url = normalize_target_url(url);
     let proxies: Vec<String> = args
         .proxies
         .into_iter()
@@ -935,4 +951,40 @@ pub fn install_app_command_hook<R: Runtime>(_window: &tauri::WebviewWindow<R>, _
     // Reserved for future WndProc subclassing if WebView2 swallows Mouse4/Mouse5.
     // The renderer also listens via DOM mousedown/auxclick which already covers
     // most cases; revisit if user reports thumb-button nav not working.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_target_url;
+
+    #[test]
+    fn bare_host_gets_https() {
+        assert_eq!(normalize_target_url("google.com"), "https://google.com");
+    }
+
+    #[test]
+    fn host_with_port_and_path_gets_https() {
+        assert_eq!(
+            normalize_target_url("localhost:8080/health"),
+            "https://localhost:8080/health"
+        );
+    }
+
+    #[test]
+    fn existing_scheme_untouched() {
+        assert_eq!(normalize_target_url("http://google.com"), "http://google.com");
+        assert_eq!(normalize_target_url("https://google.com"), "https://google.com");
+        assert_eq!(
+            normalize_target_url("socks5://1.2.3.4:1080"),
+            "socks5://1.2.3.4:1080"
+        );
+    }
+
+    #[test]
+    fn scheme_separator_later_in_string_still_prefixed() {
+        assert_eq!(
+            normalize_target_url("google.com/?next=https://x"),
+            "https://google.com/?next=https://x"
+        );
+    }
 }
