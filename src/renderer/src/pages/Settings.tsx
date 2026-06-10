@@ -40,6 +40,8 @@ type Props = {
   onRestoreLastModuleChange: (next: boolean) => void
   orderBySelectDate: boolean
   onOrderBySelectDateChange: (next: boolean) => void
+  autoFocusInput: boolean
+  onAutoFocusInputChange: (next: boolean) => void
 }
 
 export function SettingsPage({
@@ -56,7 +58,9 @@ export function SettingsPage({
   restoreLastModule,
   onRestoreLastModuleChange,
   orderBySelectDate,
-  onOrderBySelectDateChange
+  onOrderBySelectDateChange,
+  autoFocusInput,
+  onAutoFocusInputChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -102,6 +106,11 @@ export function SettingsPage({
   async function handleToggleOrderBySelectDate(next: boolean) {
     await window.api.config.setOrderBySelectDate(next)
     onOrderBySelectDateChange(next)
+  }
+
+  async function handleToggleAutoFocusInput(next: boolean) {
+    await window.api.config.setAutoFocusInput(next)
+    onAutoFocusInputChange(next)
   }
 
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -167,6 +176,20 @@ export function SettingsPage({
                 checked={restoreLastModule}
                 onChange={handleToggleRestoreLastModule}
                 ariaLabel="Toggle resume last module"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Auto-focus input</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  When on, opening a module puts the cursor in its input box, so you can
+                  paste (Ctrl+V) right away without clicking first.
+                </div>
+              </div>
+              <Toggle
+                checked={autoFocusInput}
+                onChange={handleToggleAutoFocusInput}
+                ariaLabel="Toggle auto-focus input"
               />
             </div>
           </div>

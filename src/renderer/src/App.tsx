@@ -75,6 +75,8 @@ export default function App() {
   const [restoreLastModule, setRestoreLastModule] = useState(true)
   // When true (default), newly checked Target SKUs append in check order.
   const [orderBySelectDate, setOrderBySelectDate] = useState(true)
+  // When true (default), opening a module focuses its input for instant paste.
+  const [autoFocusInput, setAutoFocusInput] = useState(true)
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   // The most recently opened module — the Tools tab returns here.
@@ -95,6 +97,7 @@ export default function App() {
         setPokemonGrouping(cfg.pokemonGrouping)
         setRestoreLastModule(cfg.restoreLastModule)
         setOrderBySelectDate(cfg.orderBySelectDate)
+        setAutoFocusInput(cfg.autoFocusInput)
       })
       .catch(() => {})
     // Check for updates once on launch (the Rust side no longer polls).
@@ -111,12 +114,20 @@ export default function App() {
   }, [])
 
   // Apply the resolved theme to <html>. CSS variables in globals.css swap on .light.
+  const effectiveLight = theme === 'light' || (theme === 'system' && !systemDark)
   useEffect(() => {
-    const effectiveLight = theme === 'light' || (theme === 'system' && !systemDark)
     const root = document.documentElement
     if (effectiveLight) root.classList.add('light')
     else root.classList.remove('light')
-  }, [theme, systemDark])
+  }, [effectiveLight])
+
+  // Title-bar sun/moon button: flip to the opposite of what's on screen. Sets
+  // an explicit theme (leaving 'system') — the Settings select can restore it.
+  const toggleTheme = useCallback(() => {
+    const next = effectiveLight ? 'dark' : 'light'
+    setTheme(next)
+    window.api.config.setTheme(next).catch(() => {})
+  }, [effectiveLight])
 
   // Subscribe to auto-updater status messages and accumulate them as logs.
   // App is always mounted, so we never miss events even if Logs page isn't open.
@@ -284,6 +295,41 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [route, navigate])
 
+  // Opening a module focuses its primary input so Ctrl+V pastes immediately
+  // without clicking the box first. Prefer a paste-box textarea; fall back to
+  // the first free-text input (tools whose main control is a single field).
+  // Scoped to the active tool's wrapper — hidden keep-alive tools can't steal
+  // focus — and preventScroll keeps revisits from yanking pane scroll.
+  useEffect(() => {
+    if (!autoFocusInput || !isToolRoute(route)) return
+    // Yield to an open dialog or dropdown (mirrors the Escape handler above):
+    // they portal to document.body, so focusing the tool underneath would send
+    // keystrokes behind the overlay.
+    if (
+      document.querySelector('[role="dialog"][aria-modal="true"]') ||
+      document.querySelector('[role="listbox"]')
+    )
+      return
+    const wrap = document.querySelector(`[data-tool="${route}"]`)
+    if (!wrap) return
+    const textarea = wrap.querySelector<HTMLTextAreaElement>(
+      'textarea:not([readonly]):not([disabled])'
+    )
+    if (textarea) {
+      // Only an empty paste box wants the caret — a populated one means the
+      // user is past the paste step and expects page-level shortcuts to work
+      // (e.g. Listify's Ctrl+A / Delete row operations).
+      if (textarea.value === '') textarea.focus({ preventScroll: true })
+      return
+    }
+    // :not([inputmode]) skips numeric fields like the IMAP tools' day-count
+    // filter — those are not paste targets.
+    const input = wrap.querySelector<HTMLElement>(
+      'input[type="text"]:not([disabled]), input[type="search"]:not([disabled]), input:not([type]):not([inputmode]):not([disabled])'
+    )
+    input?.focus({ preventScroll: true })
+  }, [route, autoFocusInput])
+
   // Disable the native (WebView2) right-click context menu app-wide. The app's
   // own right-click menus (Listify, Target SKUs) use React onContextMenu and are
   // unaffected — this only suppresses the default browser menu everywhere else.
@@ -377,13 +423,20 @@ export default function App() {
         onRestoreLastModuleChange={setRestoreLastModule}
         orderBySelectDate={orderBySelectDate}
         onOrderBySelectDateChange={setOrderBySelectDate}
+        autoFocusInput={autoFocusInput}
+        onAutoFocusInputChange={setAutoFocusInput}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
-      <TitleBar title="Beu MultiTool" version={version} />
+      <TitleBar
+        title="Beu MultiTool"
+        version={version}
+        light={effectiveLight}
+        onToggleTheme={toggleTheme}
+      />
       <div className="flex min-h-0 flex-1">
         <Sidebar current={route} onNavigate={navigateFromSidebar} />
         <main className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
@@ -402,6 +455,7 @@ export default function App() {
             return (
               <div
                 key={r}
+                data-tool={r}
                 style={{ display: isActive ? 'block' : 'none' }}
                 className="h-full"
               >

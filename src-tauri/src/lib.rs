@@ -152,6 +152,7 @@ pub fn run() {
             commands::config_set_pokemon_grouping,
             commands::config_set_restore_last_module,
             commands::config_set_order_by_select_date,
+            commands::config_set_auto_focus_input,
             commands::app_get_version,
             commands::net_test_proxies,
             commands::net_cancel_proxies,

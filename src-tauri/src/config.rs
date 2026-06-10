@@ -33,6 +33,9 @@ pub struct Config {
     /// When true (default), newly checked Target SKUs are appended to the
     /// export in the order checked; otherwise inserted in catalog order.
     pub order_by_select_date: Option<bool>,
+    /// When true (default), opening a module focuses its primary input so a
+    /// paste works immediately without clicking the box first.
+    pub auto_focus_input: Option<bool>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
@@ -127,6 +130,11 @@ impl Config {
         // Default true — order SKUs by the sequence they were checked.
         self.order_by_select_date.unwrap_or(true)
     }
+
+    pub fn auto_focus_input(&self) -> bool {
+        // Default true — paste-ready inputs are the expected behavior.
+        self.auto_focus_input.unwrap_or(true)
+    }
 }
 
 #[cfg(test)]
@@ -172,6 +180,21 @@ mod tests {
         let json = serde_json::to_string(&cfg).unwrap();
         let back: Config = serde_json::from_str(&json).unwrap();
         assert!(!back.restore_last_module());
+    }
+
+    #[test]
+    fn auto_focus_input_defaults_true_and_round_trips() {
+        // Old configs with no field default to true.
+        let cfg: Config = serde_json::from_str("{}").unwrap();
+        assert!(cfg.auto_focus_input());
+        // An explicit false survives a serialize/deserialize round trip.
+        let mut cfg = Config::default();
+        cfg.auto_focus_input = Some(false);
+        let json = serde_json::to_string(&cfg).unwrap();
+        // Serializes under the camelCase contract shared with the renderer.
+        assert!(json.contains("\"autoFocusInput\":false"));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert!(!back.auto_focus_input());
     }
 
     #[test]
