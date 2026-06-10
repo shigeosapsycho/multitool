@@ -54,14 +54,33 @@ impl Config {
         if !path.exists() {
             return Ok(Self::default());
         }
-        let text = fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&text).unwrap_or_default())
+        let text = fs::read_to_string(&path)?;
+        match serde_json::from_str(&text) {
+            Ok(cfg) => Ok(cfg),
+            Err(e) => {
+                // Don't silently reset to defaults: the next save would then
+                // persist an empty config, permanently losing output_dir,
+                // preferences, and the IMAP account list. Quarantine the bad
+                // file so it can be recovered by hand.
+                let backup = path.with_extension("json.bak");
+                let _ = fs::rename(&path, &backup);
+                eprintln!(
+                    "config.json is corrupt ({e}); moved to {} and starting with defaults",
+                    backup.display()
+                );
+                Ok(Self::default())
+            }
+        }
     }
 
     pub fn save(&self, app: &AppHandle) -> anyhow::Result<()> {
         let path = Self::path(app)?;
         let text = serde_json::to_string_pretty(self)?;
-        fs::write(path, text)?;
+        // Write-then-rename so a crash or power loss mid-write can never leave
+        // a truncated config.json behind.
+        let tmp = path.with_extension("json.tmp");
+        fs::write(&tmp, text)?;
+        fs::rename(&tmp, &path)?;
         Ok(())
     }
 

@@ -19,7 +19,7 @@ function toInt(v: string): number {
   return Number.isNaN(n) ? 0 : n
 }
 
-export function NumberedListGeneratorPage({ onBack, onSetStatus }: Props) {
+export function NumberedListGeneratorPage({ onBack, onSetStatus, active }: Props) {
   const [prefix, setPrefix] = useState('')
   const [start, setStart] = useState(1)
   const [end, setEnd] = useState(100)
@@ -56,6 +56,7 @@ export function NumberedListGeneratorPage({ onBack, onSetStatus }: Props) {
       title="Numbered List Generator"
       onBack={onBack}
       onRun={handleGenerate}
+      active={active}
       banner={
         ran && result.length > 0 ? (
           <Stat value={result.length.toLocaleString()} label="lines" />

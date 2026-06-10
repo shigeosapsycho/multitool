@@ -42,6 +42,12 @@ concurrency:
 permissions:
   contents: write
 
+# GitHub switches JavaScript actions to Node 24 on 2026-06-16; the pinned v4
+# actions still default to Node 20. Opt in ahead of the cutover so it can't
+# break a release run.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build Windows installer + portable
@@ -67,6 +73,19 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Quality gate: a failing test or type error fails the job before any
+      # artifact is built, so a broken build can never publish a release.
+      - name: Run tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Rust tests run here too — `tauri build` compiles the non-test profile,
+      # so without this step a failing or non-compiling test would still publish.
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Build (vite + tauri)
         run: npm run build:win

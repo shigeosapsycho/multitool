@@ -55,7 +55,13 @@ export type ScanRange =
 
 export type ScanResult = { emails: EmailHeader[]; cancelled: boolean }
 
-export type DeleteResult = { deleted: number; failed: number[] }
+export type DeleteResult = {
+  deleted: number
+  /** UIDs whose delete batch failed or was skipped after repeated failures. */
+  failed: number[]
+  /** First batch failure's error message; null/absent when nothing failed. */
+  error?: string | null
+}
 
 export type EmailBody = { html: string | null; text: string | null }
 
@@ -263,14 +269,15 @@ export const api = {
   net: {
     testProxies: (args: { url: string; proxies: string[]; concurrency?: number }) =>
       invoke<ProxyTestEntry[]>('net_test_proxies', { args }),
-    cancelProxies: () => invoke<void>('net_cancel_proxies')
+    cancelProxies: () => invoke<void>('net_cancel_proxies'),
+    onProxyProgress: (cb: (p: { done: number; total: number; ok: number }) => void) =>
+      onEvent<{ done: number; total: number; ok: number }>('proxy:progress', cb)
   },
   imap: {
     listAccounts: () => invoke<ImapAccount[]>('imap_list_accounts'),
     saveAccount: (account: ImapAccountInput) =>
       invoke<ImapAccount>('imap_save_account', { account }),
     deleteAccount: (id: string) => invoke<void>('imap_delete_account', { id }),
-    loadPassword: (id: string) => invoke<string>('imap_load_password', { id }),
     test: (id: string) => invoke<void>('imap_test', { id }),
     scan: (id: string, range: ScanRange) =>
       invoke<ScanResult>('imap_scan', { id, range }),

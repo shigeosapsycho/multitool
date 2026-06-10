@@ -8,14 +8,17 @@ mod update;
 mod uninstall_old;
 mod watcher;
 
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 pub struct AppState {
     pub config: Mutex<config::Config>,
     pub watcher: Mutex<Option<watcher::OutputWatcher>>,
-    pub proxy_cancel: Arc<AtomicBool>,
+    // Generation counter, not a flag: each proxy run bumps it and captures the
+    // new value; workers exit once it changes (cancel or newer run). A reset
+    // bool would un-cancel a run orphaned by a webview reload.
+    pub proxy_gen: Arc<AtomicU64>,
     pub imap_cancel: Arc<AtomicBool>,
     pub unsub_cancel: Arc<AtomicBool>,
 }
@@ -40,7 +43,7 @@ pub fn run() {
             app.manage(AppState {
                 config: Mutex::new(cfg),
                 watcher: Mutex::new(None),
-                proxy_cancel: Arc::new(AtomicBool::new(false)),
+                proxy_gen: Arc::new(AtomicU64::new(0)),
                 imap_cancel: Arc::new(AtomicBool::new(false)),
                 unsub_cancel: Arc::new(AtomicBool::new(false)),
             });
@@ -156,7 +159,6 @@ pub fn run() {
             imap_cleaner::imap_list_accounts,
             imap_cleaner::imap_save_account,
             imap_cleaner::imap_delete_account,
-            imap_cleaner::imap_load_password,
             imap_cleaner::imap_test,
             imap_cleaner::imap_scan,
             imap_cleaner::imap_cancel,

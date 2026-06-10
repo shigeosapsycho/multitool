@@ -134,6 +134,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
       toolbar={toolbar}
       onBack={onBack}
       onRun={handleRun}
+      active={active}
       running={running}
       banner={
         hasContent ? (

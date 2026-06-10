@@ -1,6 +1,6 @@
 [package]
 name = "beu-multitool"
-version = "3.9.10"
+version = "3.10.0"
 description = "Beu MultiTool - desktop edition"
 authors = ["beu"]
 edition = "2021"
@@ -39,6 +39,9 @@ rfc2047-decoder = "1"
 mailparse = "0.15"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+# SHA-256 verification of self-update downloads against the GitHub release
+# asset digest (see update.rs).
+sha2 = "0.10"
 # OS credential store for the Email Cleaner module (Windows Credential Manager).
 keyring = { version = "3", features = ["windows-native"] }
 # Registry walk for detecting the legacy Electron install (see uninstall_old.rs).

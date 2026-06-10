@@ -64,6 +64,8 @@ export default function App() {
   const [updateReady, setUpdateReady] = useState(false)
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
   const [restarting, setRestarting] = useState(false)
+  // Set when applying a staged update fails; shown in the update banner.
+  const [updateError, setUpdateError] = useState<string | null>(null)
   const [oldVersionRemoved, setOldVersionRemoved] = useState(false)
   const [filePreview, setFilePreview] = useState(false)
   const [deleteToTrash, setDeleteToTrash] = useState(true)
@@ -420,17 +422,24 @@ export default function App() {
       {updateReady && (
         <StatusBar
           message={
-            updateVersion
-              ? `Update v${updateVersion} downloaded — restart to apply.`
-              : 'Update downloaded — restart to apply.'
+            updateError
+              ? `Update failed: ${updateError}`
+              : updateVersion
+                ? `Update v${updateVersion} downloaded — restart to apply.`
+                : 'Update downloaded — restart to apply.'
           }
-          actionLabel={restarting ? 'Restarting…' : 'Restart now'}
+          actionLabel={restarting ? 'Restarting…' : updateError ? 'Retry' : 'Restart now'}
           actionDisabled={restarting}
           onAction={() => {
             setRestarting(true)
+            setUpdateError(null)
             // On success the process exits before this resolves; only a
-            // failure path comes back, so re-enable the button if it does.
-            window.api.updater.applyAndRestart().catch(() => setRestarting(false))
+            // failure path comes back, so surface the error in the banner
+            // and re-enable the button.
+            window.api.updater.applyAndRestart().catch((e) => {
+              setRestarting(false)
+              setUpdateError(String(e))
+            })
           }}
         />
       )}
