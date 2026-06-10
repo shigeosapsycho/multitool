@@ -174,6 +174,28 @@ fn header_values(lines: &[&str], name: &str) -> Vec<String> {
     out
 }
 
+/// Split a header block into physical lines without copying it: `\r\n`, lone
+/// `\r` and lone `\n` each end a line. Equivalent to normalising every ending
+/// to `\n` and splitting on it — in particular, empty lines are kept, because
+/// an empty line must still stop folded-header continuation in
+/// `header_values` (RFC 5322: a blank line ends the header section).
+fn split_physical_lines(text: &str) -> Vec<&str> {
+    let mut lines = Vec::new();
+    let mut rest = text;
+    while let Some(pos) = rest.find(['\r', '\n']) {
+        lines.push(&rest[..pos]);
+        let bytes = rest.as_bytes();
+        let sep = if bytes[pos] == b'\r' && bytes.get(pos + 1) == Some(&b'\n') {
+            2
+        } else {
+            1
+        };
+        rest = &rest[pos + sep..];
+    }
+    lines.push(rest);
+    lines
+}
+
 /// Pull the `List-Unsubscribe` links and the one-click flag out of a raw
 /// RFC 5322 header block.
 ///
@@ -185,9 +207,8 @@ fn header_values(lines: &[&str], name: &str) -> Vec<String> {
 /// spurious match, so we accept the first value that actually yields a `<URI>`.
 fn parse_unsub_headers(raw: &[u8]) -> (UnsubLinks, bool) {
     let text = String::from_utf8_lossy(raw);
-    // Normalise CRLF / CR / LF endings, then split into physical lines.
-    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
-    let lines: Vec<&str> = normalized.split('\n').collect();
+    // Split into physical lines, accepting CRLF / CR / LF endings.
+    let lines = split_physical_lines(&text);
 
     let mut links = UnsubLinks::default();
     for value in header_values(&lines, "List-Unsubscribe") {
@@ -234,9 +255,17 @@ fn scan_unsub_inbox(
             .map(u32::to_string)
             .collect::<Vec<_>>()
             .join(",");
-        // RFC822.HEADER is an implicit peek — it never sets the \Seen flag.
+        // HEADER.FIELDS fetches only the two headers we parse instead of the
+        // full header block (3-10KB per message); BODY.PEEK never sets the
+        // \Seen flag. The crate still surfaces the data via `Fetch::header()`:
+        // imap-proto parses `HEADER.FIELDS (..)` to `MessageSection::Header`,
+        // the same section `RFC822.HEADER` produced.
         let fetches = session
-            .uid_fetch(&set, "(UID ENVELOPE RFC822.SIZE INTERNALDATE RFC822.HEADER)")
+            .uid_fetch(
+                &set,
+                "(UID ENVELOPE RFC822.SIZE INTERNALDATE \
+                 BODY.PEEK[HEADER.FIELDS (List-Unsubscribe List-Unsubscribe-Post)])",
+            )
             .map_err(|e| format!("Fetching message headers failed: {e}"))?;
         for f in fetches.iter() {
             if f.uid.is_none() {
@@ -451,10 +480,12 @@ pub async fn unsub_run(
         state.unsub_cancel.clone()
     };
     tauri::async_runtime::spawn_blocking(move || {
-        let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
+        // agent_builder (not a bare AgentBuilder) — wires the native-tls
+        // connector, without which https fails (no rustls in this build).
+        let agent = crate::http::agent_builder().timeout(HTTP_TIMEOUT).build();
         // One-click POSTs follow redirects by hand (see post_one_click), so
         // their agent must not auto-redirect.
-        let post_agent = ureq::AgentBuilder::new()
+        let post_agent = crate::http::agent_builder()
             .timeout(HTTP_TIMEOUT)
             .redirects(0)
             .build();
@@ -710,5 +741,29 @@ mod tests {
             parse_unsub_headers(cr).0.http.as_deref(),
             Some("https://example.com/u")
         );
+    }
+
+    #[test]
+    fn parse_unsub_headers_handles_mixed_line_endings() {
+        // LF, CRLF and bare CR endings mixed in one block, with a folded
+        // continuation across a CRLF boundary.
+        let raw = b"From: News <news@example.com>\n\
+            List-Unsubscribe: <https://example.com/u>,\r\n\
+            \t<mailto:u@example.com>\rSubject: Hi\r\n\r\n";
+        let (links, _) = parse_unsub_headers(raw);
+        assert_eq!(links.http.as_deref(), Some("https://example.com/u"));
+        assert_eq!(links.mailto.as_deref(), Some("mailto:u@example.com"));
+    }
+
+    #[test]
+    fn folded_continuation_does_not_cross_an_empty_line() {
+        // RFC 5322: a blank line ends the header section. A whitespace-led
+        // line after it is body text, not a folded continuation, and must not
+        // be joined into the header value.
+        let raw =
+            b"List-Unsubscribe: <https://example.com/u>,\r\n\r\n\t<mailto:body@example.com>\r\n";
+        let (links, _) = parse_unsub_headers(raw);
+        assert_eq!(links.http.as_deref(), Some("https://example.com/u"));
+        assert_eq!(links.mailto, None);
     }
 }

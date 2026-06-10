@@ -1,6 +1,7 @@
 mod commands;
 mod config;
 mod email_unsubscribe;
+mod http;
 mod imap_cleaner;
 mod imap_creds;
 mod update;

@@ -83,6 +83,48 @@ function agoLabel(since: number): string {
   return `Updated ${Math.floor(mins / 60)}h ago`
 }
 
+/**
+ * Catalog freshness label (search bar, right side). Owns the 30s tick that
+ * keeps "updated N ago" current, so the timer re-renders only this label —
+ * not the whole page — and stops entirely while the page is hidden.
+ */
+function SyncLabel({
+  active,
+  syncing,
+  syncFailed,
+  lastSync
+}: {
+  active: boolean
+  syncing: boolean
+  syncFailed: boolean
+  lastSync: number | null
+}) {
+  // Bumped on a timer so the label keeps ticking between catalog pulls.
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    if (!active) return
+    const id = setInterval(() => setTick((t) => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [active])
+
+  const label = syncing
+    ? 'Syncing…'
+    : syncFailed
+      ? 'Offline'
+      : lastSync !== null
+        ? agoLabel(lastSync)
+        : 'Syncing…'
+
+  return (
+    <span
+      className={`shrink-0 text-[11px] ${syncFailed ? 'text-warning' : 'text-text-muted'}`}
+    >
+      {label}
+    </span>
+  )
+}
+
 const CheckIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
     <polyline points="20 6 9 17 4 12" />
@@ -453,6 +495,7 @@ function MonitorSection({
 export function TargetSkuPage({
   onBack,
   onSetStatus,
+  active = true,
   pokemonGrouping,
   orderBySelectDate
 }: Props) {
@@ -500,8 +543,10 @@ export function TargetSkuPage({
   const [lastSync, setLastSync] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [syncFailed, setSyncFailed] = useState(false)
-  // Bumped on a timer so the "updated N ago" label keeps ticking between pulls.
-  const [, setTick] = useState(0)
+  // Raw CSV text of the last successful pull. A byte-identical re-fetch skips
+  // setEntries, so an unchanged catalog doesn't churn `entries` (and every
+  // memo downstream) with a fresh array each minute.
+  const lastCsvRef = useRef<string | null>(null)
 
   const catalogSkus = useMemo(() => new Set(entries.map((e) => e.sku)), [entries])
   // SKU -> entry, for resolving listing names in the Order tab.
@@ -546,11 +591,16 @@ export function TargetSkuPage({
 
   // Pull the remote SKU catalog. A failed pull flips the offline badge but
   // keeps whatever list is already loaded (bundled, or a previous pull).
+  // An unchanged file is a ~5KB string compare instead of a re-parse +
+  // state churn.
   const refreshCatalog = useCallback(() => {
     setSyncing(true)
     fetchRemoteSkus()
-      .then((remote) => {
-        setEntries(remote)
+      .then(({ text, entries }) => {
+        if (text !== lastCsvRef.current) {
+          lastCsvRef.current = text
+          setEntries(entries)
+        }
         setLastSync(Date.now())
         setSyncFailed(false)
       })
@@ -558,19 +608,15 @@ export function TargetSkuPage({
       .finally(() => setSyncing(false))
   }, [])
 
-  // Show the bundled list instantly, then keep the catalog fresh: pull the
-  // remote copy on mount and every minute after.
+  // Show the bundled list instantly, then keep the catalog fresh while the
+  // page is showing: pull the remote copy immediately on becoming active and
+  // every minute after. Hidden (keep-alive mounted) pages don't poll.
   useEffect(() => {
+    if (!active) return
     refreshCatalog()
     const id = setInterval(refreshCatalog, 60_000)
     return () => clearInterval(id)
-  }, [refreshCatalog])
-
-  // Re-render every 30s so the "updated N ago" freshness label stays current.
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30_000)
-    return () => clearInterval(id)
-  }, [])
+  }, [active, refreshCatalog])
 
   // Persist the order + stars so they survive app restarts. Best-effort —
   // a full or unavailable localStorage just means they aren't remembered.
@@ -853,14 +899,6 @@ export function TargetSkuPage({
     return bad.size
   }, [draft, catalogSkus])
 
-  // Freshness label for the SKU catalog (search bar, right side).
-  function syncLabel(): string {
-    if (syncing) return 'Syncing…'
-    if (syncFailed) return 'Offline'
-    if (lastSync !== null) return agoLabel(lastSync)
-    return 'Syncing…'
-  }
-
   // Render one checklist group, recursing into sub-groups (era → set).
   function renderGroup(group: SkuGroup, depth: number): JSX.Element {
     const items = leafItems(group)
@@ -1008,11 +1046,12 @@ export function TargetSkuPage({
             className="min-w-0 flex-1 bg-transparent text-[12.5px] text-text-primary outline-none placeholder:text-text-muted"
             spellCheck={false}
           />
-          <span
-            className={`shrink-0 text-[11px] ${syncFailed ? 'text-warning' : 'text-text-muted'}`}
-          >
-            {syncLabel()}
-          </span>
+          <SyncLabel
+            active={active}
+            syncing={syncing}
+            syncFailed={syncFailed}
+            lastSync={lastSync}
+          />
           <button
             onClick={refreshCatalog}
             disabled={syncing}

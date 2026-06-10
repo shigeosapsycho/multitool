@@ -108,7 +108,9 @@ mod win {
     /// published tag is strictly newer than the running build.
     fn check_remote() -> Result<Option<Available>> {
         let url = format!("https://api.github.com/repos/{GITHUB_REPO}/releases/latest");
-        let agent = ureq::AgentBuilder::new()
+        // agent_builder (not a bare AgentBuilder) — wires the native-tls
+        // connector, without which https fails (no rustls in this build).
+        let agent = crate::http::agent_builder()
             .timeout_connect(Duration::from_secs(8))
             .timeout_read(Duration::from_secs(15))
             .build();
@@ -182,7 +184,7 @@ mod win {
         let _ = std::fs::remove_file(&target);
         let _ = std::fs::remove_file(&part);
 
-        let agent = ureq::AgentBuilder::new()
+        let agent = crate::http::agent_builder()
             .timeout_connect(Duration::from_secs(8))
             .timeout_read(Duration::from_secs(120))
             .build();

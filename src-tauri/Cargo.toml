@@ -1,6 +1,6 @@
 [package]
 name = "beu-multitool"
-version = "3.10.0"
+version = "3.10.1"
 description = "Beu MultiTool - desktop edition"
 authors = ["beu"]
 edition = "2021"
@@ -27,7 +27,13 @@ chrono = "0.4"
 rand = "0.8"
 anyhow = "1"
 # Self-updater HTTP client (GitHub Releases API + asset download).
-ureq = { version = "2", features = ["json", "socks-proxy"] }
+# default-features off drops ureq's rustls stack (rustls + ring + webpki-roots)
+# from the Windows binary; HTTPS goes through native-tls/schannel instead,
+# which imap already requires. With rustls off ureq has NO default TLS backend,
+# so every agent must be built via crate::http::agent_builder() — a bare
+# ureq::AgentBuilder/ureq::get cannot reach https. "gzip" is kept because the
+# default build had it.
+ureq = { version = "2", default-features = false, features = ["json", "gzip", "socks-proxy", "native-tls"] }
 base64 = "0.22"
 url = "2"
 # Email Cleaner module: IMAP client + OS credential storage.
@@ -63,9 +69,11 @@ keyring = { version = "3", features = ["apple-native"] }
 # official plugin (downloads a signed .app.tar.gz and replaces the bundle).
 tauri-plugin-updater = "2"
 
+# Thin LTO + 16 codegen units instead of fat LTO + 1: cuts ~2m50s of
+# single-threaded tail off every release build for ~0.3-0.5MB of size.
 [profile.release]
 panic = "abort"
-codegen-units = 1
-lto = true
+codegen-units = 16
+lto = "thin"
 opt-level = "s"
 strip = true
