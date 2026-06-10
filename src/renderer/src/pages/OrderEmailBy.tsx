@@ -286,6 +286,7 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
       toolbar={toolbar}
       onBack={onBack}
       onRun={handleRun}
+      active={active}
       running={running}
       banner={
         hasContent ? (

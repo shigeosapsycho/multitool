@@ -411,12 +411,12 @@ export function ToolsPage({ onNavigate }: Props) {
   }, [query])
 
   // Cards kept in the DOM while they animate out (ids mid-exit).
-  const [exiting, setExiting] = useState<Set<string>>(new Set())
+  const [exiting, setExiting] = useState<Set<ToolMeta['id']>>(new Set())
   // Mirror of `exiting` so the effect can read it without listing it as a dep —
   // depending on the state the effect writes would tear down its own timers.
   const exitingRef = useRef(exiting)
   exitingRef.current = exiting
-  const prevMatchIds = useRef<Set<string>>(new Set(matches.map((t) => t.id)))
+  const prevMatchIds = useRef<Set<ToolMeta['id']>>(new Set(matches.map((t) => t.id)))
   // Pending unmount timers, keyed by card id. Held in a ref so a re-render
   // never cancels them — only re-entry or page unmount does.
   const exitTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())

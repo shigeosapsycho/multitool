@@ -253,6 +253,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
       toolbar={toolbar}
       onBack={onBack}
       onRun={handleRun}
+      active={active}
       running={running}
       banner={
         hasAny ? (

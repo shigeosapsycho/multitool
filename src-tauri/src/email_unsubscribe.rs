@@ -28,6 +28,10 @@ const IMAP_BATCH: usize = 500;
 /// Per-request HTTP timeout for the unsubscribe run.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(20);
 
+/// Maximum redirect hops a one-click unsubscribe follows, counting POST and
+/// GET hops alike.
+const MAX_POST_HOPS: usize = 3;
+
 // ---------- shared data types ----------
 
 /// One scanned email that carries a `List-Unsubscribe` header.
@@ -89,14 +93,14 @@ pub struct UnsubLinks {
 /// True when `url` begins with the `http://` or `https://` scheme.
 fn is_http_url(url: &str) -> bool {
     let u = url.trim();
-    u.len() >= 7 && u[..7].eq_ignore_ascii_case("http://")
-        || u.len() >= 8 && u[..8].eq_ignore_ascii_case("https://")
+    u.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("http://"))
+        || u.get(..8).is_some_and(|p| p.eq_ignore_ascii_case("https://"))
 }
 
 /// True when `url` begins with the `https://` scheme.
 fn is_https_url(url: &str) -> bool {
     let u = url.trim();
-    u.len() >= 8 && u[..8].eq_ignore_ascii_case("https://")
+    u.get(..8).is_some_and(|p| p.eq_ignore_ascii_case("https://"))
 }
 
 /// Parse a `List-Unsubscribe` header value (RFC 2369). The value is a list of
@@ -114,7 +118,9 @@ pub fn parse_list_unsubscribe(raw: &str) -> UnsubLinks {
             if links.http.is_none() {
                 links.http = Some(entry.to_string());
             }
-        } else if entry.len() >= 7 && entry[..7].eq_ignore_ascii_case("mailto:") && links.mailto.is_none() {
+        } else if entry.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("mailto:"))
+            && links.mailto.is_none()
+        {
             links.mailto = Some(entry.to_string());
         }
         rest = &after[end + 1..];
@@ -268,8 +274,96 @@ fn scan_unsub_inbox(
 
 // ---------- HTTP unsubscribe ----------
 
+/// Resolve a redirect `Location` header value against the URL that produced
+/// it (absolute, protocol-relative and path-relative forms all work). Returns
+/// `None` when either part does not parse as a URL.
+fn resolve_location(base: &str, location: &str) -> Option<String> {
+    let target = url::Url::parse(base).ok()?.join(location.trim()).ok()?;
+    Some(target.into())
+}
+
+/// How a redirect status applies to an in-flight `POST` (RFC 9110 §15.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RedirectKind {
+    /// 307/308 — the method and body must be preserved: re-POST at the target.
+    RepeatPost,
+    /// 301/302/303 — the POST was already delivered and processed; fetch the
+    /// redirect target with a body-less GET. 303 says exactly that ("GET the
+    /// result"); for 301/302 it matches browsers and the old auto-redirecting
+    /// ureq, which is the behavior ESP unsubscribe endpoints are built around.
+    SwitchToGet,
+}
+
+/// Classify a redirect status, or `None` when it is not a redirect we follow.
+fn redirect_kind(status: u16) -> Option<RedirectKind> {
+    match status {
+        301 | 302 | 303 => Some(RedirectKind::SwitchToGet),
+        307 | 308 => Some(RedirectKind::RepeatPost),
+        _ => None,
+    }
+}
+
+/// RFC 8058 one-click POST. Only a 2xx is a real confirmation, so redirects
+/// are followed by hand — `agent` must have auto-redirects disabled, because
+/// ureq's auto-redirect would silently demote the POST. Hops follow RFC 9110
+/// §15.4 (see `redirect_kind`): a 307/308 re-POSTs the one-click body, while
+/// a 301/302/303 demotes the rest of the chain to body-less GETs that fetch
+/// the result. Design note: 303 gets no success short-circuit — even though
+/// it implies the POST was processed, we still require the chain to end in a
+/// 2xx, so `ok` uniformly means "a 2xx was observed". Every hop must stay on
+/// https and the chain is capped at `MAX_POST_HOPS`. Returns the final 2xx
+/// status, or an error description.
+fn post_one_click(agent: &ureq::Agent, url: &str) -> Result<u16, String> {
+    let mut url = url.to_string();
+    // Once a 301/302/303 demotes the chain to GET it never goes back to POST:
+    // the POST is done, the remaining hops only fetch the result page. A
+    // later 307/308 then repeats the current method, i.e. stays a GET.
+    let mut as_get = false;
+    for _ in 0..=MAX_POST_HOPS {
+        let req = agent
+            .request(if as_get { "GET" } else { "POST" }, &url)
+            .set("User-Agent", USER_AGENT);
+        let sent = if as_get {
+            req.call()
+        } else {
+            req.set("Content-Type", "application/x-www-form-urlencoded")
+                .send_string("List-Unsubscribe=One-Click")
+        };
+        let resp = match sent {
+            Ok(resp) => resp,
+            Err(ureq::Error::Status(code, _)) => {
+                return Err(format!("Server rejected the request (HTTP {code})"))
+            }
+            Err(ureq::Error::Transport(e)) => {
+                return Err(format!("Could not reach the server — {e}"))
+            }
+        };
+        let status = resp.status();
+        if (200..=299).contains(&status) {
+            return Ok(status);
+        }
+        let Some(kind) = redirect_kind(status) else {
+            return Err(format!("Unexpected response (HTTP {status})"));
+        };
+        let Some(location) = resp.header("Location") else {
+            return Err(format!("Redirect (HTTP {status}) had no Location header"));
+        };
+        let Some(next) = resolve_location(&url, location) else {
+            return Err(format!("Redirect (HTTP {status}) target could not be resolved"));
+        };
+        if !is_https_url(&next) {
+            return Err(format!("Redirect (HTTP {status}) left https — refusing"));
+        }
+        if kind == RedirectKind::SwitchToGet {
+            as_get = true;
+        }
+        url = next;
+    }
+    Err(format!("Too many redirects (more than {MAX_POST_HOPS} hops)"))
+}
+
 /// Perform one unsubscribe request and describe the outcome.
-fn run_one(agent: &ureq::Agent, target: &UnsubTarget) -> UnsubRunItem {
+fn run_one(agent: &ureq::Agent, post_agent: &ureq::Agent, target: &UnsubTarget) -> UnsubRunItem {
     let key = target.key.clone();
     let fail = |detail: String| UnsubRunItem {
         key: key.clone(),
@@ -285,33 +379,26 @@ fn run_one(agent: &ureq::Agent, target: &UnsubTarget) -> UnsubRunItem {
         return fail("One-click unsubscribe requires an https link.".into());
     }
 
-    // RFC 8058: the one-click POST body is the fixed form value below.
-    let result = if is_post {
-        agent
-            .post(url)
-            .set("User-Agent", USER_AGENT)
-            .set("Content-Type", "application/x-www-form-urlencoded")
-            .send_string("List-Unsubscribe=One-Click")
-    } else {
-        agent.get(url).set("User-Agent", USER_AGENT).call()
-    };
-
-    match result {
-        // A one-click POST returning 2xx is a real confirmation per RFC 8058.
-        // A plain link GET returning 2xx only means the page loaded — the
-        // sender may still require a click there — so word it honestly.
-        Ok(resp) => {
-            let status = resp.status();
-            UnsubRunItem {
+    // A one-click POST reaching 2xx is a real confirmation per RFC 8058.
+    if is_post {
+        return match post_one_click(post_agent, url) {
+            Ok(status) => UnsubRunItem {
                 key,
                 ok: true,
-                detail: if is_post {
-                    format!("Unsubscribed · server accepted one-click (HTTP {status})")
-                } else {
-                    format!("Unsubscribe page opened (HTTP {status})")
-                },
-            }
-        }
+                detail: format!("Unsubscribed · server accepted one-click (HTTP {status})"),
+            },
+            Err(detail) => fail(detail),
+        };
+    }
+
+    // A plain link GET returning 2xx only means the page loaded — the sender
+    // may still require a click there — so word it honestly.
+    match agent.get(url).set("User-Agent", USER_AGENT).call() {
+        Ok(resp) => UnsubRunItem {
+            key,
+            ok: true,
+            detail: format!("Unsubscribe page opened (HTTP {})", resp.status()),
+        },
         Err(ureq::Error::Status(code, _)) => {
             fail(format!("Server rejected the request (HTTP {code})"))
         }
@@ -365,12 +452,18 @@ pub async fn unsub_run(
     };
     tauri::async_runtime::spawn_blocking(move || {
         let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
+        // One-click POSTs follow redirects by hand (see post_one_click), so
+        // their agent must not auto-redirect.
+        let post_agent = ureq::AgentBuilder::new()
+            .timeout(HTTP_TIMEOUT)
+            .redirects(0)
+            .build();
         let mut out: Vec<UnsubRunItem> = Vec::with_capacity(targets.len());
         for target in &targets {
             if cancel.load(Ordering::Acquire) {
                 break;
             }
-            out.push(run_one(&agent, target));
+            out.push(run_one(&agent, &post_agent, target));
         }
         out
     })
@@ -513,6 +606,96 @@ mod tests {
         let (links, _) = parse_unsub_headers(raw);
         assert_eq!(links.http.as_deref(), Some("https://example.com/u"));
         assert_eq!(links.mailto.as_deref(), Some("mailto:unsub@example.com"));
+    }
+
+    #[test]
+    fn scheme_checks_do_not_panic_on_a_multibyte_boundary() {
+        // The 7th / 8th byte lands inside a multibyte character — a naive
+        // `[..7]` / `[..8]` slice would panic here (and, with the release
+        // profile's panic="abort", take the whole app down).
+        assert!(!is_http_url("http:/é-not-a-url"));
+        assert!(!is_https_url("https:/é-not-a-url"));
+    }
+
+    #[test]
+    fn parse_list_unsubscribe_survives_a_multibyte_entry() {
+        // "mailtoé" puts a multibyte char across the 7-byte boundary; the old
+        // `entry[..7]` slice panicked on it.
+        let links = parse_list_unsubscribe("<mailtoé:nope>, <https://example.com/u>");
+        assert_eq!(links.http.as_deref(), Some("https://example.com/u"));
+        assert_eq!(links.mailto, None);
+    }
+
+    #[test]
+    fn resolve_location_accepts_an_absolute_url() {
+        assert_eq!(
+            resolve_location("https://a.test/u", "https://b.test/v").as_deref(),
+            Some("https://b.test/v")
+        );
+    }
+
+    #[test]
+    fn resolve_location_resolves_an_absolute_path_against_the_origin() {
+        assert_eq!(
+            resolve_location("https://a.test/u/one?id=7", "/two").as_deref(),
+            Some("https://a.test/two")
+        );
+    }
+
+    #[test]
+    fn resolve_location_resolves_a_relative_path_against_the_base() {
+        assert_eq!(
+            resolve_location("https://a.test/u/one", "two").as_deref(),
+            Some("https://a.test/u/two")
+        );
+    }
+
+    #[test]
+    fn resolve_location_keeps_the_scheme_for_a_protocol_relative_target() {
+        assert_eq!(
+            resolve_location("https://a.test/u", "//b.test/v").as_deref(),
+            Some("https://b.test/v")
+        );
+    }
+
+    #[test]
+    fn resolve_location_rejects_an_unparseable_base() {
+        assert_eq!(resolve_location("not a url", "/x"), None);
+    }
+
+    #[test]
+    fn resolve_location_leaves_the_https_check_to_the_caller() {
+        // A downgrade to http resolves fine here — post_one_click rejects it
+        // via is_https_url before re-POSTing.
+        let next = resolve_location("https://a.test/u", "http://b.test/v");
+        assert_eq!(next.as_deref(), Some("http://b.test/v"));
+        assert!(!is_https_url(next.as_deref().unwrap()));
+    }
+
+    #[test]
+    fn redirect_kind_demotes_301_302_303_to_get() {
+        // RFC 9110: 303 means the POST was processed — GET the result. 301/302
+        // get the same treatment browsers (and the old auto-redirecting ureq)
+        // give them; re-POSTing there turned successes into 405/404 failures.
+        for status in [301, 302, 303] {
+            assert_eq!(redirect_kind(status), Some(RedirectKind::SwitchToGet));
+        }
+    }
+
+    #[test]
+    fn redirect_kind_preserves_the_method_for_307_308() {
+        for status in [307, 308] {
+            assert_eq!(redirect_kind(status), Some(RedirectKind::RepeatPost));
+        }
+    }
+
+    #[test]
+    fn redirect_kind_does_not_follow_other_statuses() {
+        // Includes the 3xx codes that are not location redirects (300, 304)
+        // and the long-deprecated 305/306.
+        for status in [200, 204, 300, 304, 305, 306, 400, 404, 410, 500] {
+            assert_eq!(redirect_kind(status), None);
+        }
     }
 
     #[test]

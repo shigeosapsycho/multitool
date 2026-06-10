@@ -33,10 +33,14 @@ pub struct EmailHeader {
 #[serde(rename_all = "camelCase")]
 pub struct DeleteResult {
     pub deleted: u32,
-    /// UIDs that failed to delete. Currently always empty: `delete_emails`
-    /// fails the whole operation (returns `Err`) on the first IMAP error
-    /// rather than tracking per-UID outcomes. Kept for forward compatibility.
+    /// UIDs whose delete batch failed (or was never attempted — after two
+    /// consecutive batch failures the session is assumed dead and the
+    /// remaining batches are skipped). `deleted` counts only the batches
+    /// that succeeded.
     pub failed: Vec<u32>,
+    /// The first batch failure's error message, so the renderer can show the
+    /// cause instead of just a count. `None` when nothing failed.
+    pub error: Option<String>,
 }
 
 /// Result of an inbox scan. `cancelled` is true when the user stopped the
@@ -289,16 +293,45 @@ fn find_trash_folder(session: &mut ImapSession) -> Result<String, String> {
     })
 }
 
+/// Flag the given UID set `\Deleted`, then expunge. With UIDPLUS the expunge
+/// is scoped to exactly that set (`UID EXPUNGE`); a plain `EXPUNGE` would also
+/// remove messages other clients have flagged `\Deleted`, so it is only the
+/// fallback for servers without the extension.
+fn flag_and_expunge(
+    session: &mut ImapSession,
+    set: &str,
+    uidplus: bool,
+) -> Result<(), String> {
+    session
+        .uid_store(set, "+FLAGS (\\Deleted)")
+        .map_err(|e| format!("Flagging messages failed: {e}"))?;
+    if uidplus {
+        session
+            .uid_expunge(set)
+            .map_err(|e| format!("Expunge failed: {e}"))?;
+    } else if let Err(e) = session.expunge() {
+        // The store succeeded, so the set is still flagged `\Deleted` — a
+        // later batch's mailbox-wide EXPUNGE would silently delete it even
+        // though it is being reported as failed. Best-effort unflag first.
+        let _ = session.uid_store(set, "-FLAGS (\\Deleted)");
+        return Err(format!("Expunge failed: {e}"));
+    }
+    Ok(())
+}
+
 /// Delete the given UIDs from INBOX. `permanent` expunges; otherwise the
 /// emails are moved to the Trash folder. UIDs are processed in batches so a
-/// huge selection does not become one oversized IMAP command line.
+/// huge selection does not become one oversized IMAP command line. A failed
+/// batch lands in `DeleteResult.failed` and the remaining batches still run —
+/// but after two consecutive failures the session is assumed dead, the loop
+/// stops, and the unattempted batches are recorded as failed too.
 fn delete_emails(
     session: &mut ImapSession,
     uids: &[u32],
     permanent: bool,
 ) -> Result<DeleteResult, String> {
     if uids.is_empty() {
-        return Ok(DeleteResult { deleted: 0, failed: vec![] });
+        return Ok(DeleteResult { deleted: 0, failed: vec![], error: None });
     }
     session
         .select("INBOX")
@@ -318,22 +351,32 @@ fn delete_emails(
             .map(|caps| caps.has_str("MOVE"))
             .unwrap_or(false)
     };
+    // Only the expunging paths (permanent, or copy+flag fallback) care about
+    // UIDPLUS; skip the extra CAPABILITY round trip when MOVE handles it.
+    let supports_uidplus = if permanent || !supports_move {
+        session
+            .capabilities()
+            .map(|caps| caps.has_str("UIDPLUS"))
+            .unwrap_or(false)
+    } else {
+        false
+    };
 
-    for chunk in uids.chunks(IMAP_BATCH) {
+    let mut deleted: u32 = 0;
+    let mut failed: Vec<u32> = Vec::new();
+    let mut error: Option<String> = None;
+    let mut consecutive_failures = 0;
+    let mut chunks = uids.chunks(IMAP_BATCH);
+    while let Some(chunk) = chunks.next() {
         let set = chunk.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
-        if permanent {
-            session
-                .uid_store(&set, "+FLAGS (\\Deleted)")
-                .map_err(|e| format!("Flagging messages failed: {e}"))?;
-            session
-                .expunge()
-                .map_err(|e| format!("Expunge failed: {e}"))?;
+        let result = if permanent {
+            flag_and_expunge(session, &set, supports_uidplus)
         } else {
             let trash = trash.as_ref().expect("trash set when not permanent");
             if supports_move {
                 session
                     .uid_mv(&set, trash)
-                    .map_err(|e| format!("Moving messages to {trash} failed: {e}"))?;
+                    .map_err(|e| format!("Moving messages to {trash} failed: {e}"))
             } else {
                 // The imap crate's `uid_copy` — unlike `uid_mv` — does not
                 // quote the mailbox name, so a name with a space (e.g.
@@ -341,20 +384,35 @@ fn delete_emails(
                 // Quote it here.
                 session
                     .uid_copy(&set, quote_mailbox(trash))
-                    .map_err(|e| format!("Copying messages to {trash} failed: {e}"))?;
-                session
-                    .uid_store(&set, "+FLAGS (\\Deleted)")
-                    .map_err(|e| format!("Flagging messages failed: {e}"))?;
-                session
-                    .expunge()
-                    .map_err(|e| format!("Expunge failed: {e}"))?;
+                    .map_err(|e| format!("Copying messages to {trash} failed: {e}"))
+                    .and_then(|_| flag_and_expunge(session, &set, supports_uidplus))
+            }
+        };
+        match result {
+            Ok(()) => {
+                deleted += chunk.len() as u32;
+                consecutive_failures = 0;
+            }
+            Err(e) => {
+                eprintln!("imap delete: batch of {} failed: {e}", chunk.len());
+                failed.extend_from_slice(chunk);
+                if error.is_none() {
+                    error = Some(e);
+                }
+                consecutive_failures += 1;
+                if consecutive_failures >= 2 {
+                    // Two failures in a row almost always mean a dead session;
+                    // grinding through the rest would just stall. The skipped
+                    // batches were never attempted, so they count as failed.
+                    for rest in chunks.by_ref() {
+                        failed.extend_from_slice(rest);
+                    }
+                    break;
+                }
             }
         }
     }
-    Ok(DeleteResult {
-        deleted: uids.len() as u32,
-        failed: vec![],
-    })
+    Ok(DeleteResult { deleted, failed, error })
 }
 
 /// Walk a parsed MIME tree, collecting the first `text/html` and the first
@@ -418,6 +476,14 @@ fn new_account_id() -> String {
     format!("{:016x}{:016x}", rng.gen::<u64>(), rng.gen::<u64>())
 }
 
+/// Whether a save that keeps the stored password (empty password field) is
+/// allowed. Only when the credential still goes to the same place: a changed
+/// host or username would silently send the stored password to a different
+/// server, so it must be re-entered. A port-only change is fine.
+fn keep_password_allowed(existing: &ImapAccount, host: &str, username: &str) -> bool {
+    existing.host == host && existing.username == username
+}
+
 /// Account fields coming in from the renderer's Save form.
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -468,8 +534,27 @@ pub async fn imap_save_account(
         port: account.port,
         username: account.username,
     };
+    // An empty password means "keep the stored one" — the renderer never loads
+    // the saved password back into the edit form. Refuse that when the host or
+    // username changed, so the stored credential cannot be re-pointed at a
+    // different server.
+    if account.password.is_empty() {
+        let state = app.state::<AppState>();
+        let cfg = state.config.lock().unwrap();
+        let existing = cfg
+            .imap_accounts
+            .as_ref()
+            .and_then(|list| list.iter().find(|a| a.id == id));
+        if let Some(existing) = existing {
+            if !keep_password_allowed(existing, &saved.host, &saved.username) {
+                return Err("Password required when changing server or username.".into());
+            }
+        }
+    }
     // Persist the password first; if that fails the config is left untouched.
-    crate::imap_creds::save_password(&id, &account.password)?;
+    if !account.password.is_empty() {
+        crate::imap_creds::save_password(&id, &account.password)?;
+    }
     with_accounts(&app, |accounts| {
         if let Some(existing) = accounts.iter_mut().find(|a| a.id == id) {
             *existing = saved.clone();
@@ -485,11 +570,6 @@ pub async fn imap_delete_account(app: AppHandle, id: String) -> Result<(), Strin
     crate::imap_creds::delete_password(&id)?;
     with_accounts(&app, |accounts| accounts.retain(|a| a.id != id))?;
     Ok(())
-}
-
-#[tauri::command]
-pub async fn imap_load_password(_app: AppHandle, id: String) -> Result<String, String> {
-    Ok(crate::imap_creds::load_password(&id)?.unwrap_or_default())
 }
 
 /// Look up an account by id and load its password from the credential store.
@@ -673,6 +753,22 @@ mod tests {
     fn decode_header_decodes_encoded_word() {
         // "=?UTF-8?B?w6lj?=" is base64 "éc".
         assert_eq!(decode_header(b"=?UTF-8?B?w6lj?="), "éc");
+    }
+
+    #[test]
+    fn keep_password_allowed_only_for_same_host_and_username() {
+        let existing = ImapAccount {
+            id: "abc".into(),
+            label: "Work".into(),
+            host: "imap.example.com".into(),
+            port: 993,
+            username: "me@example.com".into(),
+        };
+        // Same host + username (port changes don't matter here): allowed.
+        assert!(keep_password_allowed(&existing, "imap.example.com", "me@example.com"));
+        // Changed host or username: the stored password must be re-entered.
+        assert!(!keep_password_allowed(&existing, "imap.evil.com", "me@example.com"));
+        assert!(!keep_password_allowed(&existing, "imap.example.com", "other@example.com"));
     }
 
     #[test]

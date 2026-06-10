@@ -24,7 +24,7 @@ const StopIcon = () => (
 const fieldClass =
   'h-9 rounded-lg border border-border bg-surface px-3 text-[12.5px] text-text-primary outline-none transition focus:border-accent'
 
-export function EmailUnsubscribePage({ onBack }: Props) {
+export function EmailUnsubscribePage({ onBack, active }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const [rangeMode, setRangeMode] = useState<'dateRange' | 'lastDays'>('lastDays')
@@ -277,6 +277,10 @@ export function EmailUnsubscribePage({ onBack }: Props) {
           const gone = new Set(uids.filter((u) => !result.failed.includes(u)))
           setEmails((prev) => (prev ? prev.filter((e) => !gone.has(e.uid)) : prev))
           summary = `${summary} Moved ${result.deleted.toLocaleString()} emails to Trash.`
+          if (result.failed.length > 0) {
+            const cause = result.error ? ` — ${result.error}` : ''
+            summary = `${summary} ${result.failed.length} could not be deleted${cause}.`
+          }
         } catch (e) {
           summary = `${summary} Could not delete emails: ${String(e)}`
         }
@@ -300,6 +304,7 @@ export function EmailUnsubscribePage({ onBack }: Props) {
       title="Email Unsubscribe"
       onBack={onBack}
       onRun={canScan ? handleScan : undefined}
+      active={active}
       running={running}
       banner={<span>{status}</span>}
       actions={

@@ -113,6 +113,7 @@ export function SplitTool(props: SplitToolProps) {
       title={title}
       onBack={onBack}
       onRun={handleRun}
+      active={active}
       running={running}
       banner={
         hasContent ? (

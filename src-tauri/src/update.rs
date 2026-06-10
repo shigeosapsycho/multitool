@@ -40,11 +40,13 @@ mod win {
     use super::UpdaterResult;
     use std::io::{Read, Write};
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::Duration;
 
     use anyhow::{anyhow, Context, Result};
     use serde::Deserialize;
     use serde_json::json;
+    use sha2::{Digest, Sha256};
     use tauri::{AppHandle, Emitter};
 
     const GITHUB_REPO: &str = "shigeosapsycho/multitool";
@@ -53,6 +55,29 @@ mod win {
     const ASSET_NAME: &str = "beu-multitool.exe";
     const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
     const USER_AGENT: &str = "beu-multitool-updater";
+
+    /// Set while `check` is running (and possibly streaming a download). A
+    /// second concurrent `updater_check` refuses to start, and
+    /// `apply_and_restart` refuses to swap binaries, while this is held.
+    static DOWNLOAD_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
+    /// RAII holder for `DOWNLOAD_IN_FLIGHT` so every exit path releases it.
+    struct InFlightGuard;
+
+    impl InFlightGuard {
+        fn try_acquire() -> Option<Self> {
+            DOWNLOAD_IN_FLIGHT
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+                .then_some(InFlightGuard)
+        }
+    }
+
+    impl Drop for InFlightGuard {
+        fn drop(&mut self) {
+            DOWNLOAD_IN_FLIGHT.store(false, Ordering::SeqCst);
+        }
+    }
 
     #[derive(Deserialize)]
     struct ReleaseJson {
@@ -66,12 +91,17 @@ mod win {
         name: String,
         browser_download_url: String,
         size: u64,
+        /// Per-asset checksum the API publishes as `"sha256:<hex>"`. Older
+        /// releases may lack it, so verification falls back to `size`.
+        #[serde(default)]
+        digest: Option<String>,
     }
 
     struct Available {
         latest: String,
         download_url: String,
         size: u64,
+        sha256: Option<[u8; 32]>,
     }
 
     /// Queries GitHub for the latest release. Returns `Some` only when the
@@ -109,7 +139,25 @@ mod win {
             latest,
             download_url: asset.browser_download_url.clone(),
             size: asset.size,
+            sha256: asset.digest.as_deref().and_then(parse_sha256_digest),
         }))
+    }
+
+    /// Parses the API's per-asset `digest` field (`"sha256:<64 hex chars>"`)
+    /// into raw bytes. Returns `None` for other algorithms or malformed hex,
+    /// which the caller treats the same as no digest at all.
+    fn parse_sha256_digest(digest: &str) -> Option<[u8; 32]> {
+        let hex = digest.strip_prefix("sha256:")?.as_bytes();
+        if hex.len() != 64 {
+            return None;
+        }
+        let mut out = [0u8; 32];
+        for (i, pair) in hex.chunks_exact(2).enumerate() {
+            let hi = (pair[0] as char).to_digit(16)?;
+            let lo = (pair[1] as char).to_digit(16)?;
+            out[i] = ((hi << 4) | lo) as u8;
+        }
+        Some(out)
     }
 
     fn staged_path() -> Result<PathBuf> {
@@ -118,12 +166,21 @@ mod win {
         Ok(dir.join(format!("{ASSET_NAME}.new")))
     }
 
-    /// Streams the new exe to `beu-multitool.exe.new` next to the running exe,
-    /// emitting coalesced `updater:progress` events as it goes.
-    fn download(app: &AppHandle, url: &str, expected: u64) -> Result<PathBuf> {
+    /// Streams the new exe to `beu-multitool.exe.new.part` next to the running
+    /// exe, emitting coalesced `updater:progress` events as it goes. The file
+    /// only becomes `.new` (what `apply_and_restart` swaps in) after it
+    /// verifies, so a half-finished download can never be installed.
+    fn download(
+        app: &AppHandle,
+        url: &str,
+        expected: u64,
+        sha256: Option<[u8; 32]>,
+    ) -> Result<PathBuf> {
         let target = staged_path()?;
-        // Wipe any previous half-finished staging so we never resume garbage.
+        let part = target.with_file_name(format!("{ASSET_NAME}.new.part"));
+        // Wipe any previous staging so we never resume garbage.
         let _ = std::fs::remove_file(&target);
+        let _ = std::fs::remove_file(&part);
 
         let agent = ureq::AgentBuilder::new()
             .timeout_connect(Duration::from_secs(8))
@@ -135,14 +192,17 @@ mod win {
             .call()
             .with_context(|| format!("download {url}"))?;
 
+        // For progress display only — integrity is checked against the digest
+        // or the API-reported asset size below, never the response's own length.
         let total: u64 = resp
             .header("Content-Length")
             .and_then(|s| s.parse().ok())
             .unwrap_or(expected);
 
         let mut reader = resp.into_reader();
-        let mut file = std::fs::File::create(&target)
-            .with_context(|| format!("create {}", target.display()))?;
+        let mut file = std::fs::File::create(&part)
+            .with_context(|| format!("create {}", part.display()))?;
+        let mut hasher = Sha256::new();
         let mut buf = vec![0u8; 64 * 1024];
         let mut downloaded: u64 = 0;
         let mut last_emit = std::time::Instant::now();
@@ -152,6 +212,7 @@ mod win {
                 break;
             }
             file.write_all(&buf[..n]).context("write chunk")?;
+            hasher.update(&buf[..n]);
             downloaded += n as u64;
             // Coalesce progress events to ~10/sec so we don't flood the renderer.
             if last_emit.elapsed() >= Duration::from_millis(100) {
@@ -161,19 +222,37 @@ mod win {
         }
         let _ = app.emit("updater:progress", json!({ "downloaded": downloaded, "total": total }));
         file.sync_all().context("fsync")?;
+        drop(file);
 
-        if total > 0 && downloaded != total {
-            let _ = std::fs::remove_file(&target);
+        if let Some(expected_hash) = sha256 {
+            let actual: [u8; 32] = hasher.finalize().into();
+            if actual != expected_hash {
+                let _ = std::fs::remove_file(&part);
+                return Err(anyhow!(
+                    "sha256 mismatch: download does not match the release digest"
+                ));
+            }
+        } else if expected > 0 && downloaded != expected {
+            // No digest published — fall back to the asset size the API reported.
+            let _ = std::fs::remove_file(&part);
             return Err(anyhow!(
-                "short download: got {downloaded} bytes, expected {total}"
+                "short download: got {downloaded} bytes, expected {expected}"
             ));
         }
+
+        std::fs::rename(&part, &target)
+            .with_context(|| format!("rename {} -> {}", part.display(), target.display()))?;
         Ok(target)
     }
 
     /// Swaps the staged `.new` exe into place and relaunches. Windows allows
     /// renaming a running exe, so this is just two renames + spawn + exit.
     pub fn apply_and_restart(app: &AppHandle) -> Result<()> {
+        // Never swap while a download is in flight — any `.new` on disk is
+        // from an older check, and exiting now would kill the stream mid-write.
+        if DOWNLOAD_IN_FLIGHT.load(Ordering::SeqCst) {
+            return Err(anyhow!("an update download is in progress"));
+        }
         // Persist window size/position before exiting so the relaunched .exe
         // restores them. The plugin debounces auto-saves on resize/move, but
         // process::exit below bypasses Tauri's normal shutdown choreography,
@@ -222,11 +301,18 @@ mod win {
             return false;
         };
         let stale_prefix = format!("{ASSET_NAME}.old");
+        let part_name = format!("{ASSET_NAME}.new.part");
         let mut removed = false;
         for entry in entries.flatten() {
             let Some(name) = entry.file_name().to_str().map(str::to_string) else {
                 continue;
             };
+            // A half-finished download from a crashed run is never valid to
+            // keep; sweep it but don't treat it as evidence of an upgrade.
+            if name == part_name {
+                let _ = std::fs::remove_file(entry.path());
+                continue;
+            }
             if !name.starts_with(&stale_prefix) {
                 continue;
             }
@@ -264,6 +350,13 @@ mod win {
     /// preserving the contract the v2.x Electron build used.
     pub async fn check(app: AppHandle) -> Result<UpdaterResult, String> {
         tauri::async_runtime::spawn_blocking(move || {
+            // One check/download at a time — a second check while bytes are
+            // streaming would clobber the staging files mid-write.
+            let Some(_in_flight) = InFlightGuard::try_acquire() else {
+                let msg = "an update check is already in progress".to_string();
+                let _ = app.emit("updater:status", json!({ "type": "error", "message": msg }));
+                return Ok(UpdaterResult { ok: false, error: Some(msg) });
+            };
             let _ = app.emit(
                 "updater:status",
                 json!({ "type": "checking", "currentVersion": CURRENT_VERSION }),
@@ -281,7 +374,7 @@ mod win {
                         "updater:status",
                         json!({ "type": "available", "version": found.latest }),
                     );
-                    match download(&app, &found.download_url, found.size) {
+                    match download(&app, &found.download_url, found.size, found.sha256) {
                         Ok(_) => {
                             let _ = app.emit(
                                 "updater:status",
@@ -315,7 +408,7 @@ mod win {
 
     #[cfg(test)]
     mod tests {
-        use super::is_strictly_newer;
+        use super::{is_strictly_newer, parse_sha256_digest};
 
         #[test]
         fn semver_compare() {
@@ -324,6 +417,30 @@ mod win {
             assert!(!is_strictly_newer("3.0.0", "3.0.0"));
             assert!(!is_strictly_newer("3.0.0", "3.0.1"));
             assert!(is_strictly_newer("4.0.0", "3.99.99"));
+        }
+
+        // sha256 of the empty string — a well-known vector.
+        const EMPTY_HEX: &str =
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+        #[test]
+        fn digest_parse_valid() {
+            let bytes = parse_sha256_digest(&format!("sha256:{EMPTY_HEX}")).expect("parses");
+            assert_eq!(bytes[0], 0xe3);
+            assert_eq!(bytes[1], 0xb0);
+            assert_eq!(bytes[31], 0x55);
+            // Hex case must not matter.
+            let upper = parse_sha256_digest(&format!("sha256:{}", EMPTY_HEX.to_uppercase()));
+            assert_eq!(upper, Some(bytes));
+        }
+
+        #[test]
+        fn digest_parse_rejects_malformed() {
+            // Wrong algorithm, missing prefix, bad length, non-hex characters.
+            assert!(parse_sha256_digest(&format!("sha512:{EMPTY_HEX}")).is_none());
+            assert!(parse_sha256_digest(EMPTY_HEX).is_none());
+            assert!(parse_sha256_digest("sha256:abcd").is_none());
+            assert!(parse_sha256_digest(&format!("sha256:{}", "g".repeat(64))).is_none());
         }
     }
 }

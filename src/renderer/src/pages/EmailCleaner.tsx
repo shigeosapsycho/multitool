@@ -22,7 +22,7 @@ const StopIcon = () => (
 const fieldClass =
   'h-9 rounded-lg border border-border bg-surface px-3 text-[12.5px] text-text-primary outline-none transition focus:border-accent'
 
-export function EmailCleanerPage({ onBack }: Props) {
+export function EmailCleanerPage({ onBack, active }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const [rangeMode, setRangeMode] = useState<'dateRange' | 'lastDays'>('lastDays')
@@ -211,9 +211,10 @@ export function EmailCleanerPage({ onBack }: Props) {
       setEmails((prev) => (prev ? prev.filter((e) => !deletedSet.has(e.uid)) : prev))
       setSelected(new Set())
       const base = `Deleted ${result.deleted.toLocaleString()} emails.`
+      const cause = result.error ? ` — ${result.error}` : ''
       setStatus(
         result.failed.length > 0
-          ? `${base} ${result.failed.length} could not be deleted.`
+          ? `${base} ${result.failed.length} could not be deleted${cause}.`
           : base
       )
     } catch (e) {
@@ -235,6 +236,7 @@ export function EmailCleanerPage({ onBack }: Props) {
       title="Email Cleaner"
       onBack={onBack}
       onRun={canScan ? handleScan : undefined}
+      active={active}
       running={running}
       banner={<span>{status}</span>}
       actions={

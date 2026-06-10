@@ -7,7 +7,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_opener::OpenerExt;
 
@@ -766,13 +766,28 @@ fn test_http_connect(target_url: &url::Url, spec: &ProxySpec) -> (Option<u128>, 
     }
 }
 
-/// Test a SOCKS5 proxy. Delegated to ureq since SOCKS handshake is non-trivial
-/// to roll by hand and ureq's socks support is solid (the bug is HTTP-proxy
-/// specific).
+/// Map a parsed SOCKS scheme to one ureq's proxy parser accepts. ureq rejects
+/// `socks5h` (the remote-DNS spelling) outright, so downgrade it to `socks5`;
+/// everything else — including `socks4a`, which ureq accepts — passes through.
+fn ureq_socks_scheme(scheme: &str) -> &str {
+    if scheme == "socks5h" {
+        "socks5"
+    } else {
+        scheme
+    }
+}
+
+/// Test a SOCKS proxy (4/4a/5/5h). Delegated to ureq since SOCKS handshake is
+/// non-trivial to roll by hand and ureq's socks support is solid (the bug is
+/// HTTP-proxy specific).
 fn test_socks(target_url_str: &str, spec: &ProxySpec) -> (Option<u128>, Option<u16>, Option<String>) {
     use std::time::{Duration, Instant};
 
-    let proxy_url = spec.normalized_url();
+    let proxy_url = ProxySpec {
+        scheme: ureq_socks_scheme(&spec.scheme).to_string(),
+        ..spec.clone()
+    }
+    .normalized_url();
     let proxy = match ureq::Proxy::new(&proxy_url) {
         Ok(p) => p,
         Err(e) => return (None, None, Some(format!("Invalid SOCKS proxy: {e}"))),
@@ -824,7 +839,7 @@ fn test_one(url_str: &str, raw: &str) -> ProxyTestEntry {
     };
 
     let (latency, status, error) = match spec.scheme.as_str() {
-        "socks4" | "socks5" | "socks5h" => test_socks(url_str, &spec),
+        "socks4" | "socks4a" | "socks5" | "socks5h" => test_socks(url_str, &spec),
         _ => test_http_connect(&target_url, &spec),
     };
 
@@ -857,9 +872,11 @@ pub async fn net_test_proxies(
     app: AppHandle,
     args: ProxyTestArgs,
 ) -> Result<Vec<ProxyTestEntry>, String> {
-    use std::sync::atomic::Ordering;
+    use serde_json::json;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use std::thread;
+    use std::time::Duration;
 
     let url = args.url.trim();
     if url.is_empty() {
@@ -877,71 +894,113 @@ pub async fn net_test_proxies(
         return Ok(vec![]);
     }
 
-    let cancel = {
+    // Bump the run generation and capture it. Workers exit once the counter
+    // moves past `my_gen` (a cancel or a newer run), so a run orphaned by a
+    // webview reload can never be revived the way a reset bool could be.
+    let (proxy_gen, my_gen) = {
         let state = app.state::<AppState>();
-        state.proxy_cancel.store(false, Ordering::Release);
-        state.proxy_cancel.clone()
+        let proxy_gen = state.proxy_gen.clone();
+        let my_gen = proxy_gen.fetch_add(1, Ordering::AcqRel) + 1;
+        (proxy_gen, my_gen)
     };
 
     let total = proxies.len();
     let concurrency = args.concurrency.unwrap_or(10).clamp(1, 64).min(total);
     let raw_lookup: Vec<String> = proxies.clone();
 
-    let queue: Vec<(usize, String)> = proxies.into_iter().enumerate().rev().collect();
-    let queue = Arc::new(Mutex::new(queue));
-    let results: Arc<Mutex<Vec<Option<ProxyTestEntry>>>> =
-        Arc::new(Mutex::new(vec![None; total]));
+    // The spawn-and-join below blocks for the whole multi-minute run, so keep
+    // it off the async runtime (same pattern as imap_cleaner.rs /
+    // email_unsubscribe.rs).
+    tauri::async_runtime::spawn_blocking(move || {
+        let queue: Vec<(usize, String)> = proxies.into_iter().enumerate().rev().collect();
+        let queue = Arc::new(Mutex::new(queue));
+        let results: Arc<Mutex<Vec<Option<ProxyTestEntry>>>> =
+            Arc::new(Mutex::new(vec![None; total]));
+        let done = Arc::new(AtomicUsize::new(0));
+        let ok = Arc::new(AtomicUsize::new(0));
 
-    let handles: Vec<_> = (0..concurrency)
-        .map(|_| {
-            let q = queue.clone();
-            let r = results.clone();
-            let url = url.clone();
-            let cancel = cancel.clone();
-            thread::spawn(move || loop {
-                if cancel.load(Ordering::Acquire) {
-                    return;
-                }
-                let next = { q.lock().unwrap().pop() };
-                let Some((idx, raw)) = next else { return };
-                if cancel.load(Ordering::Acquire) {
-                    return;
-                }
-                let entry = test_one(&url, &raw);
-                r.lock().unwrap()[idx] = Some(entry);
+        let handles: Vec<_> = (0..concurrency)
+            .map(|_| {
+                let q = queue.clone();
+                let r = results.clone();
+                let url = url.clone();
+                let proxy_gen = proxy_gen.clone();
+                let done = done.clone();
+                let ok = ok.clone();
+                thread::spawn(move || loop {
+                    if proxy_gen.load(Ordering::Acquire) != my_gen {
+                        return;
+                    }
+                    let next = { q.lock().unwrap().pop() };
+                    let Some((idx, raw)) = next else { return };
+                    if proxy_gen.load(Ordering::Acquire) != my_gen {
+                        return;
+                    }
+                    let entry = test_one(&url, &raw);
+                    if entry.error.is_none() {
+                        ok.fetch_add(1, Ordering::AcqRel);
+                    }
+                    done.fetch_add(1, Ordering::AcqRel);
+                    r.lock().unwrap()[idx] = Some(entry);
+                })
             })
-        })
-        .collect();
+            .collect();
 
-    for h in handles {
-        let _ = h.join();
-    }
+        // Coalesce progress events to ~10/sec so we don't flood the renderer.
+        // Skip the emit once a cancel or a newer run bumps the generation, so a
+        // superseded run can't keep emitting stale done/total while in-flight
+        // workers drain.
+        let emit_progress = || {
+            if proxy_gen.load(Ordering::Acquire) != my_gen {
+                return;
+            }
+            let _ = app.emit(
+                "proxy:progress",
+                json!({
+                    "done": done.load(Ordering::Acquire),
+                    "total": total,
+                    "ok": ok.load(Ordering::Acquire),
+                }),
+            );
+        };
+        while handles.iter().any(|h| !h.is_finished()) {
+            thread::sleep(Duration::from_millis(100));
+            emit_progress();
+        }
+        for h in handles {
+            let _ = h.join();
+        }
+        emit_progress();
 
-    let arr = Arc::try_unwrap(results)
-        .map_err(|_| "result lock leak".to_string())?
-        .into_inner()
-        .map_err(|e| e.to_string())?;
-    let out: Vec<ProxyTestEntry> = arr
-        .into_iter()
-        .enumerate()
-        .map(|(idx, slot)| {
-            slot.unwrap_or_else(|| ProxyTestEntry {
-                raw: raw_lookup.get(idx).cloned().unwrap_or_default(),
-                normalized: None,
-                latency_ms: None,
-                status: None,
-                error: Some("Canceled".into()),
+        let arr = Arc::try_unwrap(results)
+            .map_err(|_| "result lock leak".to_string())?
+            .into_inner()
+            .map_err(|e| e.to_string())?;
+        let out: Vec<ProxyTestEntry> = arr
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                slot.unwrap_or_else(|| ProxyTestEntry {
+                    raw: raw_lookup.get(idx).cloned().unwrap_or_default(),
+                    normalized: None,
+                    latency_ms: None,
+                    status: None,
+                    error: Some("Canceled".into()),
+                })
             })
-        })
-        .collect();
-    Ok(out)
+            .collect();
+        Ok(out)
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
 pub fn net_cancel_proxies(app: AppHandle) {
     use std::sync::atomic::Ordering;
     let state = app.state::<AppState>();
-    state.proxy_cancel.store(true, Ordering::Release);
+    // Bumping the generation past every captured `my_gen` stops all workers.
+    state.proxy_gen.fetch_add(1, Ordering::AcqRel);
 }
 
 // ---------- Windows APPCOMMAND hook (Mouse4/Mouse5) ----------
@@ -955,7 +1014,7 @@ pub fn install_app_command_hook<R: Runtime>(_window: &tauri::WebviewWindow<R>, _
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_target_url;
+    use super::{normalize_target_url, ureq_socks_scheme};
 
     #[test]
     fn bare_host_gets_https() {
@@ -986,5 +1045,17 @@ mod tests {
             normalize_target_url("google.com/?next=https://x"),
             "https://google.com/?next=https://x"
         );
+    }
+
+    #[test]
+    fn socks5h_downgraded_to_socks5_for_ureq() {
+        assert_eq!(ureq_socks_scheme("socks5h"), "socks5");
+    }
+
+    #[test]
+    fn other_socks_schemes_pass_through() {
+        assert_eq!(ureq_socks_scheme("socks4"), "socks4");
+        assert_eq!(ureq_socks_scheme("socks4a"), "socks4a");
+        assert_eq!(ureq_socks_scheme("socks5"), "socks5");
     }
 }

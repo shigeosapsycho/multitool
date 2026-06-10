@@ -46,6 +46,10 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
   const [savedTo, setSavedTo] = useState<string | null>(null)
   const [lineCount, setLineCount] = useState(0)
   const panelRef = useRef<FilePanelHandle>(null)
+  const unsubProgressRef = useRef<(() => void) | null>(null)
+
+  // Drop any live progress subscription if the page unmounts mid-run.
+  useEffect(() => () => unsubProgressRef.current?.(), [])
 
   async function loadFromPath(path: string) {
     const text = await window.api.files.read(path)
@@ -99,6 +103,9 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
     setResults(null)
     setSavedTo(null)
     onSetStatus(`Testing ${proxies.length.toLocaleString()} proxies against ${targetUrl}...`)
+    unsubProgressRef.current = window.api.net.onProxyProgress(({ done, total, ok }) => {
+      onSetStatus(`Testing… ${done.toLocaleString()}/${total.toLocaleString()} — ${ok.toLocaleString()} working`)
+    })
     const start = Date.now()
     try {
       const res = await window.api.net.testProxies({ url: targetUrl, proxies, concurrency: 10 })
@@ -114,6 +121,10 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
       const message = e instanceof Error ? e.message : String(e)
       onSetStatus(`Failed: ${message}`)
     } finally {
+      // Unsubscribe before yielding so a trailing progress event can't
+      // overwrite the final status message.
+      unsubProgressRef.current?.()
+      unsubProgressRef.current = null
       const elapsed = Date.now() - start
       const min = 300
       if (elapsed < min) await new Promise((r) => setTimeout(r, min - elapsed))
@@ -125,6 +136,11 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
   async function handleStop() {
     if (!running || stopping) return
     setStopping(true)
+    // Unsubscribe immediately so progress events emitted while in-flight
+    // workers drain can't overwrite the Stopping status. handleRun's finally
+    // null-checks before unsubscribing, so this is safe to run first.
+    unsubProgressRef.current?.()
+    unsubProgressRef.current = null
     onSetStatus('Stopping... (in-flight requests will finish)')
     try {
       await window.api.net.cancelProxies()
@@ -167,6 +183,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
       title="Proxy Tester"
       onBack={onBack}
       onRun={canRun ? handleRun : undefined}
+      active={active}
       running={running}
       banner={
         results ? (

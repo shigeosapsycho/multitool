@@ -308,14 +308,20 @@ type ToolLayoutProps = {
   toolbar?: ReactNode
   onBack: () => void
   onRun?: () => void
+  /**
+   * Whether this tool is the visible one. App keeps visited tools mounted
+   * behind display:none, so the Ctrl+Enter shortcut must only bind on the
+   * active tool — otherwise one keypress runs every hidden tool too.
+   */
+  active?: boolean
   running?: boolean
   actions: ReactNode
   children: ReactNode
 }
 
-export function ToolLayout({ title, hint, banner, toolbar, onBack, onRun, running, actions, children }: ToolLayoutProps) {
+export function ToolLayout({ title, hint, banner, toolbar, onBack, onRun, active = true, running, actions, children }: ToolLayoutProps) {
   useEffect(() => {
-    if (!onRun) return
+    if (!onRun || !active) return
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
@@ -324,7 +330,7 @@ export function ToolLayout({ title, hint, banner, toolbar, onBack, onRun, runnin
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [onRun])
+  }, [onRun, active])
 
   return (
     <div className="flex h-full min-h-0 flex-col">

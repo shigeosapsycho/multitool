@@ -68,16 +68,10 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
     setForm({ ...CLOSED_FORM, mode: 'add' })
   }
 
-  async function openEdit() {
+  function openEdit() {
     const acc = accounts.find((a) => a.id === selectedId)
     if (!acc) return
     setTestStatus(null)
-    let password = ''
-    try {
-      password = await window.api.imap.loadPassword(acc.id)
-    } catch {
-      // Missing/locked credential: leave blank and let the user re-enter.
-    }
     setForm({
       mode: 'edit',
       id: acc.id,
@@ -85,7 +79,9 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
       host: acc.host,
       port: String(acc.port),
       username: acc.username,
-      password
+      // The stored password never leaves the credential store; leaving this
+      // blank keeps it as-is on save.
+      password: ''
     })
   }
 
@@ -105,10 +101,21 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
     }
   }
 
+  // When editing, an empty password means "keep the stored one" — but the
+  // backend refuses that when the host or username changed (the stored
+  // credential would be sent to a different server), so require a password
+  // again in that case. A port-only change keeps the stored password.
+  const editingAccount =
+    form.mode === 'edit' ? (accounts.find((a) => a.id === form.id) ?? null) : null
+  const canKeepStoredPassword =
+    editingAccount != null &&
+    form.host.trim() === editingAccount.host &&
+    form.username.trim() === editingAccount.username
+
   const formValid =
     form.host.trim().length > 0 &&
     form.username.trim().length > 0 &&
-    form.password.length > 0 &&
+    (form.password.length > 0 || canKeepStoredPassword) &&
     Number(form.port) > 0
 
   async function saveAccount() {
@@ -238,7 +245,9 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
           <input
             className={fieldClass}
             type="text"
-            placeholder="Password"
+            placeholder={
+              form.mode === 'edit' ? 'leave blank to keep current password' : 'Password'
+            }
             value={form.password}
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             spellCheck={false}
