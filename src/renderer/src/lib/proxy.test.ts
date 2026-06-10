@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { providerOf, detectProviders, filterProxies, type ProxyFilters } from './proxy'
+import {
+  providerOf,
+  detectProviders,
+  detectIspUsers,
+  filterProxies,
+  ispUserStemOf,
+  parseProxyLine,
+  type ProxyFilters
+} from './proxy'
 
 const BOTH: ProxyFilters = { residential: true, isp: true }
 
@@ -46,6 +54,102 @@ describe('detectProviders', () => {
       { provider: 'alpha.com', count: 1 },
       { provider: 'bravo.com', count: 1 }
     ])
+  })
+})
+
+describe('parseProxyLine username extraction', () => {
+  it('host:port:user:pass', () => {
+    expect(parseProxyLine('1.2.3.4:8080:alice:secret').user).toBe('alice')
+  })
+  it('user:pass@host:port', () => {
+    expect(parseProxyLine('alice:secret@1.2.3.4:8080').user).toBe('alice')
+  })
+  it('user:pass:host:port', () => {
+    expect(parseProxyLine('alice:secret:1.2.3.4:8080').user).toBe('alice')
+  })
+  it('host:port has no user', () => {
+    expect(parseProxyLine('1.2.3.4:8080').user).toBeNull()
+  })
+})
+
+describe('ispUserStemOf', () => {
+  it('strips the numeric tail from a batch username', () => {
+    expect(ispUserStemOf('xyz377')).toBe('xyz')
+    expect(ispUserStemOf('xyz6028')).toBe('xyz')
+    expect(ispUserStemOf('cust-8821')).toBe('cust')
+    expect(ispUserStemOf('user_2')).toBe('user')
+    expect(ispUserStemOf('alpinewekkprk6')).toBe('alpinewekkprk')
+  })
+  it('keeps a username with no numeric tail intact', () => {
+    expect(ispUserStemOf('proxies')).toBe('proxies')
+  })
+  it('keeps an all-numeric username whole instead of collapsing to empty', () => {
+    expect(ispUserStemOf('12345')).toBe('12345')
+  })
+  it('lowercases and handles null/blank', () => {
+    expect(ispUserStemOf('XYZ377')).toBe('xyz')
+    expect(ispUserStemOf(null)).toBeNull()
+    expect(ispUserStemOf('  ')).toBeNull()
+  })
+})
+
+describe('detectIspUsers', () => {
+  const list = [
+    '147.68.215.226:3128:xyz377:9xhnno828c02m0bx',
+    '147.68.142.34:3128:xyz6028:7vuxtmgg6vxlqkvh',
+    '151.246.69.173:3128:xyz1970:fsvsztoqru8v1e3u',
+    '147.68.215.200:3128:xyz5835:f34v3dpu64oobt8x',
+    '147.68.142.46:3128:xyz6028:7vuxtmgg6vxlqkvh',
+    '64.205.47.232:3120:alpinewekkprk6:proxies',
+    '64.205.47.216:3120:alpinewekkprk6:proxies',
+    '151.246.69.247:3128:xyz6380:7urzmpp2pxgbh5r7',
+    '151.246.69.73:3128:xyz8358:oj2qhrpkt9ymdh7t',
+    '151.246.69.245:3128:xyz6380:7urzmpp2pxgbh5r7'
+  ].join('\n')
+
+  it('groups ISP usernames by stem', () => {
+    expect(detectIspUsers(list)).toEqual([
+      { user: 'xyz', count: 8 },
+      { user: 'alpinewekkprk', count: 2 }
+    ])
+  })
+  it('ignores residential lines, lines without a user, comments, and blanks', () => {
+    const mixed = [
+      'gate.smartproxy.com:8080:resuser:p',
+      '1.2.3.4:8080',
+      '# comment',
+      '',
+      '5.6.7.8:9000:abc12:pw'
+    ].join('\n')
+    expect(detectIspUsers(mixed)).toEqual([{ user: 'abc', count: 1 }])
+  })
+})
+
+describe('filterProxies with removed ISP users', () => {
+  const list = [
+    '147.68.215.226:3128:xyz377:9xhnno828c02m0bx',
+    '64.205.47.232:3120:alpinewekkprk6:proxies',
+    '9.9.9.9:1080',
+    'gate.smartproxy.com:8080:xyz999:p'
+  ].join('\n')
+
+  it('drops only ISP lines whose username stem is removed', () => {
+    expect(filterProxies(list, BOTH, undefined, new Set(['xyz']))).toEqual([
+      '64.205.47.232:3120:alpinewekkprk6:proxies',
+      '9.9.9.9:1080',
+      // Residential line shares the stem but is not an ISP line — kept.
+      'gate.smartproxy.com:8080:xyz999:p'
+    ])
+  })
+  it('keeps ISP lines without a username when stems are removed', () => {
+    expect(filterProxies('9.9.9.9:1080', BOTH, undefined, new Set(['xyz']))).toEqual([
+      '9.9.9.9:1080'
+    ])
+  })
+  it('composes with removed providers', () => {
+    expect(
+      filterProxies(list, BOTH, new Set(['smartproxy.com']), new Set(['alpinewekkprk']))
+    ).toEqual(['147.68.215.226:3128:xyz377:9xhnno828c02m0bx', '9.9.9.9:1080'])
   })
 })
 

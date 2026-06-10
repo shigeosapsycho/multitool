@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { SingleFileTool } from './SingleFileTool'
 import { Button } from '../components/ToolShell'
-import { filterProxies, detectProviders, type ProxyFilters } from '../lib/proxy'
+import { filterProxies, detectProviders, detectIspUsers, type ProxyFilters } from '../lib/proxy'
 import { setPendingProxies } from '../lib/pending'
 import type { Route } from '../types'
 
@@ -56,14 +56,25 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
   const [filters, setFilters] = useState<ProxyFilters>({ residential: true, isp: true })
   const [content, setContent] = useState('')
   const [removed, setRemoved] = useState<Set<string>>(() => new Set())
+  const [removedUsers, setRemovedUsers] = useState<Set<string>>(() => new Set())
 
   const providers = useMemo(() => detectProviders(content), [content])
+  const ispUsers = useMemo(() => detectIspUsers(content), [content])
 
   function toggleProvider(provider: string) {
     setRemoved((prev) => {
       const next = new Set(prev)
       if (next.has(provider)) next.delete(provider)
       else next.add(provider)
+      return next
+    })
+  }
+
+  function toggleIspUser(user: string) {
+    setRemovedUsers((prev) => {
+      const next = new Set(prev)
+      if (next.has(user)) next.delete(user)
+      else next.add(user)
       return next
     })
   }
@@ -98,20 +109,34 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
           ))}
         </div>
       )}
+      {ispUsers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="pr-1 text-[12px] text-text-muted">ISP users:</span>
+          {ispUsers.map(({ user, count }) => (
+            <FilterChip
+              key={user}
+              active={!removedUsers.has(user)}
+              onToggle={() => toggleIspUser(user)}
+            >
+              {user} · {count.toLocaleString()}
+            </FilterChip>
+          ))}
+        </div>
+      )}
     </div>
   )
 
   return (
     <SingleFileTool
       title="Proxy Cleaner"
-      hint="Keep only Residential and/or ISP proxies. Remove specific providers with the chips in the header."
+      hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header."
       taskName="filtered-proxies"
       inputLabel="Proxy List"
       resultLabel="Filtered Proxies"
       resultUnit="proxies"
       emptyResultMessage="No proxies matched the selected filters."
       runLabel="Filter Proxies"
-      transform={(text) => filterProxies(text, filters, removed)}
+      transform={(text) => filterProxies(text, filters, removed, removedUsers)}
       pickerTitle="Select a proxy list"
       toolbar={toolbar}
       onContentChange={setContent}
