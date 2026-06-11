@@ -177,22 +177,27 @@ export function detectProviders(text: string): { provider: string; count: number
  * Keep only the proxy lines matching the selected filters. A line is kept when
  * it matches ANY checked type filter (residential OR isp), its provider is not
  * in `removed`, and — for ISP lines — its username stem is not in
- * `removedUsers`. Original line text and order are preserved; no deduplication.
+ * `removedUsers`. When `residentialLimit` is a number, at most that many
+ * residential lines are kept (the first N that survive the other filters);
+ * ISP lines are never counted against it. Original line text and order are
+ * preserved; no deduplication.
  */
 export function filterProxies(
   text: string,
   filters: ProxyFilters,
   removed?: Set<string>,
-  removedUsers?: Set<string>
+  removedUsers?: Set<string>,
+  residentialLimit?: number | null
 ): string[] {
   const out: string[] = []
+  let residentialKept = 0
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
     const { host, port, user } = parseProxyLine(line)
     const isIsp = isIspProxy(host, port)
-    const typeMatch =
-      (filters.residential && isResidentialHost(host)) || (filters.isp && isIsp)
+    const isResidential = isResidentialHost(host)
+    const typeMatch = (filters.residential && isResidential) || (filters.isp && isIsp)
     if (!typeMatch) continue
     if (removed && removed.size > 0) {
       // null provider (raw IP, etc.) means there's nothing to match against — keep the line.
@@ -203,6 +208,10 @@ export function filterProxies(
       // null stem (no username on the line) means nothing to match — keep the line.
       const stem = ispUserStemOf(user)
       if (stem && removedUsers.has(stem)) continue
+    }
+    if (isResidential && residentialLimit != null) {
+      if (residentialKept >= residentialLimit) continue
+      residentialKept++
     }
     out.push(line)
   }

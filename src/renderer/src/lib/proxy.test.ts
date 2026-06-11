@@ -153,6 +153,54 @@ describe('filterProxies with removed ISP users', () => {
   })
 })
 
+describe('filterProxies with a residential limit', () => {
+  const list = [
+    'b2b-s10.liveproxies.io:7383:u:p',
+    '147.68.215.226:3128:xyz377:pw',
+    'mix.nexaproxies.com:8888:u:p',
+    'gate.smartproxy.com:8080:u:p',
+    '9.9.9.9:1080'
+  ].join('\n')
+
+  it('keeps only the first N residential lines, ISP lines unaffected', () => {
+    expect(filterProxies(list, BOTH, undefined, undefined, 2)).toEqual([
+      'b2b-s10.liveproxies.io:7383:u:p',
+      '147.68.215.226:3128:xyz377:pw',
+      'mix.nexaproxies.com:8888:u:p',
+      '9.9.9.9:1080'
+    ])
+  })
+  it('keeps everything when the limit exceeds the residential count', () => {
+    expect(filterProxies(list, BOTH, undefined, undefined, 99)).toEqual([
+      'b2b-s10.liveproxies.io:7383:u:p',
+      '147.68.215.226:3128:xyz377:pw',
+      'mix.nexaproxies.com:8888:u:p',
+      'gate.smartproxy.com:8080:u:p',
+      '9.9.9.9:1080'
+    ])
+  })
+  it('applies no limit when null or undefined', () => {
+    expect(filterProxies(list, BOTH, undefined, undefined, null)).toEqual(
+      filterProxies(list, BOTH)
+    )
+  })
+  it('counts only residential lines that survive the other filters', () => {
+    // liveproxies.io removed — the cap of 1 should be spent on the next
+    // surviving residential line, not consumed by the dropped one.
+    expect(filterProxies(list, BOTH, new Set(['liveproxies.io']), undefined, 1)).toEqual([
+      '147.68.215.226:3128:xyz377:pw',
+      'mix.nexaproxies.com:8888:u:p',
+      '9.9.9.9:1080'
+    ])
+  })
+  it('a limit of 0 drops all residential lines', () => {
+    expect(filterProxies(list, BOTH, undefined, undefined, 0)).toEqual([
+      '147.68.215.226:3128:xyz377:pw',
+      '9.9.9.9:1080'
+    ])
+  })
+})
+
 describe('filterProxies with removed providers', () => {
   const list = ['b2b-s10.liveproxies.io:7383:u:p', 'mix.nexaproxies.com:8888:u:p'].join('\n')
 
