@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { SingleFileTool } from './SingleFileTool'
 import { Button } from '../components/ToolShell'
 import { filterProxies, detectProviders, detectIspUsers, type ProxyFilters } from '../lib/proxy'
@@ -29,15 +30,21 @@ const SendIcon = () => (
 function FilterChip({
   active,
   onToggle,
+  onContextMenu,
+  title,
   children
 }: {
   active: boolean
   onToggle: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
+  title?: string
   children: React.ReactNode
 }) {
   return (
     <button
       onClick={onToggle}
+      onContextMenu={onContextMenu}
+      title={title}
       className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[12.5px] font-medium transition ${
         active ? 'bg-accent-soft text-accent' : 'text-text-secondary hover:text-text-primary'
       }`}
@@ -52,11 +59,155 @@ function FilterChip({
   )
 }
 
+/**
+ * Right-click popover for capping how many residential proxies are kept.
+ * Positioning/dismiss behavior mirrors components/ContextMenu.tsx, but the
+ * body is a number input + actions instead of a menu-item list.
+ */
+function LimitPopover({
+  x,
+  y,
+  limit,
+  onApply,
+  onClear,
+  onClose
+}: {
+  x: number
+  y: number
+  limit: number | null
+  onApply: (n: number) => void
+  onClear: () => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [position, setPosition] = useState({ left: x, top: y })
+  const [value, setValue] = useState(limit != null ? String(limit) : '')
+
+  // Adjust if the popover would overflow the right or bottom of the viewport.
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    let left = x
+    let top = y
+    if (left + rect.width > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - rect.width - 8)
+    }
+    if (top + rect.height > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - rect.height - 8)
+    }
+    setPosition({ left, top })
+  }, [x, y])
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  // Dismiss on outside interaction. Defer attaching listeners so that the
+  // very click that *opened* the popover doesn't immediately close it.
+  useEffect(() => {
+    const close = (e: Event) => {
+      if (ref.current && e.target instanceof Node && ref.current.contains(e.target)) return
+      onClose()
+    }
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Consume the key so App's Escape-to-Tools handler doesn't also fire.
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    const id = window.setTimeout(() => {
+      document.addEventListener('mousedown', close)
+      document.addEventListener('contextmenu', close)
+      document.addEventListener('scroll', close, true)
+      document.addEventListener('keydown', keyHandler)
+    }, 0)
+    return () => {
+      window.clearTimeout(id)
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('contextmenu', close)
+      document.removeEventListener('scroll', close, true)
+      document.removeEventListener('keydown', keyHandler)
+    }
+  }, [onClose])
+
+  // Number() (not parseInt) so '2e3' reads as 2000, and '2.5' is rejected
+  // outright instead of silently truncating.
+  const parsed = Number(value)
+  const valid = Number.isInteger(parsed) && parsed >= 1
+
+  function apply() {
+    if (!valid) return
+    onApply(parsed)
+    onClose()
+  }
+
+  return createPortal(
+    <div
+      ref={ref}
+      // dialog + aria-modal is the contract App.tsx's Escape-to-Tools handler
+      // yields to (same as ConfirmDialog).
+      role="dialog"
+      aria-modal="true"
+      className="fixed z-[1000] w-[210px] rounded-lg border border-border bg-surface p-3 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+      style={{ left: position.left, top: position.top }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+    >
+      <div className="pb-2 text-[12px] font-medium text-text-secondary">
+        Max residential proxies
+      </div>
+      <input
+        ref={inputRef}
+        type="number"
+        min={1}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') apply()
+        }}
+        placeholder="e.g. 500"
+        className="h-8 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text-primary outline-none focus:border-accent"
+      />
+      <div className="flex items-center justify-end gap-1.5 pt-2.5">
+        {limit != null && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              onClear()
+              onClose()
+            }}
+          >
+            Clear
+          </Button>
+        )}
+        <Button variant="primary" disabled={!valid} onClick={apply}>
+          Filter
+        </Button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Props) {
   const [filters, setFilters] = useState<ProxyFilters>({ residential: true, isp: true })
   const [content, setContent] = useState('')
   const [removed, setRemoved] = useState<Set<string>>(() => new Set())
   const [removedUsers, setRemovedUsers] = useState<Set<string>>(() => new Set())
+  const [residentialLimit, setResidentialLimit] = useState<number | null>(null)
+  const [limitPopover, setLimitPopover] = useState<{ x: number; y: number } | null>(null)
+
+  // Pages stay mounted (display:none) while the popover portals to body —
+  // close it when the page deactivates (back/forward nav, IPC nav) so it
+  // can't float orphaned over another page.
+  useEffect(() => {
+    if (!active) setLimitPopover(null)
+  }, [active])
 
   const providers = useMemo(() => detectProviders(content), [content])
   const ispUsers = useMemo(() => detectIspUsers(content), [content])
@@ -85,8 +236,14 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
         <FilterChip
           active={filters.residential}
           onToggle={() => setFilters((f) => ({ ...f, residential: !f.residential }))}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setLimitPopover({ x: e.clientX, y: e.clientY })
+          }}
+          title="Right-click to limit how many residential proxies are kept"
         >
           Residential
+          {residentialLimit != null && ` · max ${residentialLimit.toLocaleString()}`}
         </FilterChip>
         <FilterChip
           active={filters.isp}
@@ -127,34 +284,46 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
   )
 
   return (
-    <SingleFileTool
-      title="Proxy Cleaner"
-      hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header."
-      taskName="filtered-proxies"
-      inputLabel="Proxy List"
-      resultLabel="Filtered Proxies"
-      resultUnit="proxies"
-      emptyResultMessage="No proxies matched the selected filters."
-      runLabel="Filter Proxies"
-      transform={(text) => filterProxies(text, filters, removed, removedUsers)}
-      pickerTitle="Select a proxy list"
-      toolbar={toolbar}
-      onContentChange={setContent}
-      resultActions={(results) => (
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setPendingProxies(results.join('\n') + '\n')
-            onNavigate('proxy-tester')
-          }}
-        >
-          <SendIcon />
-          Send to Proxy Tester
-        </Button>
+    <>
+      <SingleFileTool
+        title="Proxy Cleaner"
+        hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header. Right-click Residential to cap how many are kept."
+        taskName="filtered-proxies"
+        inputLabel="Proxy List"
+        resultLabel="Filtered Proxies"
+        resultUnit="proxies"
+        emptyResultMessage="No proxies matched the selected filters."
+        runLabel="Filter Proxies"
+        transform={(text) => filterProxies(text, filters, removed, removedUsers, residentialLimit)}
+        pickerTitle="Select a proxy list"
+        toolbar={toolbar}
+        onContentChange={setContent}
+        resultActions={(results) => (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setPendingProxies(results.join('\n') + '\n')
+              onNavigate('proxy-tester')
+            }}
+          >
+            <SendIcon />
+            Send to Proxy Tester
+          </Button>
+        )}
+        active={active}
+        onBack={onBack}
+        onSetStatus={onSetStatus}
+      />
+      {limitPopover && (
+        <LimitPopover
+          x={limitPopover.x}
+          y={limitPopover.y}
+          limit={residentialLimit}
+          onApply={setResidentialLimit}
+          onClear={() => setResidentialLimit(null)}
+          onClose={() => setLimitPopover(null)}
+        />
       )}
-      active={active}
-      onBack={onBack}
-      onSetStatus={onSetStatus}
-    />
+    </>
   )
 }
