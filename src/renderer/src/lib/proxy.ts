@@ -177,31 +177,31 @@ export function detectProviders(text: string): { provider: string; count: number
  * Keep only the proxy lines matching the selected filters. A line is kept when
  * it matches ANY checked type filter (residential OR isp), its provider is not
  * in `removed`, and — for ISP lines — its username stem is not in
- * `removedUsers`. When `residentialLimit` is a number, at most that many
- * residential lines are kept (the first N that survive the other filters);
- * ISP lines are never counted against it. Original line text and order are
- * preserved; no deduplication.
+ * `removedUsers`. `providerLimits` caps providers independently: a provider
+ * mapped to N keeps only its first N surviving lines; unmapped providers are
+ * uncapped, and lines with no provider name (raw IPs) are never counted.
+ * Original line text and order are preserved; no deduplication.
  */
 export function filterProxies(
   text: string,
   filters: ProxyFilters,
   removed?: Set<string>,
   removedUsers?: Set<string>,
-  residentialLimit?: number | null
+  providerLimits?: Map<string, number> | null
 ): string[] {
   const out: string[] = []
-  let residentialKept = 0
+  const keptPerProvider = new Map<string, number>()
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
     const { host, port, user } = parseProxyLine(line)
     const isIsp = isIspProxy(host, port)
-    const isResidential = isResidentialHost(host)
-    const typeMatch = (filters.residential && isResidential) || (filters.isp && isIsp)
+    const typeMatch =
+      (filters.residential && isResidentialHost(host)) || (filters.isp && isIsp)
     if (!typeMatch) continue
+    const provider = providerOf(host)
     if (removed && removed.size > 0) {
       // null provider (raw IP, etc.) means there's nothing to match against — keep the line.
-      const provider = providerOf(host)
       if (provider && removed.has(provider)) continue
     }
     if (isIsp && removedUsers && removedUsers.size > 0) {
@@ -209,9 +209,13 @@ export function filterProxies(
       const stem = ispUserStemOf(user)
       if (stem && removedUsers.has(stem)) continue
     }
-    if (isResidential && residentialLimit != null) {
-      if (residentialKept >= residentialLimit) continue
-      residentialKept++
+    if (provider && providerLimits && providerLimits.size > 0) {
+      const limit = providerLimits.get(provider)
+      if (limit != null) {
+        const kept = keptPerProvider.get(provider) ?? 0
+        if (kept >= limit) continue
+        keptPerProvider.set(provider, kept + 1)
+      }
     }
     out.push(line)
   }

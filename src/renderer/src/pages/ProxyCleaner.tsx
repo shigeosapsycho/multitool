@@ -60,29 +60,36 @@ function FilterChip({
 }
 
 /**
- * Right-click popover for capping how many residential proxies are kept.
- * Positioning/dismiss behavior mirrors components/ContextMenu.tsx, but the
- * body is a number input + actions instead of a menu-item list.
+ * Right-click popover for capping how many proxies each provider keeps.
+ * One number input per detected provider; blank means uncapped. Positioning
+ * and dismiss behavior mirror components/ContextMenu.tsx.
  */
-function LimitPopover({
+function ProviderLimitsPopover({
   x,
   y,
-  limit,
+  providers,
+  limits,
   onApply,
-  onClear,
   onClose
 }: {
   x: number
   y: number
-  limit: number | null
-  onApply: (n: number) => void
-  onClear: () => void
+  providers: { provider: string; count: number }[]
+  limits: Map<string, number>
+  onApply: (limits: Map<string, number>) => void
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [position, setPosition] = useState({ left: x, top: y })
-  const [value, setValue] = useState(limit != null ? String(limit) : '')
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {}
+    for (const { provider } of providers) {
+      const limit = limits.get(provider)
+      init[provider] = limit != null ? String(limit) : ''
+    }
+    return init
+  })
 
   // Adjust if the popover would overflow the right or bottom of the viewport.
   useLayoutEffect(() => {
@@ -134,13 +141,21 @@ function LimitPopover({
   }, [onClose])
 
   // Number() (not parseInt) so '2e3' reads as 2000, and '2.5' is rejected
-  // outright instead of silently truncating.
-  const parsed = Number(value)
-  const valid = Number.isInteger(parsed) && parsed >= 1
+  // outright instead of silently truncating. Blank means "no cap".
+  const parsedOf = (v: string): number | null => {
+    const n = Number(v)
+    return Number.isInteger(n) && n >= 1 ? n : null
+  }
+  const allValid = Object.values(values).every((v) => v.trim() === '' || parsedOf(v) != null)
 
   function apply() {
-    if (!valid) return
-    onApply(parsed)
+    if (!allValid) return
+    const next = new Map<string, number>()
+    for (const [provider, v] of Object.entries(values)) {
+      const n = parsedOf(v)
+      if (v.trim() !== '' && n != null) next.set(provider, n)
+    }
+    onApply(next)
     onClose()
   }
 
@@ -151,7 +166,7 @@ function LimitPopover({
       // yields to (same as ConfirmDialog).
       role="dialog"
       aria-modal="true"
-      className="fixed z-[1000] w-[210px] rounded-lg border border-border bg-surface p-3 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+      className="fixed z-[1000] w-[270px] rounded-lg border border-border bg-surface p-3 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
       style={{ left: position.left, top: position.top }}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -159,35 +174,55 @@ function LimitPopover({
       }}
     >
       <div className="pb-2 text-[12px] font-medium text-text-secondary">
-        Max residential proxies
+        Max proxies per provider
       </div>
-      <input
-        ref={inputRef}
-        type="number"
-        min={1}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') apply()
-        }}
-        placeholder="e.g. 500"
-        className="h-8 w-full rounded-md border border-border bg-bg px-2 text-[13px] text-text-primary outline-none focus:border-accent"
-      />
+      {providers.length === 0 ? (
+        <div className="pb-1 text-[12px] text-text-muted">
+          No providers detected — load a proxy list first.
+        </div>
+      ) : (
+        <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
+          {providers.map(({ provider, count }, i) => (
+            <label key={provider} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-text-primary">
+                {provider}
+                <span className="pl-1 text-[11px] text-text-muted">· {count.toLocaleString()}</span>
+              </span>
+              <input
+                ref={i === 0 ? inputRef : undefined}
+                type="number"
+                min={1}
+                value={values[provider] ?? ''}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, [provider]: e.target.value }))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') apply()
+                }}
+                placeholder="all"
+                className="h-7 w-16 shrink-0 rounded-md border border-border bg-bg px-2 text-[12.5px] text-text-primary outline-none focus:border-accent"
+              />
+            </label>
+          ))}
+        </div>
+      )}
       <div className="flex items-center justify-end gap-1.5 pt-2.5">
-        {limit != null && (
+        {limits.size > 0 && (
           <Button
             variant="ghost"
             onClick={() => {
-              onClear()
+              onApply(new Map())
               onClose()
             }}
           >
             Clear
           </Button>
         )}
-        <Button variant="primary" disabled={!valid} onClick={apply}>
-          Filter
-        </Button>
+        {providers.length > 0 && (
+          <Button variant="primary" disabled={!allValid} onClick={apply}>
+            Filter
+          </Button>
+        )}
       </div>
     </div>,
     document.body
@@ -199,7 +234,7 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
   const [content, setContent] = useState('')
   const [removed, setRemoved] = useState<Set<string>>(() => new Set())
   const [removedUsers, setRemovedUsers] = useState<Set<string>>(() => new Set())
-  const [residentialLimit, setResidentialLimit] = useState<number | null>(null)
+  const [providerLimits, setProviderLimits] = useState<Map<string, number>>(() => new Map())
   const [limitPopover, setLimitPopover] = useState<{ x: number; y: number } | null>(null)
 
   // Pages stay mounted (display:none) while the popover portals to body —
@@ -236,10 +271,8 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
         <FilterChip
           active={filters.residential}
           onToggle={() => setFilters((f) => ({ ...f, residential: !f.residential }))}
-          title="Right-click to limit how many residential proxies are kept"
         >
           Residential
-          {residentialLimit != null && ` · max ${residentialLimit.toLocaleString()}`}
         </FilterChip>
         <FilterChip
           active={filters.isp}
@@ -256,8 +289,11 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
               key={provider}
               active={!removed.has(provider)}
               onToggle={() => toggleProvider(provider)}
+              title="Right-click to cap how many proxies this provider keeps"
             >
               {provider} · {count.toLocaleString()}
+              {providerLimits.has(provider) &&
+                ` · max ${providerLimits.get(provider)!.toLocaleString()}`}
             </FilterChip>
           ))}
         </div>
@@ -292,14 +328,14 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
       >
       <SingleFileTool
         title="Proxy Cleaner"
-        hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header. Right-click anywhere to cap how many residential proxies are kept."
+        hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header. Right-click anywhere to cap how many proxies each provider keeps."
         taskName="filtered-proxies"
         inputLabel="Proxy List"
         resultLabel="Filtered Proxies"
         resultUnit="proxies"
         emptyResultMessage="No proxies matched the selected filters."
         runLabel="Filter Proxies"
-        transform={(text) => filterProxies(text, filters, removed, removedUsers, residentialLimit)}
+        transform={(text) => filterProxies(text, filters, removed, removedUsers, providerLimits)}
         pickerTitle="Select a proxy list"
         toolbar={toolbar}
         onContentChange={setContent}
@@ -321,12 +357,12 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
       />
       </div>
       {limitPopover && (
-        <LimitPopover
+        <ProviderLimitsPopover
           x={limitPopover.x}
           y={limitPopover.y}
-          limit={residentialLimit}
-          onApply={setResidentialLimit}
-          onClear={() => setResidentialLimit(null)}
+          providers={providers}
+          limits={providerLimits}
+          onApply={setProviderLimits}
           onClose={() => setLimitPopover(null)}
         />
       )}
