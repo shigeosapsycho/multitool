@@ -118,16 +118,16 @@ function LimitPopover({
         onClose()
       }
     }
+    // No 'contextmenu' close listener: an outside right-click already closes
+    // via its mousedown, and the page handler then reopens at the new spot.
     const id = window.setTimeout(() => {
       document.addEventListener('mousedown', close)
-      document.addEventListener('contextmenu', close)
       document.addEventListener('scroll', close, true)
       document.addEventListener('keydown', keyHandler)
     }, 0)
     return () => {
       window.clearTimeout(id)
       document.removeEventListener('mousedown', close)
-      document.removeEventListener('contextmenu', close)
       document.removeEventListener('scroll', close, true)
       document.removeEventListener('keydown', keyHandler)
     }
@@ -236,10 +236,6 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
         <FilterChip
           active={filters.residential}
           onToggle={() => setFilters((f) => ({ ...f, residential: !f.residential }))}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            setLimitPopover({ x: e.clientX, y: e.clientY })
-          }}
           title="Right-click to limit how many residential proxies are kept"
         >
           Residential
@@ -285,9 +281,18 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
 
   return (
     <>
+      {/* display:contents — no layout box, but right-click anywhere on the
+          page bubbles here and opens the limit popover at the cursor. */}
+      <div
+        className="contents"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setLimitPopover({ x: e.clientX, y: e.clientY })
+        }}
+      >
       <SingleFileTool
         title="Proxy Cleaner"
-        hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header. Right-click Residential to cap how many are kept."
+        hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header. Right-click anywhere to cap how many residential proxies are kept."
         taskName="filtered-proxies"
         inputLabel="Proxy List"
         resultLabel="Filtered Proxies"
@@ -314,6 +319,7 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
         onBack={onBack}
         onSetStatus={onSetStatus}
       />
+      </div>
       {limitPopover && (
         <LimitPopover
           x={limitPopover.x}
