@@ -878,6 +878,18 @@ export function TargetSkuPage({
     setOrderMenu(null)
   }
 
+  // "Copy SKU" from either context menu: just the one SKU, no formatting.
+  async function copySku(sku: string) {
+    try {
+      await navigator.clipboard.writeText(sku)
+      onSetStatus(`Copied ${sku}`)
+    } catch {
+      // Clipboard can reject when the window isn't focused; the user can retry.
+    }
+    setMenu(null)
+    setOrderMenu(null)
+  }
+
   // Shikari Monitor view: the Tasks SKUs split into comma lists, none longer
   // than SHIKARI_MONITOR_MAX — one list per monitor group, each copyable on
   // its own.
@@ -1200,7 +1212,7 @@ export function TargetSkuPage({
           className="fixed z-50 min-w-[150px] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-card"
           style={{
             left: Math.min(menu.x, window.innerWidth - 170),
-            top: Math.min(menu.y, window.innerHeight - 52)
+            top: Math.min(menu.y, window.innerHeight - 84)
           }}
         >
           <button
@@ -1213,6 +1225,13 @@ export function TargetSkuPage({
             <LinkIcon />
             Open link
           </button>
+          <button
+            onClick={() => copySku(menu.sku)}
+            className="flex w-full select-none items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-text-primary transition hover:bg-surface-2"
+          >
+            <Icons.Copy />
+            Copy SKU
+          </button>
         </div>
       )}
 
@@ -1221,7 +1240,7 @@ export function TargetSkuPage({
           className="fixed z-50 min-w-[160px] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-card"
           style={{
             left: Math.min(orderMenu.x, window.innerWidth - 180),
-            top: Math.min(orderMenu.y, window.innerHeight - 120)
+            top: Math.min(orderMenu.y, window.innerHeight - 150)
           }}
         >
           <button
@@ -1249,6 +1268,13 @@ export function TargetSkuPage({
           >
             <LinkIcon />
             Open link
+          </button>
+          <button
+            onClick={() => copySku(orderMenu.sku)}
+            className="flex w-full select-none items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-text-primary transition hover:bg-surface-2"
+          >
+            <Icons.Copy />
+            Copy SKU
           </button>
           <button
             onClick={() => removeFromOrder(orderMenu.sku)}

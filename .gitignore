@@ -24,3 +24,6 @@ src-tauri/output/
 # Tauri updater signing key — NEVER commit. The private key lives only here
 # locally and as the TAURI_SIGNING_PRIVATE_KEY GitHub Actions secret.
 src-tauri/.tauri/
+
+# Playwright MCP session artifacts (snapshots, console logs)
+.playwright-mcp/
