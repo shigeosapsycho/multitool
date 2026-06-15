@@ -19,6 +19,7 @@ import { OrderEmailByPage } from './pages/OrderEmailBy'
 import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
+import { RemoveDuplicatesPage } from './pages/RemoveDuplicates'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { ReverseListPage } from './pages/ReverseList'
 import { SearchMasterPage } from './pages/SearchMaster'
@@ -45,6 +46,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'proxy-cleaner',
   'proxy-tester',
   'randomize',
+  'remove-duplicates',
   'remove-passwords',
   'reverse-list',
   'search-master',
@@ -380,6 +382,8 @@ export default function App() {
         return <ProxyTesterPage {...props} />
       case 'randomize':
         return <RandomizePage {...props} />
+      case 'remove-duplicates':
+        return <RemoveDuplicatesPage {...props} />
       case 'remove-passwords':
         return <RemovePasswordsPage {...props} />
       case 'reverse-list':

@@ -1,8 +1,16 @@
 import { extractContent } from './parse'
-import { findDuplicates, findNonDuplicates } from './dedupe'
+import { findDuplicates, findNonDuplicates, dedupeKeepFirst } from './dedupe'
 
 export function duplicatesFromText(text: string): string[] {
   return findDuplicates(extractContent(text))
+}
+
+export function dedupeFromText(text: string): string[] {
+  return dedupeKeepFirst(extractContent(text))
+}
+
+export function dedupeFromTwoTexts(t1: string, t2: string): string[] {
+  return dedupeKeepFirst([...extractContent(t1), ...extractContent(t2)])
 }
 
 export function nonDuplicatesFromText(text: string): string[] {

@@ -96,6 +96,12 @@ const tools: ToolMeta[] = [
     accent: '#f472b6'
   },
   {
+    id: 'remove-duplicates',
+    title: 'Remove Duplicates',
+    description: 'Keep one copy of each line, drop the repeats — in one file or across two.',
+    accent: '#14b8a6'
+  },
+  {
     id: 'remove-passwords',
     title: 'Remove Passwords',
     description: 'Strip the :password from a user:pass list.',
@@ -161,6 +167,14 @@ const DuplicatesIcon = () => (
   <svg {...SVG_PROPS}>
     <rect x="3" y="3" width="13" height="13" rx="2" />
     <rect x="8" y="8" width="13" height="13" rx="2" />
+  </svg>
+)
+
+const RemoveDuplicatesIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="3" width="11" height="11" rx="2" />
+    <rect x="10" y="10" width="11" height="11" rx="2" />
+    <path d="M5.5 8.5h6" />
   </svg>
 )
 
@@ -317,6 +331,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
+  'remove-duplicates': RemoveDuplicatesIcon,
   'remove-passwords': KeyIcon,
   'reverse-list': ReverseListIcon,
   'search-master': SearchIcon,

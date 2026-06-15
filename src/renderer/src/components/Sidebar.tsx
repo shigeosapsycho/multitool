@@ -52,6 +52,7 @@ const TOOL_ROUTES = new Set<Route>([
   'numbered-list-generator',
   'proxy-cleaner',
   'randomize',
+  'remove-duplicates',
   'remove-passwords',
   'split-by-n',
   'target-sku'
