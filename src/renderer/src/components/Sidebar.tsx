@@ -50,6 +50,7 @@ const TOOL_ROUTES = new Set<Route>([
   'listify',
   'multiply-lines',
   'numbered-list-generator',
+  'profile-filter',
   'proxy-cleaner',
   'randomize',
   'remove-duplicates',

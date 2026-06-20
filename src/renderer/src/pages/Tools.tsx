@@ -78,6 +78,12 @@ const tools: ToolMeta[] = [
     accent: '#0ea5e9'
   },
   {
+    id: 'profile-filter',
+    title: 'Profile Filter',
+    description: 'Filter a Refract JSON or Shikari CSV export down to a list of emails.',
+    accent: '#eab308'
+  },
+  {
     id: 'proxy-cleaner',
     title: 'Proxy Cleaner',
     description: 'Filter a proxy list down to residential and/or ISP proxies.',
@@ -316,6 +322,13 @@ const OrderEmailByIcon = () => (
   </svg>
 )
 
+const ProfileFilterIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M4 4h16l-6 7v6l-4 2v-8z" />
+    <path d="M14.5 14.8l1.7 1.7 3.3-3.4" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
@@ -328,6 +341,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'multiply-lines': MultiplyLinesIcon,
   'numbered-list-generator': SplitByNumberIcon,
   'order-email-by': OrderEmailByIcon,
+  'profile-filter': ProfileFilterIcon,
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
