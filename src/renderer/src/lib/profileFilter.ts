@@ -75,17 +75,23 @@ function emptyResult(format: ProfileFormat, error: string, requested: string[]):
   }
 }
 
+// Pulls the address out of a decorated list line — `email:password`,
+// `Name <email>`, quoted, etc. — so those still match the bare profile email.
+const EMAIL_RE = /[^\s,;:<>"']+@[^\s,;:<>"']+/
+
 /** Lowercased lookup set + first-seen original-casing list, deduped. */
 function parseEmailList(text: string): { set: Set<string>; ordered: string[] } {
   const set = new Set<string>()
   const ordered: string[] = []
   for (const token of stripBom(text).split(/[\s,;]+/)) {
-    const t = token.trim()
-    if (!t) continue
-    const low = t.toLowerCase()
+    // Only count tokens that actually contain an address; a bare name from a
+    // "Name <email>" line isn't a requested email and shouldn't become a miss.
+    const email = token.match(EMAIL_RE)?.[0]
+    if (!email) continue
+    const low = email.toLowerCase()
     if (set.has(low)) continue
     set.add(low)
-    ordered.push(t)
+    ordered.push(email)
   }
   return { set, ordered }
 }

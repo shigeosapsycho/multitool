@@ -178,6 +178,19 @@ describe('filterProfiles — email list parsing', () => {
     expect(r.error).toBeTruthy()
     expect(r.matchedCount).toBe(0)
   })
+
+  it('matches when the list is in email:password format, keeping those profiles', () => {
+    const r = filterProfiles('alice@example.com:hunter2\nbob@example.com:pw', REFRACT)
+    expect(r.matchedCount).toBe(2)
+    expect(r.misses).toEqual([])
+    expect(r.matchedEmails).toEqual(['Alice@Example.com', 'bob@example.com'])
+  })
+
+  it('extracts the address from "Name <email>" list lines', () => {
+    const r = filterProfiles('Alice <alice@example.com>', REFRACT)
+    expect(r.matchedCount).toBe(1)
+    expect(r.misses).toEqual([])
+  })
 })
 
 describe('cross-format conversion', () => {
