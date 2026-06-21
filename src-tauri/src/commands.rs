@@ -224,9 +224,11 @@ pub async fn files_write_output(
     app: AppHandle,
     name: String,
     content: String,
+    ext: Option<String>,
 ) -> Result<String, String> {
     let dir = ensure_output_dir(&app).map_err(|e| e.to_string())?;
-    let filename = format!("{}_{}.txt", name, timestamp());
+    let ext = ext.unwrap_or_else(|| "txt".to_string());
+    let filename = format!("{}_{}.{}", name, timestamp(), ext);
     let path = dir.join(&filename);
     fs::write(&path, content).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())

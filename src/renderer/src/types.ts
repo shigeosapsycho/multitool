@@ -11,6 +11,7 @@ export type Route =
   | 'multiply-lines'
   | 'numbered-list-generator'
   | 'order-email-by'
+  | 'profile-filter'
   | 'proxy-cleaner'
   | 'proxy-tester'
   | 'randomize'

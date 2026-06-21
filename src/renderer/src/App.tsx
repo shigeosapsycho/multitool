@@ -16,6 +16,7 @@ import { MatchEmailPassPage } from './pages/MatchEmailPass'
 import { MultiplyLinesPage } from './pages/MultiplyLines'
 import { NumberedListGeneratorPage } from './pages/NumberedListGenerator'
 import { OrderEmailByPage } from './pages/OrderEmailBy'
+import { ProfileFilterPage } from './pages/ProfileFilter'
 import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
@@ -43,6 +44,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'multiply-lines',
   'numbered-list-generator',
   'order-email-by',
+  'profile-filter',
   'proxy-cleaner',
   'proxy-tester',
   'randomize',
@@ -376,6 +378,8 @@ export default function App() {
         return <NumberedListGeneratorPage {...props} />
       case 'order-email-by':
         return <OrderEmailByPage {...props} />
+      case 'profile-filter':
+        return <ProfileFilterPage {...props} />
       case 'proxy-cleaner':
         return <ProxyCleanerPage {...props} />
       case 'proxy-tester':

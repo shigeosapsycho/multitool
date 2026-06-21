@@ -203,8 +203,8 @@ export const api = {
   files: {
     open: (opts?: OpenOpts) => invoke<string[]>('files_open', { opts }),
     read: (path: string) => invoke<string>('files_read', { path }),
-    writeOutput: (name: string, content: string) =>
-      invoke<string>('files_write_output', { name, content }),
+    writeOutput: (name: string, content: string, ext?: string) =>
+      invoke<string>('files_write_output', { name, content, ext }),
     writeOutputs: (items: { name: string; content: string }[]) =>
       invoke<string[]>('files_write_outputs', { items }),
     reveal: (path: string) => invoke<void>('files_reveal', { path }),
