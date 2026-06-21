@@ -103,14 +103,16 @@ describe('filterProfiles — refract JSON', () => {
     expect(JSON.parse(r.fullOutput)).toEqual([{ name: 'B', email: 'bob@example.com' }])
   })
 
-  it('keeps every matching profile but dedupes matchedEmails', () => {
+  it('keeps only the first profile per email when the file repeats an email', () => {
     const dupes = JSON.stringify([
       { name: 'A1', email: 'alice@example.com' },
       { name: 'A2', email: 'alice@example.com' }
     ])
     const r = filterProfiles('alice@example.com', dupes)
-    expect(r.matchedCount).toBe(2)
+    expect(r.matchedCount).toBe(1)
+    expect(r.totalCount).toBe(2)
     expect(r.matchedEmails).toEqual(['alice@example.com'])
+    expect(JSON.parse(r.fullOutput)).toEqual([{ name: 'A1', email: 'alice@example.com' }])
   })
 
   it('treats a profile with no email as a non-match but still counts it in the total', () => {
@@ -147,6 +149,14 @@ describe('filterProfiles — shikari CSV', () => {
     const r = filterProfiles('alice@example.com, dave@example.com', SHIKARI)
     expect(r.matchedEmails).toEqual(['Alice@Example.com'])
     expect(r.misses).toEqual(['dave@example.com'])
+  })
+
+  it('keeps one row per email when the CSV repeats an email', () => {
+    const csv = ['profile_name,email', 'P1,alice@example.com', 'P2,alice@example.com'].join('\n')
+    const r = filterProfiles('alice@example.com', csv)
+    expect(r.matchedCount).toBe(1)
+    expect(r.totalCount).toBe(2)
+    expect(r.fullOutput).toBe('profile_name,email\nP1,alice@example.com')
   })
 
   it('normalizes CRLF line endings to LF in the output', () => {

@@ -160,13 +160,13 @@ function filterRefract(text: string, allowed: Set<string>, requested: string[]):
     if (email === null) continue
     const low = email.trim().toLowerCase()
     fileEmailsLower.add(low)
-    if (allowed.has(low)) {
+    // Keep the first profile per email — a list of emails wants one match each,
+    // even when the export repeats an email across rows.
+    if (allowed.has(low) && !seenMatched.has(low)) {
+      seenMatched.add(low)
       kept.push(el)
       matched.push(refractToProfile(el, email))
-      if (!seenMatched.has(low)) {
-        seenMatched.add(low)
-        matchedEmails.push(email)
-      }
+      matchedEmails.push(email)
     }
   }
 
@@ -223,13 +223,13 @@ function filterShikari(text: string, allowed: Set<string>, requested: string[]):
     if (!email) continue
     const low = email.toLowerCase()
     fileEmailsLower.add(low)
-    if (allowed.has(low)) {
+    // Keep the first row per email — one match per listed email, even when the
+    // export repeats an email across rows.
+    if (allowed.has(low) && !seenMatched.has(low)) {
+      seenMatched.add(low)
       keptRows.push(raw)
       matched.push(shikariToProfile(cells, colIndex, email))
-      if (!seenMatched.has(low)) {
-        seenMatched.add(low)
-        matchedEmails.push(email)
-      }
+      matchedEmails.push(email)
     }
   }
 
