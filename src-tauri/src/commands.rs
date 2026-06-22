@@ -499,6 +499,7 @@ pub struct ConfigSnapshot {
     pub restore_last_module: bool,
     pub order_by_select_date: bool,
     pub auto_focus_input: bool,
+    pub format_csv: bool,
 }
 
 #[tauri::command]
@@ -518,6 +519,7 @@ pub async fn config_get(app: AppHandle) -> Result<ConfigSnapshot, String> {
         restore_last_module: cfg.restore_last_module(),
         order_by_select_date: cfg.order_by_select_date(),
         auto_focus_input: cfg.auto_focus_input(),
+        format_csv: cfg.format_csv(),
     })
 }
 
@@ -593,6 +595,12 @@ pub async fn config_set_order_by_select_date(
 #[tauri::command]
 pub async fn config_set_auto_focus_input(app: AppHandle, enabled: bool) -> Result<bool, String> {
     mutate_config(&app, |cfg| cfg.auto_focus_input = Some(enabled))?;
+    Ok(enabled)
+}
+
+#[tauri::command]
+pub async fn config_set_format_csv(app: AppHandle, enabled: bool) -> Result<bool, String> {
+    mutate_config(&app, |cfg| cfg.format_csv = Some(enabled))?;
     Ok(enabled)
 }
 

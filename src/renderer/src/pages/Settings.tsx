@@ -42,6 +42,8 @@ type Props = {
   onOrderBySelectDateChange: (next: boolean) => void
   autoFocusInput: boolean
   onAutoFocusInputChange: (next: boolean) => void
+  formatCsv: boolean
+  onFormatCsvChange: (next: boolean) => void
 }
 
 export function SettingsPage({
@@ -60,7 +62,9 @@ export function SettingsPage({
   orderBySelectDate,
   onOrderBySelectDateChange,
   autoFocusInput,
-  onAutoFocusInputChange
+  onAutoFocusInputChange,
+  formatCsv,
+  onFormatCsvChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -111,6 +115,11 @@ export function SettingsPage({
   async function handleToggleAutoFocusInput(next: boolean) {
     await window.api.config.setAutoFocusInput(next)
     onAutoFocusInputChange(next)
+  }
+
+  async function handleToggleFormatCsv(next: boolean) {
+    await window.api.config.setFormatCsv(next)
+    onFormatCsvChange(next)
   }
 
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -228,6 +237,20 @@ export function SettingsPage({
                 checked={filePreview}
                 onChange={handleTogglePreview}
                 ariaLabel="Toggle file previews"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Format .CSV</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  When on, CSV output and saved .csv files are shown as a table instead of raw
+                  comma-separated text.
+                </div>
+              </div>
+              <Toggle
+                checked={formatCsv}
+                onChange={handleToggleFormatCsv}
+                ariaLabel="Toggle CSV table formatting"
               />
             </div>
             <div className="flex items-start justify-between gap-4 border-t border-border pt-4">

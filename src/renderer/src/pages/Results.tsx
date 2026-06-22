@@ -3,6 +3,7 @@ import { PageHeader, Button } from '../components/PageHeader'
 import { Icons } from '../components/ToolShell'
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { CsvTable } from '../components/CsvTable'
 
 type Entry = { path: string; name: string; size: number; mtime: number }
 
@@ -58,9 +59,10 @@ type Props = {
   filePreview: boolean
   deleteToTrash: boolean
   outputSort: 'name' | 'size' | 'modified'
+  formatCsv: boolean
 }
 
-export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
+export function ResultsPage({ filePreview, deleteToTrash, outputSort, formatCsv }: Props) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null)
@@ -314,6 +316,8 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort }: Props) {
                     <div className="flex min-h-0 flex-1 items-start p-4 font-mono text-[12.5px] leading-relaxed text-text-muted">
                       Loading…
                     </div>
+                  ) : formatCsv && selected.name.toLowerCase().endsWith('.csv') ? (
+                    <CsvTable text={previewText} />
                   ) : (
                     <textarea
                       readOnly
