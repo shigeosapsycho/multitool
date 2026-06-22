@@ -36,6 +36,9 @@ pub struct Config {
     /// When true (default), opening a module focuses its primary input so a
     /// paste works immediately without clicking the box first.
     pub auto_focus_input: Option<bool>,
+    /// When true (default), CSV output and saved .csv files render as a table
+    /// instead of raw comma-separated text.
+    pub format_csv: Option<bool>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
@@ -135,6 +138,11 @@ impl Config {
         // Default true — paste-ready inputs are the expected behavior.
         self.auto_focus_input.unwrap_or(true)
     }
+
+    pub fn format_csv(&self) -> bool {
+        // Default true — show CSV as a table.
+        self.format_csv.unwrap_or(true)
+    }
 }
 
 #[cfg(test)]
@@ -195,6 +203,18 @@ mod tests {
         assert!(json.contains("\"autoFocusInput\":false"));
         let back: Config = serde_json::from_str(&json).unwrap();
         assert!(!back.auto_focus_input());
+    }
+
+    #[test]
+    fn format_csv_defaults_true_and_round_trips() {
+        let cfg: Config = serde_json::from_str("{}").unwrap();
+        assert!(cfg.format_csv());
+        let mut cfg = Config::default();
+        cfg.format_csv = Some(false);
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"formatCsv\":false"));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert!(!back.format_csv());
     }
 
     #[test]

@@ -249,6 +249,7 @@ export const api = {
         restoreLastModule: boolean
         orderBySelectDate: boolean
         autoFocusInput: boolean
+        formatCsv: boolean
       }>('config_get'),
     setFilePreview: (enabled: boolean) =>
       invoke<boolean>('config_set_file_preview', { enabled }),
@@ -263,7 +264,9 @@ export const api = {
     setOrderBySelectDate: (enabled: boolean) =>
       invoke<boolean>('config_set_order_by_select_date', { enabled }),
     setAutoFocusInput: (enabled: boolean) =>
-      invoke<boolean>('config_set_auto_focus_input', { enabled })
+      invoke<boolean>('config_set_auto_focus_input', { enabled }),
+    setFormatCsv: (enabled: boolean) =>
+      invoke<boolean>('config_set_format_csv', { enabled })
   },
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),

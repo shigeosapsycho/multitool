@@ -81,6 +81,7 @@ export default function App() {
   const [orderBySelectDate, setOrderBySelectDate] = useState(true)
   // When true (default), opening a module focuses its input for instant paste.
   const [autoFocusInput, setAutoFocusInput] = useState(true)
+  const [formatCsv, setFormatCsv] = useState(true)
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   // The most recently opened module — the Tools tab returns here.
@@ -102,6 +103,7 @@ export default function App() {
         setRestoreLastModule(cfg.restoreLastModule)
         setOrderBySelectDate(cfg.orderBySelectDate)
         setAutoFocusInput(cfg.autoFocusInput)
+        setFormatCsv(cfg.formatCsv)
       })
       .catch(() => {})
     // Check for updates once on launch (the Rust side no longer polls).
@@ -353,7 +355,8 @@ export default function App() {
       active,
       onNavigate: navigate,
       pokemonGrouping,
-      orderBySelectDate
+      orderBySelectDate,
+      formatCsv
     }
     switch (r) {
       case 'csv-email-pass':
@@ -412,6 +415,7 @@ export default function App() {
         filePreview={filePreview}
         deleteToTrash={deleteToTrash}
         outputSort={outputSort}
+        formatCsv={formatCsv}
       />
     )
   else if (route === 'settings')
@@ -433,6 +437,8 @@ export default function App() {
         onOrderBySelectDateChange={setOrderBySelectDate}
         autoFocusInput={autoFocusInput}
         onAutoFocusInputChange={setAutoFocusInput}
+        formatCsv={formatCsv}
+        onFormatCsvChange={setFormatCsv}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />
