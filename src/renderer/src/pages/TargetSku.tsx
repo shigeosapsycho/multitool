@@ -14,6 +14,7 @@ import {
   detectFormat,
   fetchRemoteSkus,
   formatSkus,
+  moveSkuToIndex,
   parseSkuList,
   rowDisplayName,
   type ExportFormat,
@@ -182,6 +183,16 @@ const ArrowTopIcon = () => (
   </svg>
 )
 
+/** Hash mark for the "Move to position…" Order-tab context-menu action. */
+const HashIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+    <line x1="4" y1="9" x2="20" y2="9" />
+    <line x1="4" y1="15" x2="20" y2="15" />
+    <line x1="10" y1="3" x2="8" y2="21" />
+    <line x1="16" y1="3" x2="14" y2="21" />
+  </svg>
+)
+
 /** A single SKU row: checkbox-style toggle plus the SKU and listing name. */
 function SkuRow({
   entry,
@@ -230,6 +241,7 @@ function ReorderRow({
   name,
   color,
   dragging,
+  dragDisabled,
   onPointerDown,
   onContextMenu
 }: {
@@ -239,20 +251,25 @@ function ReorderRow({
   /** Listing color, set only when this SKU shares its listing with another. */
   color?: string
   dragging: boolean
+  /** While a search filter is active, drag is off — the visible subset can't
+   * map back onto the full `order`, so reordering is done via right-click. */
+  dragDisabled?: boolean
   onPointerDown: (e: React.PointerEvent) => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
   return (
     <div
-      onPointerDown={onPointerDown}
+      onPointerDown={dragDisabled ? undefined : onPointerDown}
       onContextMenu={onContextMenu}
-      className={`flex cursor-grab touch-none select-none items-center gap-2.5 rounded-md border px-2 py-1 transition-[transform,box-shadow,background-color] duration-150 active:cursor-grabbing ${
+      className={`flex touch-none select-none items-center gap-2.5 rounded-md border px-2 py-1 transition-[transform,box-shadow,background-color] duration-150 ${
+        dragDisabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+      } ${
         dragging
           ? 'relative z-10 scale-[1.02] border-accent bg-accent-soft shadow-lg'
           : 'border-transparent hover:bg-surface-2'
       }`}
     >
-      <span className="shrink-0 text-text-muted">
+      <span className={`shrink-0 text-text-muted ${dragDisabled ? 'opacity-40' : ''}`}>
         <GripIcon />
       </span>
       <span className="w-5 shrink-0 text-right font-mono text-[11px] text-text-muted">
@@ -525,6 +542,14 @@ export function TargetSkuPage({
   const [orderMenu, setOrderMenu] = useState<{ sku: string; x: number; y: number } | null>(
     null
   )
+  // Search box on the Reorder tab. Filters the list to matching SKUs while each
+  // row keeps its true position number; a non-empty query also disables drag.
+  const [orderQuery, setOrderQuery] = useState('')
+  // "Move to position…" numeric-input popover (Order tab) and its draft value.
+  const [posPrompt, setPosPrompt] = useState<{ sku: string; x: number; y: number } | null>(
+    null
+  )
+  const [posValue, setPosValue] = useState('')
   // Select-all confirm modal (Select tab).
   const [confirmSelectAll, setConfirmSelectAll] = useState(false)
   // "Copied!" flash on the Reorder tab's Copy-list button.
@@ -676,12 +701,14 @@ export function TargetSkuPage({
     }
   }, [dragSku])
 
-  // Dismiss either context menu on any click, Esc, scroll, or resize.
+  // Dismiss either context menu or the position popover on any click, Esc,
+  // scroll, or resize. (The popover stops its own clicks from bubbling here.)
   useEffect(() => {
-    if (!menu && !orderMenu) return
+    if (!menu && !orderMenu && !posPrompt) return
     const close = () => {
       setMenu(null)
       setOrderMenu(null)
+      setPosPrompt(null)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close()
@@ -696,7 +723,18 @@ export function TargetSkuPage({
       window.removeEventListener('resize', close)
       window.removeEventListener('keydown', onKey)
     }
-  }, [menu, orderMenu])
+  }, [menu, orderMenu, posPrompt])
+
+  // The page stays mounted while hidden (keep-alive). A lingering aria-modal
+  // popover would swallow Escape app-wide — the documented overlay misfire — so
+  // close all transient overlays the moment the page goes inactive.
+  useEffect(() => {
+    if (!active) {
+      setMenu(null)
+      setOrderMenu(null)
+      setPosPrompt(null)
+    }
+  }, [active])
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -791,6 +829,7 @@ export function TargetSkuPage({
     setOrder([])
     setDraft('')
     setAnchor(null)
+    setOrderQuery('')
     onSetStatus('Selection cleared')
   }
 
@@ -859,6 +898,14 @@ export function TargetSkuPage({
   function moveToBottom(sku: string) {
     applyOrder([...order.filter((s) => s !== sku), sku])
     setOrderMenu(null)
+  }
+
+  // Move a SKU to a 1-based position from the "Move to position…" popover.
+  // Invalid / out-of-range input is handled in moveSkuToIndex (no-op / clamp).
+  function moveToIndex(sku: string, pos1: number) {
+    applyOrder(moveSkuToIndex(order, sku, pos1))
+    setPosPrompt(null)
+    setPosValue('')
   }
 
   // Copy the whole reordered list in the format chosen on the Select tab.
@@ -1088,6 +1135,18 @@ export function TargetSkuPage({
     </Card>
   )
 
+  // Reorder-tab search: filter the list to SKUs whose number or listing name
+  // matches, keeping each row's TRUE position index so "#7" stays accurate.
+  const orderQ = orderQuery.trim().toLowerCase()
+  const visibleRows = useMemo(() => {
+    const rows = order.map((sku, index) => ({ sku, index }))
+    if (!orderQ) return rows
+    return rows.filter(({ sku }) => {
+      const item = entryBySku.get(sku)?.item ?? ''
+      return sku.toLowerCase().includes(orderQ) || item.toLowerCase().includes(orderQ)
+    })
+  }, [order, orderQ, entryBySku])
+
   // Order tab: the selected SKUs as draggable rows, in export order.
   // Order tab card. Not the shared <Card> (which forces h-full and leaves a
   // tall empty box for short lists) — this hugs its rows and only scrolls once
@@ -1099,35 +1158,61 @@ export function TargetSkuPage({
           Reorder SKUs
         </span>
       </div>
-      <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-text-muted">
-        Drag rows to reorder · right-click for options
-      </div>
       {order.length === 0 ? (
         <div className="p-8 text-center text-[13px] text-text-muted">
           No SKUs selected. Check SKUs in the Select tab to arrange them here.
         </div>
       ) : (
         <>
-          <div ref={listRef} className="min-h-0 flex-1 overflow-auto p-2">
-            {order.map((sku, i) => {
-              const entry = entryBySku.get(sku)
-              return (
-                <ReorderRow
-                  key={sku}
-                  index={i}
-                  sku={sku}
-                  name={entry ? rowDisplayName(entry, false) : sku}
-                  color={orderColors.get(sku)}
-                  dragging={dragSku === sku}
-                  onPointerDown={(ev) => startRowDrag(ev, sku)}
-                  onContextMenu={(ev) => {
-                    ev.preventDefault()
-                    setOrderMenu({ sku, x: ev.clientX, y: ev.clientY })
-                  }}
-                />
-              )
-            })}
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
+            <span className="text-text-muted">
+              <SearchIcon />
+            </span>
+            <input
+              value={orderQuery}
+              onChange={(e) => setOrderQuery(e.target.value)}
+              placeholder="Search selected SKUs by number or name…"
+              className="min-w-0 flex-1 bg-transparent text-[12.5px] text-text-primary outline-none placeholder:text-text-muted"
+              spellCheck={false}
+            />
+            {orderQ && (
+              <span className="shrink-0 text-[11px] text-text-muted">
+                {visibleRows.length} of {order.length}
+              </span>
+            )}
           </div>
+          <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-text-muted">
+            {orderQ
+              ? 'Right-click a row to move it · clear search to drag'
+              : 'Drag rows to reorder · right-click for options'}
+          </div>
+          {visibleRows.length === 0 ? (
+            <div className="flex-1 p-8 text-center text-[13px] text-text-muted">
+              No selected SKUs match “{orderQuery}”.
+            </div>
+          ) : (
+            <div ref={listRef} className="min-h-0 flex-1 overflow-auto p-2">
+              {visibleRows.map(({ sku, index }) => {
+                const entry = entryBySku.get(sku)
+                return (
+                  <ReorderRow
+                    key={sku}
+                    index={index}
+                    sku={sku}
+                    name={entry ? rowDisplayName(entry, false) : sku}
+                    color={orderColors.get(sku)}
+                    dragging={dragSku === sku}
+                    dragDisabled={!!orderQ}
+                    onPointerDown={(ev) => startRowDrag(ev, sku)}
+                    onContextMenu={(ev) => {
+                      ev.preventDefault()
+                      setOrderMenu({ sku, x: ev.clientX, y: ev.clientY })
+                    }}
+                  />
+                )
+              })}
+            </div>
+          )}
           <div className="flex shrink-0 items-center gap-2 border-t border-border p-3">
             <span className="flex-1 text-[12px] text-text-muted">
               Copies the list in {FORMATS.find((f) => f.id === format)?.label ?? format}{' '}
@@ -1260,6 +1345,20 @@ export function TargetSkuPage({
             Move to bottom
           </button>
           <button
+            onClick={(e) => {
+              // Stop the click reaching the window-level dismiss listener, which
+              // would clear posPrompt the instant we open it.
+              e.stopPropagation()
+              setPosValue('')
+              setPosPrompt({ sku: orderMenu.sku, x: orderMenu.x, y: orderMenu.y })
+              setOrderMenu(null)
+            }}
+            className="flex w-full select-none items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-text-primary transition hover:bg-surface-2"
+          >
+            <HashIcon />
+            Move to position…
+          </button>
+          <button
             onClick={() => {
               window.api.files.openUrl(`${TARGET_URL}${orderMenu.sku}`).catch(() => {})
               setOrderMenu(null)
@@ -1283,6 +1382,64 @@ export function TargetSkuPage({
             <Icons.Trash />
             Remove
           </button>
+        </div>
+      )}
+
+      {posPrompt && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          // Keep clicks inside the popover from reaching the window-level
+          // dismiss listener (both phases — it closes on `click`).
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="fixed z-50 w-[224px] overflow-hidden rounded-lg border border-border bg-surface p-3 shadow-card"
+          style={{
+            left: Math.min(posPrompt.x, window.innerWidth - 244),
+            top: Math.min(posPrompt.y, window.innerHeight - 130)
+          }}
+        >
+          <div className="mb-2 text-[11px] text-text-muted">
+            Move <span className="font-mono text-text-secondary">{posPrompt.sku}</span> (now #
+            {order.indexOf(posPrompt.sku) + 1})
+          </div>
+          <input
+            autoFocus
+            inputMode="numeric"
+            value={posValue}
+            onChange={(e) => setPosValue(e.target.value.replace(/[^0-9]/g, ''))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.stopPropagation()
+                moveToIndex(posPrompt.sku, parseInt(posValue, 10))
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                e.stopPropagation()
+                setPosPrompt(null)
+                setPosValue('')
+              }
+            }}
+            placeholder={`type a number 1 - ${order.length}`}
+            className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-text-primary outline-none placeholder:text-text-muted focus:border-accent"
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <Button
+              onClick={() => {
+                setPosPrompt(null)
+                setPosValue('')
+              }}
+              variant="ghost"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => moveToIndex(posPrompt.sku, parseInt(posValue, 10))}
+              variant="secondary"
+            >
+              Move
+            </Button>
+          </div>
         </div>
       )}
 

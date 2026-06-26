@@ -110,6 +110,18 @@ export default function App() {
     window.api.updater.check().catch(() => {})
   }, [])
 
+  // Poll GitHub for a newer release every minute. The check is a cheap API
+  // ping + version compare, so a tight interval is fine. Stop once an update
+  // has been staged: the running version only changes on restart, so further
+  // checks would just re-download the same exe every minute.
+  useEffect(() => {
+    if (updateReady) return
+    const id = setInterval(() => {
+      window.api.updater.check().catch(() => {})
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [updateReady])
+
   // Track the OS color preference. Used when theme === 'system'.
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')

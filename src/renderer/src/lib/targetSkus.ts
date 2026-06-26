@@ -269,6 +269,20 @@ export function formatSkus(skus: string[], format: ExportFormat): string {
   }
 }
 
+/**
+ * Move `sku` to a 1-based `position` within `order`, returning a new array.
+ * A position past the end clamps to the last slot; a position below 1, a
+ * non-numeric position, or a SKU not in the list returns the order unchanged.
+ */
+export function moveSkuToIndex(order: string[], sku: string, position: number): string[] {
+  if (!Number.isFinite(position) || position < 1) return order
+  if (!order.includes(sku)) return order
+  const without = order.filter((s) => s !== sku)
+  // Clamp against the original length, then shift to a 0-based insert index.
+  without.splice(Math.min(position, order.length) - 1, 0, sku)
+  return without
+}
+
 /** Max SKUs allowed in a single Shikari Monitor list. */
 export const SHIKARI_MONITOR_MAX = 30
 
