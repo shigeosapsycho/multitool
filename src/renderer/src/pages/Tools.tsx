@@ -12,6 +12,12 @@ const EXIT_MS = 170
 
 const tools: ToolMeta[] = [
   {
+    id: 'add-passwords',
+    title: 'Add Passwords',
+    description: 'Append a fixed or random password to each email, as email:password.',
+    accent: '#4ade80'
+  },
+  {
     id: 'csv-email-pass',
     title: 'CSV → Email:Password',
     description: 'Pull email & password columns from a CSV into an email:password list.',
@@ -329,7 +335,17 @@ const ProfileFilterIcon = () => (
   </svg>
 )
 
+const AddPasswordIcon = () => (
+  <svg {...SVG_PROPS}>
+    <circle cx="9" cy="15" r="3.5" />
+    <path d="M11.5 12.5 18 6" />
+    <path d="M15.5 8.5l2 2" />
+    <path d="M16 7.5v-4M14 5.5h4" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
+  'add-passwords': AddPasswordIcon,
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
   'email-filter': FunnelIcon,
