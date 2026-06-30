@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { filterTools, nextSelection, parseColumnCount, type ArrowDirection } from '../lib/toolSearch'
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
+import { OrderTrackerLogo } from '../components/OrderTrackerLogo'
 import { setPendingFile } from '../lib/pending'
 import { useFlip } from '../lib/useFlip'
 
@@ -82,6 +83,12 @@ const tools: ToolMeta[] = [
     title: 'Order Email By',
     description: 'Sort a list of emails by provider — drag icloud, gmail, yahoo… into your order.',
     accent: '#0ea5e9'
+  },
+  {
+    id: 'order-tracker',
+    title: 'Order Tracker',
+    description: "Open Iroth's Order Tracker dashboard in your browser.",
+    accent: '#E2B377'
   },
   {
     id: 'profile-filter',
@@ -360,6 +367,8 @@ const SortListIcon = () => (
   </svg>
 )
 
+const OrderTrackerIcon = () => <OrderTrackerLogo className="h-full w-full" />
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'add-passwords': AddPasswordIcon,
   'sort-list': SortListIcon,
@@ -374,6 +383,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'multiply-lines': MultiplyLinesIcon,
   'numbered-list-generator': SplitByNumberIcon,
   'order-email-by': OrderEmailByIcon,
+  'order-tracker': OrderTrackerIcon,
   'profile-filter': ProfileFilterIcon,
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
