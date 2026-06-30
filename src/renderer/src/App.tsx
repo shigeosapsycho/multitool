@@ -25,6 +25,7 @@ import { RemoveDuplicatesPage } from './pages/RemoveDuplicates'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { ReverseListPage } from './pages/ReverseList'
 import { SearchMasterPage } from './pages/SearchMaster'
+import { SortListPage } from './pages/SortList'
 import { SplitByNumberPage } from './pages/SplitByNumber'
 import { TargetSkuPage } from './pages/TargetSku'
 import { ResultsPage } from './pages/Results'
@@ -54,6 +55,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'remove-passwords',
   'reverse-list',
   'search-master',
+  'sort-list',
   'split-by-n',
   'target-sku'
 ]
@@ -413,6 +415,8 @@ export default function App() {
         return <ReverseListPage {...props} />
       case 'search-master':
         return <SearchMasterPage {...props} />
+      case 'sort-list':
+        return <SortListPage {...props} />
       case 'split-by-n':
         return <SplitByNumberPage {...props} />
       case 'target-sku':
