@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { PageHeader, Button } from '../components/PageHeader'
 import { OrderTrackerLogo } from '../components/OrderTrackerLogo'
 
@@ -31,9 +31,18 @@ export function OrderTrackerPage({ onBack, onSetStatus, active = true }: Props) 
     onSetStatus('Opened Order Tracker in your browser')
   }, [onSetStatus])
 
-  // Launch the dashboard as soon as the tool becomes the active one.
+  // Launch the dashboard once per entry. The effect's deps can churn on unrelated App
+  // re-renders (onSetStatus is a fresh function each render, so `open` is too), which would
+  // otherwise re-fire open() and pop the browser open again a few seconds later. Guard with
+  // a ref that only resets when the tool is left, so re-entry opens exactly once again.
+  const openedRef = useRef(false)
   useEffect(() => {
-    if (active) open()
+    if (active && !openedRef.current) {
+      openedRef.current = true
+      open()
+    } else if (!active) {
+      openedRef.current = false
+    }
   }, [active, open])
 
   return (
