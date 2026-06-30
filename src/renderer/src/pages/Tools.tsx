@@ -132,6 +132,12 @@ const tools: ToolMeta[] = [
     accent: '#34d399'
   },
   {
+    id: 'sort-list',
+    title: 'Sort List',
+    description: 'Sort lines alphabetically, A → Z or Z → A.',
+    accent: '#84cc16'
+  },
+  {
     id: 'split-by-n',
     title: 'Split by Number',
     description: 'Split a file into N evenly-sized parts.',
@@ -346,8 +352,17 @@ const AddPasswordIcon = () => (
   </svg>
 )
 
+const SortListIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M4 7h7M4 12h10M4 17h13" />
+    <path d="M18 5v13" />
+    <path d="M15 15l3 3 3-3" />
+  </svg>
+)
+
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'add-passwords': AddPasswordIcon,
+  'sort-list': SortListIcon,
   'csv-email-pass': CsvEmailPassIcon,
   'email-cleaner': EmailCleanerIcon,
   'email-filter': FunnelIcon,

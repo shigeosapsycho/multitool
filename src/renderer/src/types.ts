@@ -20,6 +20,7 @@ export type Route =
   | 'remove-passwords'
   | 'reverse-list'
   | 'search-master'
+  | 'sort-list'
   | 'split-by-n'
   | 'target-sku'
   | 'results'
