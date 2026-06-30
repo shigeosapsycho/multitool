@@ -37,7 +37,7 @@ export function SortListPage({ onBack, onSetStatus, active }: Props) {
 
   return (
     <SingleFileTool
-      title="Sort List"
+      title="Alphabetizer"
       hint="Pick a text file to sort its lines alphabetically (case-insensitive, natural order)."
       taskName="sorted"
       resultLabel="Sorted"
