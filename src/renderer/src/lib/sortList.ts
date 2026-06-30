@@ -1,4 +1,4 @@
-// Logic for the Sort List tool: alphabetize a list of lines.
+// Logic for the Alphabetizer tool: alphabetize a list of lines.
 
 export type SortDirection = 'asc' | 'desc'
 

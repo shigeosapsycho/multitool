@@ -133,7 +133,7 @@ const tools: ToolMeta[] = [
   },
   {
     id: 'sort-list',
-    title: 'Sort List',
+    title: 'Alphabetizer',
     description: 'Sort lines alphabetically, A → Z or Z → A.',
     accent: '#84cc16'
   },
