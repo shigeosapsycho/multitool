@@ -337,10 +337,12 @@ const ProfileFilterIcon = () => (
 
 const AddPasswordIcon = () => (
   <svg {...SVG_PROPS}>
-    <circle cx="9" cy="15" r="3.5" />
-    <path d="M11.5 12.5 18 6" />
-    <path d="M15.5 8.5l2 2" />
-    <path d="M16 7.5v-4M14 5.5h4" />
+    {/* plus */}
+    <path d="M5.5 10.5v8M1.5 14.5h8" />
+    {/* lock body + shackle + keyhole */}
+    <rect x="12" y="12" width="9" height="9" rx="2" />
+    <path d="M14 12v-1.5a2.5 2.5 0 0 1 5 0V12" />
+    <circle cx="16.5" cy="16.5" r="1" />
   </svg>
 )
 
