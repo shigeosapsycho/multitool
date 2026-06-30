@@ -26,7 +26,7 @@ export function PageHeader({ title, subtitle, actions, onBack }: Props) {
             <BackIcon />
           </button>
         )}
-        <div>
+        <div className="select-none">
           <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-text-primary">
             {title}
           </h1>
