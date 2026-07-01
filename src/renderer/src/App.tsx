@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { LogEntry, Route } from './types'
 import type { GroupingMode } from './lib/targetSkus'
+import { PROXY_SPEED_DEFAULTS } from './lib/proxySpeed'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
@@ -66,6 +67,17 @@ function isToolRoute(r: Route): boolean {
   return (TOOL_ROUTES as Route[]).includes(r)
 }
 
+/** Read a positive-integer setting from localStorage, falling back on missing/invalid. */
+function readIntSetting(key: string, fallback: number): number {
+  try {
+    const raw = localStorage.getItem(key)
+    const n = raw != null ? parseInt(raw, 10) : NaN
+    return Number.isFinite(n) && n >= 1 ? n : fallback
+  } catch {
+    return fallback
+  }
+}
+
 export default function App() {
   const [nav, setNav] = useState<NavState>({ history: ['tools'], index: 0 })
   const [version, setVersion] = useState('2.0.0')
@@ -88,6 +100,22 @@ export default function App() {
   // When true (default), opening a module focuses its input for instant paste.
   const [autoFocusInput, setAutoFocusInput] = useState(true)
   const [formatCsv, setFormatCsv] = useState(true)
+  // Proxy Tester speed thresholds (Good/Ok latency cutoffs, ms). Persisted to
+  // localStorage; adjustable in Settings with a reset-to-defaults.
+  const [proxyGoodMs, setProxyGoodMs] = useState<number>(() =>
+    readIntSetting('proxyTester.goodMs', PROXY_SPEED_DEFAULTS.goodMs)
+  )
+  const [proxyOkMs, setProxyOkMs] = useState<number>(() =>
+    readIntSetting('proxyTester.okMs', PROXY_SPEED_DEFAULTS.okMs)
+  )
+  const changeProxyGoodMs = (n: number) => {
+    setProxyGoodMs(n)
+    try { localStorage.setItem('proxyTester.goodMs', String(n)) } catch { /* ignore */ }
+  }
+  const changeProxyOkMs = (n: number) => {
+    setProxyOkMs(n)
+    try { localStorage.setItem('proxyTester.okMs', String(n)) } catch { /* ignore */ }
+  }
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
   // The most recently opened module — the Tools tab returns here.
@@ -374,7 +402,9 @@ export default function App() {
       onNavigate: navigate,
       pokemonGrouping,
       orderBySelectDate,
-      formatCsv
+      formatCsv,
+      proxyGoodMs,
+      proxyOkMs
     }
     switch (r) {
       case 'add-passwords':
@@ -463,6 +493,10 @@ export default function App() {
         onAutoFocusInputChange={setAutoFocusInput}
         formatCsv={formatCsv}
         onFormatCsvChange={setFormatCsv}
+        proxyGoodMs={proxyGoodMs}
+        onProxyGoodMsChange={changeProxyGoodMs}
+        proxyOkMs={proxyOkMs}
+        onProxyOkMsChange={changeProxyOkMs}
       />
     )
   else if (route === 'logs') nonToolContent = <LogsPage logs={logs} />
