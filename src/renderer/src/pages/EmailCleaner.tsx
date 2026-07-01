@@ -19,6 +19,13 @@ const StopIcon = () => (
   </svg>
 )
 
+const ClearIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
 const fieldClass =
   'h-9 rounded-lg border border-border bg-surface px-3 text-[12.5px] text-text-primary outline-none transition focus:border-accent'
 
@@ -339,13 +346,25 @@ export function EmailCleanerPage({ onBack, active }: Props) {
         ) : (
           <div className="flex h-full min-h-0 flex-col">
             <div className="border-b border-border px-3 py-2">
-              <input
-                className={`${fieldClass} w-full`}
-                placeholder="Search senders and subjects…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                spellCheck={false}
-              />
+              <div className="relative">
+                <input
+                  className={`${fieldClass} w-full ${search ? 'pr-9' : ''}`}
+                  placeholder="Search senders and subjects…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  spellCheck={false}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    aria-label="Clear filter"
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-text-muted transition hover:bg-surface-2 hover:text-text-primary"
+                  >
+                    <ClearIcon />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
               <button
