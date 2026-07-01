@@ -5,6 +5,7 @@ import { Toggle } from '../components/Toggle'
 import { Select } from '../components/Select'
 import { Icons } from '../components/ToolShell'
 import type { GroupingMode } from '../lib/targetSkus'
+import { PROXY_SPEED_DEFAULTS } from '../lib/proxySpeed'
 
 const PencilIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -44,6 +45,10 @@ type Props = {
   onAutoFocusInputChange: (next: boolean) => void
   formatCsv: boolean
   onFormatCsvChange: (next: boolean) => void
+  proxyGoodMs: number
+  onProxyGoodMsChange: (next: number) => void
+  proxyOkMs: number
+  onProxyOkMsChange: (next: number) => void
 }
 
 export function SettingsPage({
@@ -64,7 +69,11 @@ export function SettingsPage({
   autoFocusInput,
   onAutoFocusInputChange,
   formatCsv,
-  onFormatCsvChange
+  onFormatCsvChange,
+  proxyGoodMs,
+  onProxyGoodMsChange,
+  proxyOkMs,
+  onProxyOkMsChange
 }: Props) {
   const [outputDir, setOutputDir] = useState('—')
 
@@ -324,6 +333,57 @@ export function SettingsPage({
                 onChange={handleToggleOrderBySelectDate}
                 ariaLabel="Toggle order SKUs by select date"
               />
+            </div>
+          </div>
+        </Card>
+
+        <Card label="Proxy Tester">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div>
+              <div className="text-[14px] text-text-primary">Speed thresholds</div>
+              <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                Latency cutoffs (ms) used to bucket tested proxies. Good is ≤ the first
+                value, Ok is ≤ the second, and anything higher is Slow.
+              </div>
+            </div>
+            <div className="flex flex-wrap items-end gap-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[12px] text-text-secondary">Good ≤ (ms)</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={proxyGoodMs}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10)
+                    if (Number.isFinite(n) && n >= 1) onProxyGoodMsChange(n)
+                  }}
+                  className="h-9 w-28 rounded-lg border border-border bg-surface px-3 font-mono text-[12.5px] text-text-primary outline-none transition focus:border-accent"
+                  aria-label="Good latency threshold in milliseconds"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[12px] text-text-secondary">Ok ≤ (ms)</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={proxyOkMs}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10)
+                    if (Number.isFinite(n) && n >= 1) onProxyOkMsChange(n)
+                  }}
+                  className="h-9 w-28 rounded-lg border border-border bg-surface px-3 font-mono text-[12.5px] text-text-primary outline-none transition focus:border-accent"
+                  aria-label="Ok latency threshold in milliseconds"
+                />
+              </label>
+              <Button
+                onClick={() => {
+                  onProxyGoodMsChange(PROXY_SPEED_DEFAULTS.goodMs)
+                  onProxyOkMsChange(PROXY_SPEED_DEFAULTS.okMs)
+                }}
+                variant="ghost"
+              >
+                Reset to defaults
+              </Button>
             </div>
           </div>
         </Card>

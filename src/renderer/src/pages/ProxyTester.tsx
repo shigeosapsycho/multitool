@@ -5,11 +5,22 @@ import { consumePendingFile, consumePendingProxies } from '../lib/pending'
 import type { ProxyTestEntry } from '../lib/api'
 import { shortOutputPath } from '../lib/paths'
 import { normalizeTargetUrl } from '../lib/url'
+import { speedCategory, PROXY_SPEED_DEFAULTS, type ProxySpeedCategory } from '../lib/proxySpeed'
 
 type Props = {
   onBack: () => void
   onSetStatus: (msg: string) => void
   active?: boolean
+  proxyGoodMs?: number
+  proxyOkMs?: number
+}
+
+// Latency-cell color per speed bucket.
+const MS_COLOR: Record<ProxySpeedCategory | 'failed', string> = {
+  good: 'text-green-400',
+  ok: 'text-amber-400',
+  slow: 'text-orange-400',
+  failed: 'text-text-muted'
 }
 
 const StopIcon = () => (
@@ -21,7 +32,13 @@ const StopIcon = () => (
 const URL_STORAGE_KEY = 'proxyTester.targetUrl'
 const DEFAULT_TARGET_URL = 'https://btcollectibles.com'
 
-export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
+export function ProxyTesterPage({
+  onBack,
+  onSetStatus,
+  active = true,
+  proxyGoodMs = PROXY_SPEED_DEFAULTS.goodMs,
+  proxyOkMs = PROXY_SPEED_DEFAULTS.okMs
+}: Props) {
   const [url, setUrl] = useState<string>(() => {
     try {
       return localStorage.getItem(URL_STORAGE_KEY) ?? DEFAULT_TARGET_URL
@@ -43,6 +60,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [results, setResults] = useState<ProxyTestEntry[] | null>(null)
+  const [speedFilter, setSpeedFilter] = useState<'all' | ProxySpeedCategory | 'failed'>('all')
   const [savedTo, setSavedTo] = useState<string | null>(null)
   const [lineCount, setLineCount] = useState(0)
   const panelRef = useRef<FilePanelHandle>(null)
@@ -86,6 +104,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
     setFilePath(null)
     panelRef.current?.setValue('')
     setResults(null)
+    setSpeedFilter('all')
     setSavedTo(null)
     onSetStatus('Ready')
   }
@@ -101,6 +120,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
     setRunning(true)
     setStopping(false)
     setResults(null)
+    setSpeedFilter('all')
     setSavedTo(null)
     onSetStatus(`Testing ${proxies.length.toLocaleString()} proxies against ${targetUrl}...`)
     unsubProgressRef.current = window.api.net.onProxyProgress(({ done, total, ok }) => {
@@ -152,7 +172,15 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
   async function handleSaveWorking() {
     if (!results) return
     const working = results
-      .filter((r) => r.error == null && r.normalized)
+      .filter((r) => {
+        if (r.error != null || !r.normalized) return false
+        if (speedFilter === 'all') return true
+        if (speedFilter === 'failed') return false
+        return (
+          r.latencyMs != null &&
+          speedCategory(r.latencyMs, { goodMs: proxyGoodMs, okMs: proxyOkMs }) === speedFilter
+        )
+      })
       .map((r) => {
         // Strip scheme, then emit host:port:user:pass (creds last, colon-separated)
         const stripped = r.normalized!.replace(/^[a-z0-9]+:\/\//i, '')
@@ -163,7 +191,9 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
         return `${hostPort}:${creds}` // host:port:user:pass
       })
     if (working.length === 0) return
-    const path = await window.api.files.writeOutput('working-proxies', working.join('\n') + '\n')
+    const name =
+      speedFilter === 'all' || speedFilter === 'failed' ? 'working-proxies' : `proxies-${speedFilter}`
+    const path = await window.api.files.writeOutput(name, working.join('\n') + '\n')
     setSavedTo(path)
     onSetStatus(`Saved ${working.length.toLocaleString()} to ${shortOutputPath(path)}`)
   }
@@ -177,6 +207,36 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
         results.filter((r) => r.error == null && r.latencyMs != null).reduce((sum, r) => sum + (r.latencyMs ?? 0), 0) / okCount
       )
     : null
+
+  // Speed bucketing (Good/Ok/Slow) for the "Filter proxies by speed" chips.
+  const categoryOf = (r: ProxyTestEntry): ProxySpeedCategory | 'failed' =>
+    r.error != null || r.latencyMs == null
+      ? 'failed'
+      : speedCategory(r.latencyMs, { goodMs: proxyGoodMs, okMs: proxyOkMs })
+  const speedCounts: Record<'all' | ProxySpeedCategory | 'failed', number> = {
+    all: results?.length ?? 0,
+    good: 0,
+    ok: 0,
+    slow: 0,
+    failed: 0
+  }
+  if (results) for (const r of results) speedCounts[categoryOf(r)]++
+  const visibleResults =
+    results && speedFilter !== 'all' ? results.filter((r) => categoryOf(r) === speedFilter) : results
+  const saveCount = results
+    ? results.filter(
+        (r) =>
+          r.error == null &&
+          r.normalized != null &&
+          (speedFilter === 'all' ||
+            (r.latencyMs != null &&
+              speedCategory(r.latencyMs, { goodMs: proxyGoodMs, okMs: proxyOkMs }) === speedFilter))
+      ).length
+    : 0
+  const saveLabel =
+    speedFilter === 'all' || speedFilter === 'failed'
+      ? 'Working'
+      : speedFilter.charAt(0).toUpperCase() + speedFilter.slice(1)
 
   return (
     <ToolLayout
@@ -241,6 +301,7 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
           onLineCountChange={setLineCount}
           onUserEdit={() => {
             setResults(null)
+            setSpeedFilter('all')
             setSavedTo(null)
           }}
           placeholder={'One proxy per line. Accepts:\n\n  host:port\n  host:port:user:pass\n  user:pass@host:port\n  user:pass:host:port\n\nOptional scheme prefix: http://, https://, socks5://'}
@@ -260,6 +321,32 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-2">
+              <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-secondary">
+                Filter by speed
+              </span>
+              {(
+                [
+                  ['all', 'All', speedCounts.all],
+                  ['good', 'Good', speedCounts.good],
+                  ['ok', 'Ok', speedCounts.ok],
+                  ['slow', 'Slow', speedCounts.slow],
+                  ['failed', 'Failed', speedCounts.failed]
+                ] as const
+              ).map(([id, label, n]) => (
+                <button
+                  key={id}
+                  onClick={() => setSpeedFilter(id)}
+                  className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
+                    speedFilter === id
+                      ? 'bg-accent-soft text-accent'
+                      : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'
+                  }`}
+                >
+                  {label} <span className="text-text-muted">{n}</span>
+                </button>
+              ))}
+            </div>
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full border-collapse text-[12px] font-mono">
                 <thead className="sticky top-0 bg-surface text-[11px] uppercase tracking-[0.06em] text-text-secondary">
@@ -271,10 +358,10 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((r, i) => (
+                  {(visibleResults ?? []).map((r, i) => (
                     <tr key={i} className="border-b border-border/40 hover:bg-surface-2">
                       <td className="px-3 py-1.5 text-text-primary break-all">{r.raw || '—'}</td>
-                      <td className="px-3 py-1.5 text-right text-text-secondary">
+                      <td className={`px-3 py-1.5 text-right ${MS_COLOR[categoryOf(r)]}`}>
                         {r.latencyMs != null ? r.latencyMs.toLocaleString() : '—'}
                       </td>
                       <td className={`px-3 py-1.5 text-right ${r.error == null ? 'text-green-400' : 'text-text-muted'}`}>
@@ -303,9 +390,9 @@ export function ProxyTesterPage({ onBack, onSetStatus, active = true }: Props) {
                   Reveal
                 </Button>
               ) : (
-                <Button onClick={handleSaveWorking} variant="secondary" disabled={okCount === 0}>
+                <Button onClick={handleSaveWorking} variant="secondary" disabled={saveCount === 0}>
                   <Icons.Save />
-                  Save Working
+                  Save {saveLabel}
                 </Button>
               )}
             </div>
