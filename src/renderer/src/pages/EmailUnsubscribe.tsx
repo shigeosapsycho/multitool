@@ -35,6 +35,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [emails, setEmails] = useState<UnsubEmail[] | null>(null)
+  const [scanSeq, setScanSeq] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<Map<string, UnsubRunItem>>(new Map())
@@ -127,6 +128,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
     try {
       const result = await window.api.unsub.scan(selectedId, range)
       setEmails(result.emails)
+      setScanSeq((s) => s + 1)
       const senderCount = groupBySender(result.emails).length
       if (result.cancelled) {
         setStatus(
@@ -454,7 +456,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
                 expanded={expanded}
                 results={results}
                 unsubInfo={unsubInfoByKey}
-                resetKey={emails}
+                resetKey={scanSeq}
                 onToggleGroup={toggleGroup}
                 onToggleExpand={toggleExpand}
                 onPreview={handlePreview}

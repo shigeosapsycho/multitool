@@ -40,6 +40,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [emails, setEmails] = useState<EmailHeader[] | null>(null)
+  const [scanSeq, setScanSeq] = useState(0)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [permanent, setPermanent] = useState(false)
@@ -132,6 +133,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
     try {
       const result = await window.api.imap.scan(selectedId, range)
       setEmails(result.emails)
+      setScanSeq((s) => s + 1)
       if (result.cancelled) {
         setStatus(
           `Scan stopped — showing ${result.emails.length.toLocaleString()} ${
@@ -409,7 +411,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
                 selected={selected}
                 selectedCountByGroup={selectedCountByGroup}
                 expanded={expanded}
-                resetKey={emails}
+                resetKey={scanSeq}
                 onToggleGroup={toggleGroup}
                 onToggleEmail={toggleEmail}
                 onToggleExpand={toggleExpand}
