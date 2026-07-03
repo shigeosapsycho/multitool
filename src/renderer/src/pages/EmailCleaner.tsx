@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { ToolLayout, Button, Icons } from '../components/ToolShell'
 import { Card } from '../components/Card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -65,9 +65,12 @@ export function EmailCleanerPage({ onBack, active }: Props) {
 
   // Scanned emails grouped by sender, narrowed by the inbox search box.
   // A search term matches against the sender name, sender address, or subject.
+  // The filter reads a deferred copy of the search text so typing never blocks
+  // on re-filtering a six-figure inbox.
+  const deferredSearch = useDeferredValue(search)
   const groups = useMemo(() => {
     if (!emails) return []
-    const q = search.trim().toLowerCase()
+    const q = deferredSearch.trim().toLowerCase()
     if (!q) return groupBySender(emails)
     const filtered = emails.filter(
       (e) =>
@@ -76,7 +79,29 @@ export function EmailCleanerPage({ onBack, active }: Props) {
         e.subject.toLowerCase().includes(q)
     )
     return groupBySender(filtered)
-  }, [emails, search])
+  }, [emails, deferredSearch])
+
+  // Selection math, one pass per change instead of per group per render.
+  const selectedCountByGroup = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const g of groups) {
+      let n = 0
+      for (const e of g.emails) if (selected.has(e.uid)) n++
+      if (n > 0) counts.set(g.key, n)
+    }
+    return counts
+  }, [groups, selected])
+
+  const visibleUids = useMemo(() => {
+    const uids: number[] = []
+    for (const g of groups) for (const e of g.emails) uids.push(e.uid)
+    return uids
+  }, [groups])
+
+  const allSelected = useMemo(
+    () => visibleUids.length > 0 && visibleUids.every((u) => selected.has(u)),
+    [visibleUids, selected]
+  )
 
   // ---------- scan ----------
 
@@ -176,13 +201,11 @@ export function EmailCleanerPage({ onBack, active }: Props) {
   // Operates on the currently visible (search-filtered) emails: if every
   // visible email is already selected, clear them; otherwise add them all.
   function selectAll() {
-    const visible = groups.flatMap((g) => g.emails.map((e) => e.uid))
-    if (visible.length === 0) return
+    if (visibleUids.length === 0) return
     setSelected((prev) => {
-      const allVisibleSelected = visible.every((u) => prev.has(u))
       const next = new Set(prev)
-      for (const u of visible) {
-        if (allVisibleSelected) next.delete(u)
+      for (const u of visibleUids) {
+        if (allSelected) next.delete(u)
         else next.add(u)
       }
       return next
@@ -214,7 +237,8 @@ export function EmailCleanerPage({ onBack, active }: Props) {
     setStatus(permanent ? 'Permanently deleting emails…' : 'Moving emails to Trash…')
     try {
       const result = await window.api.imap.delete(selectedId, uids, permanent)
-      const deletedSet = new Set(uids.filter((u) => !result.failed.includes(u)))
+      const failedSet = new Set(result.failed)
+      const deletedSet = new Set(uids.filter((u) => !failedSet.has(u)))
       setEmails((prev) => (prev ? prev.filter((e) => !deletedSet.has(e.uid)) : prev))
       setSelected(new Set())
       const base = `Deleted ${result.deleted.toLocaleString()} emails.`
@@ -235,8 +259,6 @@ export function EmailCleanerPage({ onBack, active }: Props) {
 
   const canScan = !!selectedId && !running
   const selectedCount = selected.size
-  const visibleUids = groups.flatMap((g) => g.emails.map((e) => e.uid))
-  const allSelected = visibleUids.length > 0 && visibleUids.every((u) => selected.has(u))
 
   return (
     <ToolLayout
@@ -385,7 +407,9 @@ export function EmailCleanerPage({ onBack, active }: Props) {
               <EmailCleanerGroups
                 groups={groups}
                 selected={selected}
+                selectedCountByGroup={selectedCountByGroup}
                 expanded={expanded}
+                resetKey={emails}
                 onToggleGroup={toggleGroup}
                 onToggleEmail={toggleEmail}
                 onToggleExpand={toggleExpand}

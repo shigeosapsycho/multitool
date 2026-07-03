@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { EmailHeader } from '../lib/api'
 import { ContextMenu } from '../components/ContextMenu'
+import { VirtualGroupList } from '../components/VirtualGroupList'
 
 export type SenderGroup<T extends EmailHeader = EmailHeader> = {
   /** Stable identity for this group — used as the React key and expand key. */
@@ -143,7 +144,11 @@ function Check({
 type Props = {
   groups: SenderGroup[]
   selected: Set<number>
+  /** Per-group count of selected emails, keyed by group key (absent = 0). */
+  selectedCountByGroup: ReadonlyMap<string, number>
   expanded: Set<string>
+  /** Scrolls the list back to the top when it changes (fresh scan results). */
+  resetKey?: unknown
   onToggleGroup: (group: SenderGroup) => void
   onToggleEmail: (uid: number) => void
   onToggleExpand: (addr: string) => void
@@ -153,7 +158,9 @@ type Props = {
 export function EmailCleanerGroups({
   groups,
   selected,
+  selectedCountByGroup,
   expanded,
+  resetKey,
   onToggleGroup,
   onToggleEmail,
   onToggleExpand,
@@ -162,17 +169,22 @@ export function EmailCleanerGroups({
   const [menu, setMenu] = useState<{ x: number; y: number; email: EmailHeader } | null>(null)
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto">
-      {groups.map((g) => {
-        const selectedCount = g.emails.filter((e) => selected.has(e.uid)).length
-        const groupState: 'on' | 'off' | 'some' =
-          selectedCount === 0 ? 'off' : selectedCount === g.emails.length ? 'on' : 'some'
-        const isOpen = expanded.has(g.key)
-        const subline = g.addr || (g.addrCount > 1 ? `${g.addrCount} addresses` : '')
-        return (
-          <div key={g.key} className="border-b border-border/60">
+    <>
+      <VirtualGroupList
+        groups={groups}
+        expanded={expanded}
+        resetKey={resetKey}
+        renderGroupRow={(g) => {
+          const selectedCount = selectedCountByGroup.get(g.key) ?? 0
+          const groupState: 'on' | 'off' | 'some' =
+            selectedCount === 0 ? 'off' : selectedCount === g.emails.length ? 'on' : 'some'
+          const isOpen = expanded.has(g.key)
+          const subline = g.addr || (g.addrCount > 1 ? `${g.addrCount} addresses` : '')
+          return (
             <div
-              className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-surface-2"
+              className={`flex h-full cursor-pointer items-center gap-2.5 px-3 hover:bg-surface-2 ${
+                isOpen ? '' : 'border-b border-border/60'
+              }`}
               onClick={() => onToggleExpand(g.key)}
             >
               <Check state={groupState} onClick={() => onToggleGroup(g)} />
@@ -192,44 +204,41 @@ export function EmailCleanerGroups({
                 {formatSize(g.totalSize)}
               </span>
             </div>
-            {isOpen && (
-              <div className="bg-surface-2/40">
-                {g.emails.map((e) => (
-                  <div
-                    key={e.uid}
-                    onClick={(ev) => {
-                      // Ctrl+click (Cmd+click on macOS) anywhere on the row
-                      // toggles the email's selection — a faster multi-select
-                      // than aiming for the checkbox.
-                      if (ev.ctrlKey || ev.metaKey) onToggleEmail(e.uid)
-                    }}
-                    onContextMenu={(ev) => {
-                      ev.preventDefault()
-                      setMenu({ x: ev.clientX, y: ev.clientY, email: e })
-                    }}
-                    title="Ctrl+click to select · right-click to preview"
-                    className="flex select-none items-center gap-2.5 py-1.5 pl-11 pr-3 hover:bg-surface-2"
-                  >
-                    <Check
-                      state={selected.has(e.uid) ? 'on' : 'off'}
-                      onClick={() => onToggleEmail(e.uid)}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-text-secondary">
-                      {e.subject || '(no subject)'}
-                    </span>
-                    <span className="w-20 shrink-0 text-right text-[11px] text-text-muted">
-                      {formatDate(e.dateMs)}
-                    </span>
-                    <span className="w-16 shrink-0 text-right text-[11px] text-text-muted">
-                      {formatSize(e.sizeBytes)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+          )
+        }}
+        renderEmailRow={(e, _g, isLast) => (
+          <div
+            onClick={(ev) => {
+              // Ctrl+click (Cmd+click on macOS) anywhere on the row
+              // toggles the email's selection — a faster multi-select
+              // than aiming for the checkbox.
+              if (ev.ctrlKey || ev.metaKey) onToggleEmail(e.uid)
+            }}
+            onContextMenu={(ev) => {
+              ev.preventDefault()
+              setMenu({ x: ev.clientX, y: ev.clientY, email: e })
+            }}
+            title="Ctrl+click to select · right-click to preview"
+            className={`flex h-full select-none items-center gap-2.5 bg-surface-2/40 pl-11 pr-3 hover:bg-surface-2 ${
+              isLast ? 'border-b border-border/60' : ''
+            }`}
+          >
+            <Check
+              state={selected.has(e.uid) ? 'on' : 'off'}
+              onClick={() => onToggleEmail(e.uid)}
+            />
+            <span className="min-w-0 flex-1 truncate text-[12.5px] text-text-secondary">
+              {e.subject || '(no subject)'}
+            </span>
+            <span className="w-20 shrink-0 text-right text-[11px] text-text-muted">
+              {formatDate(e.dateMs)}
+            </span>
+            <span className="w-16 shrink-0 text-right text-[11px] text-text-muted">
+              {formatSize(e.sizeBytes)}
+            </span>
           </div>
-        )
-      })}
+        )}
+      />
       {menu && (
         <ContextMenu
           x={menu.x}
@@ -244,6 +253,6 @@ export function EmailCleanerGroups({
           ]}
         />
       )}
-    </div>
+    </>
   )
 }
