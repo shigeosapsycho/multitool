@@ -500,6 +500,7 @@ pub struct ConfigSnapshot {
     pub order_by_select_date: bool,
     pub auto_focus_input: bool,
     pub format_csv: bool,
+    pub confirm_permanent_delete: bool,
 }
 
 #[tauri::command]
@@ -520,6 +521,7 @@ pub async fn config_get(app: AppHandle) -> Result<ConfigSnapshot, String> {
         order_by_select_date: cfg.order_by_select_date(),
         auto_focus_input: cfg.auto_focus_input(),
         format_csv: cfg.format_csv(),
+        confirm_permanent_delete: cfg.confirm_permanent_delete(),
     })
 }
 
@@ -601,6 +603,15 @@ pub async fn config_set_auto_focus_input(app: AppHandle, enabled: bool) -> Resul
 #[tauri::command]
 pub async fn config_set_format_csv(app: AppHandle, enabled: bool) -> Result<bool, String> {
     mutate_config(&app, |cfg| cfg.format_csv = Some(enabled))?;
+    Ok(enabled)
+}
+
+#[tauri::command]
+pub async fn config_set_confirm_permanent_delete(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<bool, String> {
+    mutate_config(&app, |cfg| cfg.confirm_permanent_delete = Some(enabled))?;
     Ok(enabled)
 }
 

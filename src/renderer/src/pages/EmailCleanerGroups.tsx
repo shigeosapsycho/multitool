@@ -151,6 +151,8 @@ type Props = {
   resetKey?: unknown
   onToggleGroup: (group: SenderGroup) => void
   onToggleEmail: (uid: number) => void
+  /** Shift+click on an email row — select the range from the anchor. */
+  onRangeSelect: (uid: number) => void
   onToggleExpand: (addr: string) => void
   onPreview: (email: EmailHeader) => void
 }
@@ -163,6 +165,7 @@ export function EmailCleanerGroups({
   resetKey,
   onToggleGroup,
   onToggleEmail,
+  onRangeSelect,
   onToggleExpand,
   onPreview
 }: Props) {
@@ -185,7 +188,12 @@ export function EmailCleanerGroups({
               className={`flex h-full cursor-pointer items-center gap-2.5 px-3 hover:bg-surface-2 ${
                 isOpen ? '' : 'border-b border-border/60'
               }`}
-              onClick={() => onToggleExpand(g.key)}
+              onClick={(ev) => {
+                // Ctrl+click (Cmd+click on macOS) toggles the whole group's
+                // selection without expanding it; plain click expands.
+                if (ev.ctrlKey || ev.metaKey) onToggleGroup(g)
+                else onToggleExpand(g.key)
+              }}
             >
               <Check state={groupState} onClick={() => onToggleGroup(g)} />
               <span className="text-text-muted">
@@ -209,16 +217,16 @@ export function EmailCleanerGroups({
         renderEmailRow={(e, _g, isLast) => (
           <div
             onClick={(ev) => {
-              // Ctrl+click (Cmd+click on macOS) anywhere on the row
-              // toggles the email's selection — a faster multi-select
-              // than aiming for the checkbox.
-              if (ev.ctrlKey || ev.metaKey) onToggleEmail(e.uid)
+              // Shift+click selects the range from the last-clicked email;
+              // Ctrl+click (Cmd+click on macOS) toggles just this email.
+              if (ev.shiftKey) onRangeSelect(e.uid)
+              else if (ev.ctrlKey || ev.metaKey) onToggleEmail(e.uid)
             }}
             onContextMenu={(ev) => {
               ev.preventDefault()
               setMenu({ x: ev.clientX, y: ev.clientY, email: e })
             }}
-            title="Ctrl+click to select · right-click to preview"
+            title="Ctrl+click to select · Shift+click for range · right-click to preview"
             className={`flex h-full select-none items-center gap-2.5 bg-surface-2/40 pl-11 pr-3 hover:bg-surface-2 ${
               isLast ? 'border-b border-border/60' : ''
             }`}
