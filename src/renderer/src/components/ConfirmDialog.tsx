@@ -9,6 +9,8 @@ type Props = {
   confirmLabel?: string
   cancelLabel?: string
   danger?: boolean
+  /** Optional "don't ask me again" row rendered between the body and buttons. */
+  suppress?: { label: string; checked: boolean; onChange: (v: boolean) => void }
   onConfirm: () => void
   onCancel: () => void
 }
@@ -21,6 +23,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   danger = false,
+  suppress,
   onConfirm,
   onCancel
 }: Props) {
@@ -56,6 +59,17 @@ export function ConfirmDialog({
           <p className="text-[14px] leading-relaxed text-text-primary">{message}</p>
           {detail && (
             <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">{detail}</p>
+          )}
+          {suppress && (
+            <label className="mt-4 flex cursor-pointer items-center gap-2 text-[12.5px] text-text-secondary">
+              <input
+                type="checkbox"
+                checked={suppress.checked}
+                onChange={(e) => suppress.onChange(e.target.checked)}
+                className="h-4 w-4 accent-accent"
+              />
+              {suppress.label}
+            </label>
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-2/40 px-5 py-3">
