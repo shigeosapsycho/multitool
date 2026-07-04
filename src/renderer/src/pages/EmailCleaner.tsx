@@ -262,7 +262,8 @@ export function EmailCleanerPage({
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
       if (
         document.querySelector('[role="dialog"][aria-modal="true"]') ||
-        document.querySelector('[role="listbox"]')
+        document.querySelector('[role="listbox"]') ||
+        document.querySelector('[role="menu"]')
       )
         return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
@@ -326,6 +327,7 @@ export function EmailCleanerPage({
   async function confirmDelete() {
     if (!selectedId || selected.size === 0) return
     setConfirmOpen(false)
+    setDeleting(true)
     if (permanent && suppressChecked && confirmPermanentDelete) {
       try {
         await window.api.config.setConfirmPermanentDelete(false)
@@ -334,7 +336,6 @@ export function EmailCleanerPage({
         setStatus(`Could not save setting: ${String(e)} — deleting anyway.`)
       }
     }
-    setDeleting(true)
     const uids = [...selected]
     setStatus(permanent ? 'Permanently deleting emails…' : 'Moving emails to Trash…')
     try {
