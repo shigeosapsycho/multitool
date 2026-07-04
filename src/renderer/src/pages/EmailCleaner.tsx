@@ -4,6 +4,7 @@ import { Card } from '../components/Card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImapAccountPicker } from '../components/ImapAccountPicker'
 import type { EmailHeader, ScanRange, ScanResult, EmailBody } from '../lib/api'
+import { rangeBetween } from '../lib/rangeSelect'
 import { EmailCleanerGroups, groupBySender } from './EmailCleanerGroups'
 import { EmailPreview } from './EmailPreview'
 
@@ -31,7 +32,12 @@ const ClearIcon = () => (
 const fieldClass =
   'h-9 rounded-lg border border-border bg-surface px-3 text-[12.5px] text-text-primary outline-none transition focus:border-accent'
 
-export function EmailCleanerPage({ onBack, active }: Props) {
+export function EmailCleanerPage({
+  onBack,
+  active,
+  confirmPermanentDelete,
+  onConfirmPermanentDeleteChange
+}: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const [rangeMode, setRangeMode] = useState<'dateRange' | 'lastDays'>('lastDays')
@@ -45,8 +51,15 @@ export function EmailCleanerPage({ onBack, active }: Props) {
   const [scanSeq, setScanSeq] = useState(0)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Anchor for Shift+click range selection: the last email row the user
+  // clicked. Cleared whenever the visible list changes shape (new scan,
+  // account switch, search edit) or the anchor email is deleted.
+  const [anchorUid, setAnchorUid] = useState<number | null>(null)
   const [permanent, setPermanent] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  // "Don't ask me again" checkbox inside the Delete Permanently dialog.
+  // Reset every time the dialog opens; persisted only on confirm.
+  const [suppressChecked, setSuppressChecked] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [status, setStatus] = useState('Pick an account and a date range, then scan the inbox.')
   const [search, setSearch] = useState('')
@@ -62,6 +75,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
   useEffect(() => {
     setEmails(null)
     setSelected(new Set())
+    setAnchorUid(null)
     setExpanded(new Set())
     setSearch('')
   }, [selectedId])
@@ -129,6 +143,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
     setStopping(false)
     setEmails(null)
     setSelected(new Set())
+    setAnchorUid(null)
     setExpanded(new Set())
     setSearch('')
     setStatus('Scanning inbox…')
@@ -191,6 +206,23 @@ export function EmailCleanerPage({ onBack, active }: Props) {
       else next.add(uid)
       return next
     })
+    setAnchorUid(uid)
+  }
+
+  // Shift+click: add the whole visible span between the anchor and the
+  // clicked email. Without a usable anchor it degrades to a single toggle.
+  function rangeSelect(uid: number) {
+    const range = rangeBetween(visibleUids, anchorUid, uid)
+    if (range.length === 0) {
+      toggleEmail(uid)
+      return
+    }
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const u of range) next.add(u)
+      return next
+    })
+    setAnchorUid(uid)
   }
 
   function toggleExpand(addr: string) {
@@ -216,6 +248,52 @@ export function EmailCleanerPage({ onBack, active }: Props) {
     })
   }
 
+  // Page-scoped shortcuts: Ctrl+A select-all-visible, Delete opens the
+  // delete flow, Esc clears the selection (and only then falls through to
+  // App's Esc-returns-to-Tools). Registered without a dependency array so
+  // the handler always closes over the latest state; gated to the active
+  // route, and inert while typing or while a dialog/dropdown is open —
+  // the same guards App.tsx uses. Capture phase so a selection-clearing
+  // Esc wins over App's bubble-phase back-navigation.
+  useEffect(() => {
+    if (!active) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      if (
+        document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        document.querySelector('[role="listbox"]')
+      )
+        return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        if (visibleUids.length === 0) return
+        e.preventDefault()
+        setSelected((prev) => {
+          const next = new Set(prev)
+          for (const u of visibleUids) next.add(u)
+          return next
+        })
+      } else if (e.key === 'Delete') {
+        if (selected.size === 0 || deleting) return
+        e.preventDefault()
+        requestDelete()
+      } else if (e.key === 'Escape') {
+        if (selected.size === 0) return
+        e.preventDefault()
+        e.stopPropagation()
+        setSelected(new Set())
+        setAnchorUid(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  })
+
+  function changeSearch(next: string) {
+    setSearch(next)
+    setAnchorUid(null)
+  }
+
   // ---------- preview ----------
 
   async function handlePreview(email: EmailHeader) {
@@ -233,9 +311,29 @@ export function EmailCleanerPage({ onBack, active }: Props) {
 
   // ---------- delete ----------
 
+  // Delete button / Delete key entry point: permanent deletes skip the
+  // dialog when the user opted out; everything else confirms first.
+  function requestDelete() {
+    if (selected.size === 0 || deleting) return
+    if (permanent && !confirmPermanentDelete) {
+      void confirmDelete()
+      return
+    }
+    setSuppressChecked(false)
+    setConfirmOpen(true)
+  }
+
   async function confirmDelete() {
     if (!selectedId || selected.size === 0) return
     setConfirmOpen(false)
+    if (permanent && suppressChecked && confirmPermanentDelete) {
+      try {
+        await window.api.config.setConfirmPermanentDelete(false)
+        onConfirmPermanentDeleteChange(false)
+      } catch (e) {
+        setStatus(`Could not save setting: ${String(e)} — deleting anyway.`)
+      }
+    }
     setDeleting(true)
     const uids = [...selected]
     setStatus(permanent ? 'Permanently deleting emails…' : 'Moving emails to Trash…')
@@ -245,6 +343,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
       const deletedSet = new Set(uids.filter((u) => !failedSet.has(u)))
       setEmails((prev) => (prev ? prev.filter((e) => !deletedSet.has(e.uid)) : prev))
       setSelected(new Set())
+      setAnchorUid((a) => (a !== null && deletedSet.has(a) ? null : a))
       const base = `Deleted ${result.deleted.toLocaleString()} emails.`
       const cause = result.error ? ` — ${result.error}` : ''
       setStatus(
@@ -377,14 +476,14 @@ export function EmailCleanerPage({ onBack, active }: Props) {
                   className={`${fieldClass} w-full ${search ? 'pr-9' : ''}`}
                   placeholder="Search senders and subjects…"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => changeSearch(e.target.value)}
                   spellCheck={false}
                 />
                 {search && (
                   <button
                     type="button"
                     aria-label="Clear filter"
-                    onClick={() => setSearch('')}
+                    onClick={() => changeSearch('')}
                     className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-text-muted transition hover:bg-surface-2 hover:text-text-primary"
                   >
                     <ClearIcon />
@@ -416,6 +515,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
                 resetKey={scanSeq}
                 onToggleGroup={toggleGroup}
                 onToggleEmail={toggleEmail}
+                onRangeSelect={rangeSelect}
                 onToggleExpand={toggleExpand}
                 onPreview={handlePreview}
               />
@@ -432,7 +532,7 @@ export function EmailCleanerPage({ onBack, active }: Props) {
               </label>
               <span className="flex-1" />
               <Button
-                onClick={() => setConfirmOpen(true)}
+                onClick={requestDelete}
                 variant="primary"
                 disabled={selectedCount === 0 || deleting}
               >
@@ -467,6 +567,15 @@ export function EmailCleanerPage({ onBack, active }: Props) {
         }
         confirmLabel={permanent ? 'Delete permanently' : 'Move to Trash'}
         danger={permanent}
+        suppress={
+          permanent
+            ? {
+                label: 'Don’t ask me again',
+                checked: suppressChecked,
+                onChange: setSuppressChecked
+              }
+            : undefined
+        }
         onConfirm={confirmDelete}
         onCancel={() => setConfirmOpen(false)}
       />
