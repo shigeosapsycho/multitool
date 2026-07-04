@@ -100,6 +100,8 @@ export default function App() {
   // When true (default), opening a module focuses its input for instant paste.
   const [autoFocusInput, setAutoFocusInput] = useState(true)
   const [formatCsv, setFormatCsv] = useState(true)
+  // When true (default), Email Cleaner confirms before permanent deletes.
+  const [confirmPermanentDelete, setConfirmPermanentDelete] = useState(true)
   // Proxy Tester speed thresholds (Good/Ok latency cutoffs, ms). Persisted to
   // localStorage; adjustable in Settings with a reset-to-defaults.
   const [proxyGoodMs, setProxyGoodMs] = useState<number>(() =>
@@ -138,6 +140,7 @@ export default function App() {
         setOrderBySelectDate(cfg.orderBySelectDate)
         setAutoFocusInput(cfg.autoFocusInput)
         setFormatCsv(cfg.formatCsv)
+        setConfirmPermanentDelete(cfg.confirmPermanentDelete)
       })
       .catch(() => {})
     // Check for updates once on launch (the Rust side no longer polls).
@@ -412,7 +415,13 @@ export default function App() {
       case 'csv-email-pass':
         return <CsvEmailPassPage {...props} />
       case 'email-cleaner':
-        return <EmailCleanerPage {...props} />
+        return (
+          <EmailCleanerPage
+            {...props}
+            confirmPermanentDelete={confirmPermanentDelete}
+            onConfirmPermanentDeleteChange={setConfirmPermanentDelete}
+          />
+        )
       case 'email-filter':
         return <EmailFilterPage {...props} />
       case 'email-unsubscribe':
@@ -493,6 +502,8 @@ export default function App() {
         onAutoFocusInputChange={setAutoFocusInput}
         formatCsv={formatCsv}
         onFormatCsvChange={setFormatCsv}
+        confirmPermanentDelete={confirmPermanentDelete}
+        onConfirmPermanentDeleteChange={setConfirmPermanentDelete}
         proxyGoodMs={proxyGoodMs}
         onProxyGoodMsChange={changeProxyGoodMs}
         proxyOkMs={proxyOkMs}

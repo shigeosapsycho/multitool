@@ -11,6 +11,8 @@ type Props = {
   onBack: () => void
   onSetStatus: (msg: string) => void
   active?: boolean
+  confirmPermanentDelete: boolean
+  onConfirmPermanentDeleteChange: (next: boolean) => void
 }
 
 const StopIcon = () => (

@@ -45,6 +45,8 @@ type Props = {
   onAutoFocusInputChange: (next: boolean) => void
   formatCsv: boolean
   onFormatCsvChange: (next: boolean) => void
+  confirmPermanentDelete: boolean
+  onConfirmPermanentDeleteChange: (next: boolean) => void
   proxyGoodMs: number
   onProxyGoodMsChange: (next: number) => void
   proxyOkMs: number
@@ -70,6 +72,8 @@ export function SettingsPage({
   onAutoFocusInputChange,
   formatCsv,
   onFormatCsvChange,
+  confirmPermanentDelete,
+  onConfirmPermanentDeleteChange,
   proxyGoodMs,
   onProxyGoodMsChange,
   proxyOkMs,
@@ -94,6 +98,11 @@ export function SettingsPage({
   async function handleToggleTrash(next: boolean) {
     await window.api.config.setDeleteToTrash(next)
     onDeleteToTrashChange(next)
+  }
+
+  async function handleToggleConfirmPermanentDelete(next: boolean) {
+    await window.api.config.setConfirmPermanentDelete(next)
+    onConfirmPermanentDeleteChange(next)
   }
 
   async function handleChangeTheme(next: ThemePref) {
@@ -227,6 +236,20 @@ export function SettingsPage({
                 checked={deleteToTrash}
                 onChange={handleToggleTrash}
                 ariaLabel="Toggle send to Recycle Bin"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+              <div>
+                <div className="text-[14px] text-text-primary">Confirm permanent deletes</div>
+                <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                  Ask before permanently deleting emails in Email Cleaner. Turn this back
+                  on if you checked "Don't ask me again".
+                </div>
+              </div>
+              <Toggle
+                checked={confirmPermanentDelete}
+                onChange={handleToggleConfirmPermanentDelete}
+                ariaLabel="Toggle confirm permanent deletes"
               />
             </div>
           </div>
