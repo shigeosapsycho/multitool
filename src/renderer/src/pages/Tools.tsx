@@ -19,6 +19,12 @@ const tools: ToolMeta[] = [
     accent: '#4ade80'
   },
   {
+    id: 'sort-list',
+    title: 'Alphabetizer',
+    description: 'Sort lines alphabetically, A → Z or Z → A.',
+    accent: '#84cc16'
+  },
+  {
     id: 'csv-email-pass',
     title: 'CSV → Email:Password',
     description: 'Pull email & password columns from a CSV into an email:password list.',
@@ -137,12 +143,6 @@ const tools: ToolMeta[] = [
     title: 'Search Master',
     description: 'Find items from a search list that also appear in a master list.',
     accent: '#34d399'
-  },
-  {
-    id: 'sort-list',
-    title: 'Alphabetizer',
-    description: 'Sort lines alphabetically, A → Z or Z → A.',
-    accent: '#84cc16'
   },
   {
     id: 'split-by-n',
