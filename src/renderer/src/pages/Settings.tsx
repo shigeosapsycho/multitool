@@ -243,7 +243,7 @@ export function SettingsPage({
                 <div className="text-[14px] text-text-primary">Confirm permanent deletes</div>
                 <div className="mt-0.5 text-[12.5px] text-text-secondary">
                   Ask before permanently deleting emails in Email Cleaner. Turn this back
-                  on if you checked "Don't ask me again".
+                  on if you checked “Don’t ask me again”.
                 </div>
               </div>
               <Toggle
