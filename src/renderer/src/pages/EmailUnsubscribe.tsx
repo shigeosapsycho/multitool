@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { ToolLayout, Button, Icons } from '../components/ToolShell'
 import { Card } from '../components/Card'
@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImapAccountPicker } from '../components/ImapAccountPicker'
 import type { UnsubEmail, UnsubRunItem, UnsubTarget, ScanRange, EmailBody } from '../lib/api'
 import { groupBySender } from './EmailCleanerGroups'
-import { EmailUnsubscribeGroups, groupUnsubInfo } from './EmailUnsubscribeGroups'
+import { EmailUnsubscribeGroups, groupUnsubInfo, type GroupUnsub } from './EmailUnsubscribeGroups'
 import { EmailPreview } from './EmailPreview'
 
 type Props = {
@@ -35,6 +35,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [emails, setEmails] = useState<UnsubEmail[] | null>(null)
+  const [scanSeq, setScanSeq] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<Map<string, UnsubRunItem>>(new Map())
@@ -62,10 +63,13 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
     setSearch('')
   }, [selectedId])
 
-  // All scanned senders grouped, and the search-narrowed subset shown.
+  // All scanned senders grouped, and the search-narrowed subset shown. The
+  // filter reads a deferred copy of the search text so typing never blocks on
+  // re-filtering a six-figure inbox.
   const allGroups = useMemo(() => (emails ? groupBySender(emails) : []), [emails])
+  const deferredSearch = useDeferredValue(search)
   const groups = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = deferredSearch.trim().toLowerCase()
     if (!q) return allGroups
     return allGroups.filter(
       (g) =>
@@ -73,17 +77,26 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
         g.addr.toLowerCase().includes(q) ||
         g.emails.some((e) => e.subject.toLowerCase().includes(q))
     )
-  }, [allGroups, search])
+  }, [allGroups, deferredSearch])
+
+  // Each group's unsubscribe action, computed once per scan instead of per
+  // row per render (groupUnsubInfo scans every email in the group).
+  const unsubInfoByKey = useMemo(() => {
+    const m = new Map<string, GroupUnsub>()
+    for (const g of allGroups) m.set(g.key, groupUnsubInfo(g))
+    return m
+  }, [allGroups])
 
   // Visible groups that can be unsubscribed in bulk (mailto-only ones can't).
   const selectableVisible = useMemo(
-    () => groups.filter((g) => groupUnsubInfo(g).method !== 'email'),
-    [groups]
+    () => groups.filter((g) => unsubInfoByKey.get(g.key)?.method !== 'email'),
+    [groups, unsubInfoByKey]
   )
-  const emailOnlyCount = useMemo(
-    () => allGroups.filter((g) => groupUnsubInfo(g).method === 'email').length,
-    [allGroups]
-  )
+  const emailOnlyCount = useMemo(() => {
+    let n = 0
+    for (const info of unsubInfoByKey.values()) if (info.method === 'email') n++
+    return n
+  }, [unsubInfoByKey])
 
   // ---------- scan ----------
 
@@ -115,6 +128,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
     try {
       const result = await window.api.unsub.scan(selectedId, range)
       setEmails(result.emails)
+      setScanSeq((s) => s + 1)
       const senderCount = groupBySender(result.emails).length
       if (result.cancelled) {
         setStatus(
@@ -227,11 +241,12 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
   async function confirmUnsub() {
     setConfirmOpen(false)
     const selectedKeys = [...selected]
+    const groupByKey = new Map(allGroups.map((g) => [g.key, g] as const))
     const targets: UnsubTarget[] = []
     for (const key of selectedKeys) {
-      const group = allGroups.find((g) => g.key === key)
+      const group = groupByKey.get(key)
       if (!group) continue
-      const info = groupUnsubInfo(group)
+      const info = unsubInfoByKey.get(key) ?? groupUnsubInfo(group)
       if (info.url && info.method === 'one-click') {
         targets.push({ key, url: info.url, method: 'post' })
       } else if (info.url && info.method === 'link') {
@@ -274,7 +289,8 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
         setStatus(`${summary} Moving ${uids.length.toLocaleString()} emails to Trash…`)
         try {
           const result = await window.api.imap.delete(selectedId, uids, false)
-          const gone = new Set(uids.filter((u) => !result.failed.includes(u)))
+          const failedSet = new Set(result.failed)
+          const gone = new Set(uids.filter((u) => !failedSet.has(u)))
           setEmails((prev) => (prev ? prev.filter((e) => !gone.has(e.uid)) : prev))
           summary = `${summary} Moved ${result.deleted.toLocaleString()} emails to Trash.`
           if (result.failed.length > 0) {
@@ -296,8 +312,10 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
 
   const canScan = !!selectedId && !running
   const selectedCount = selected.size
-  const allSelected =
-    selectableVisible.length > 0 && selectableVisible.every((g) => selected.has(g.key))
+  const allSelected = useMemo(
+    () => selectableVisible.length > 0 && selectableVisible.every((g) => selected.has(g.key)),
+    [selectableVisible, selected]
+  )
 
   return (
     <ToolLayout
@@ -437,6 +455,8 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
                 selected={selected}
                 expanded={expanded}
                 results={results}
+                unsubInfo={unsubInfoByKey}
+                resetKey={scanSeq}
                 onToggleGroup={toggleGroup}
                 onToggleExpand={toggleExpand}
                 onPreview={handlePreview}

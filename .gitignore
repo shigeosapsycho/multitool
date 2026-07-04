@@ -27,3 +27,6 @@ src-tauri/.tauri/
 
 # Playwright MCP session artifacts (snapshots, console logs)
 .playwright-mcp/
+
+# Impeccable plugin local cache
+.impeccable/
