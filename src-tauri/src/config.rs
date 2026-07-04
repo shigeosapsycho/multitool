@@ -39,6 +39,9 @@ pub struct Config {
     /// When true (default), CSV output and saved .csv files render as a table
     /// instead of raw comma-separated text.
     pub format_csv: Option<bool>,
+    /// When true (default), Email Cleaner asks for confirmation before
+    /// permanently deleting emails. Users can opt out from the dialog.
+    pub confirm_permanent_delete: Option<bool>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
@@ -143,6 +146,11 @@ impl Config {
         // Default true — show CSV as a table.
         self.format_csv.unwrap_or(true)
     }
+
+    pub fn confirm_permanent_delete(&self) -> bool {
+        // Default true — permanent deletion is irreversible, so confirm.
+        self.confirm_permanent_delete.unwrap_or(true)
+    }
 }
 
 #[cfg(test)]
@@ -215,6 +223,19 @@ mod tests {
         assert!(json.contains("\"formatCsv\":false"));
         let back: Config = serde_json::from_str(&json).unwrap();
         assert!(!back.format_csv());
+    }
+
+    #[test]
+    fn confirm_permanent_delete_defaults_true_and_round_trips() {
+        let cfg: Config = serde_json::from_str("{}").unwrap();
+        assert!(cfg.confirm_permanent_delete());
+        let mut cfg = Config::default();
+        cfg.confirm_permanent_delete = Some(false);
+        let json = serde_json::to_string(&cfg).unwrap();
+        // Serializes under the camelCase contract shared with the renderer.
+        assert!(json.contains("\"confirmPermanentDelete\":false"));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert!(!back.confirm_permanent_delete());
     }
 
     #[test]

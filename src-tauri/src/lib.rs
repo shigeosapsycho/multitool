@@ -154,6 +154,7 @@ pub fn run() {
             commands::config_set_order_by_select_date,
             commands::config_set_auto_focus_input,
             commands::config_set_format_csv,
+            commands::config_set_confirm_permanent_delete,
             commands::app_get_version,
             commands::net_test_proxies,
             commands::net_cancel_proxies,

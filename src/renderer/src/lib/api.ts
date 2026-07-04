@@ -250,6 +250,7 @@ export const api = {
         orderBySelectDate: boolean
         autoFocusInput: boolean
         formatCsv: boolean
+        confirmPermanentDelete: boolean
       }>('config_get'),
     setFilePreview: (enabled: boolean) =>
       invoke<boolean>('config_set_file_preview', { enabled }),
@@ -266,7 +267,9 @@ export const api = {
     setAutoFocusInput: (enabled: boolean) =>
       invoke<boolean>('config_set_auto_focus_input', { enabled }),
     setFormatCsv: (enabled: boolean) =>
-      invoke<boolean>('config_set_format_csv', { enabled })
+      invoke<boolean>('config_set_format_csv', { enabled }),
+    setConfirmPermanentDelete: (enabled: boolean) =>
+      invoke<boolean>('config_set_confirm_permanent_delete', { enabled })
   },
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),
