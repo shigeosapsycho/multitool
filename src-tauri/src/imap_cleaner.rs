@@ -325,10 +325,14 @@ fn flag_and_expunge(
 /// batch lands in `DeleteResult.failed` and the remaining batches still run —
 /// but after two consecutive failures the session is assumed dead, the loop
 /// stops, and the unattempted batches are recorded as failed too.
+/// `on_progress(processed, total)` fires after each attempted batch
+/// (successes and failures both advance `processed`); skipped batches after
+/// a dead session emit nothing.
 fn delete_emails(
     session: &mut ImapSession,
     uids: &[u32],
     permanent: bool,
+    on_progress: &dyn Fn(u32, u32),
 ) -> Result<DeleteResult, String> {
     if uids.is_empty() {
         return Ok(DeleteResult { deleted: 0, failed: vec![], error: None });
@@ -362,6 +366,8 @@ fn delete_emails(
         false
     };
 
+    let total = uids.len() as u32;
+    let mut processed: u32 = 0;
     let mut deleted: u32 = 0;
     let mut failed: Vec<u32> = Vec::new();
     let mut error: Option<String> = None;
@@ -400,16 +406,18 @@ fn delete_emails(
                     error = Some(e);
                 }
                 consecutive_failures += 1;
-                if consecutive_failures >= 2 {
-                    // Two failures in a row almost always mean a dead session;
-                    // grinding through the rest would just stall. The skipped
-                    // batches were never attempted, so they count as failed.
-                    for rest in chunks.by_ref() {
-                        failed.extend_from_slice(rest);
-                    }
-                    break;
-                }
             }
+        }
+        processed += chunk.len() as u32;
+        on_progress(processed, total);
+        if consecutive_failures >= 2 {
+            // Two failures in a row almost always mean a dead session;
+            // grinding through the rest would just stall. The skipped
+            // batches were never attempted, so they count as failed.
+            for rest in chunks.by_ref() {
+                failed.extend_from_slice(rest);
+            }
+            break;
         }
     }
     Ok(DeleteResult { deleted, failed, error })
@@ -468,7 +476,7 @@ fn fetch_body(session: &mut ImapSession, uid: u32) -> Result<EmailBody, String> 
 
 use crate::AppState;
 use rand::Rng;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Generate a 32-hex-char random id for a new account.
 fn new_account_id() -> String {
@@ -649,7 +657,14 @@ pub async fn imap_delete(
     let (account, password) = account_with_password(&app, &id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut session = connect_session(&account, &password)?;
-        let result = delete_emails(&mut session, &uids, permanent);
+        // Per-batch progress for the renderer's "Deleting X of Y" text; a
+        // failed emit only costs the tick, never the delete.
+        let result = delete_emails(&mut session, &uids, permanent, &|done, total| {
+            let _ = app.emit(
+                "imap:delete-progress",
+                serde_json::json!({ "done": done, "total": total }),
+            );
+        });
         let _ = session.logout();
         result
     })
