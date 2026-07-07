@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from './ToolShell'
 import { Select } from './Select'
 import { ConfirmDialog } from './ConfirmDialog'
 import type { ImapAccount } from '../lib/api'
 import { providerFor } from '../lib/imapProviders'
+import {
+  getAccounts,
+  saveAccount as saveAccountCached,
+  deleteAccount as deleteAccountCached,
+  subscribe
+} from '../lib/imapAccountsCache'
 
 type FormState = {
   mode: 'closed' | 'add' | 'edit'
@@ -50,16 +56,31 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
   const [testing, setTesting] = useState(false)
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false)
 
-  // Load saved accounts once on mount; default the selection to the first one.
+  // Latest selection props for the mount-only cache subscription below.
+  const selectedIdRef = useRef(selectedId)
+  selectedIdRef.current = selectedId
+  const onSelectedChangeRef = useRef(onSelectedChange)
+  onSelectedChangeRef.current = onSelectedChange
+
+  // Accounts come from the shared in-memory cache: instant after the first
+  // fetch this app run, and kept live across both email tools. When an
+  // update removes the selected account (deleted from the other tool), fall
+  // back to the first remaining one.
   useEffect(() => {
-    window.api.imap
-      .listAccounts()
+    getAccounts()
       .then((list) => {
         setAccounts(list)
-        if (selectedId == null) onSelectedChange(list[0]?.id ?? null)
+        if (selectedIdRef.current == null) onSelectedChangeRef.current(list[0]?.id ?? null)
       })
       .catch((e) => onStatus?.(`Could not load accounts: ${String(e)}`))
-    // Mount-only: re-running on prop changes would fight the user's selection.
+    return subscribe((list) => {
+      setAccounts(list)
+      const sel = selectedIdRef.current
+      if (sel !== null && !list.some((a) => a.id === sel)) {
+        onSelectedChangeRef.current(list[0]?.id ?? null)
+      }
+    })
+    // Mount-only: the refs above carry the latest selection props.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -121,9 +142,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
   async function saveAccount() {
     if (!formValid) return
     try {
-      const saved = await window.api.imap.saveAccount(formAccountInput())
-      const list = await window.api.imap.listAccounts()
-      setAccounts(list)
+      const saved = await saveAccountCached(formAccountInput())
       onSelectedChange(saved.id)
       closeForm()
       onStatus?.(`Account "${saved.label}" saved.`)
@@ -138,9 +157,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
     setTestStatus('Saving and testing connection…')
     try {
       // Save first so imap_test can read the credentials by id.
-      const saved = await window.api.imap.saveAccount(formAccountInput())
-      const list = await window.api.imap.listAccounts()
-      setAccounts(list)
+      const saved = await saveAccountCached(formAccountInput())
       onSelectedChange(saved.id)
       setForm((f) => ({ ...f, mode: 'edit', id: saved.id }))
       await window.api.imap.test(saved.id)
@@ -156,10 +173,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
     if (!selectedId) return
     setConfirmRemoveOpen(false)
     try {
-      await window.api.imap.deleteAccount(selectedId)
-      const list = await window.api.imap.listAccounts()
-      setAccounts(list)
-      onSelectedChange(list[0]?.id ?? null)
+      await deleteAccountCached(selectedId)
       onStatus?.('Account removed.')
     } catch (e) {
       onStatus?.(`Could not remove account: ${String(e)}`)
