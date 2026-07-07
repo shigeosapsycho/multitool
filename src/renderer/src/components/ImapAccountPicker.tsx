@@ -64,8 +64,8 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
 
   // Accounts come from the shared in-memory cache: instant after the first
   // fetch this app run, and kept live across both email tools. When an
-  // update removes the selected account (deleted from the other tool), fall
-  // back to the first remaining one.
+  // update removes the selected account (deleted from the other tool) — or
+  // arrives while nothing is selected — fall back to the first available one.
   useEffect(() => {
     getAccounts()
       .then((list) => {
@@ -76,7 +76,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
     return subscribe((list) => {
       setAccounts(list)
       const sel = selectedIdRef.current
-      if (sel !== null && !list.some((a) => a.id === sel)) {
+      if (sel === null || !list.some((a) => a.id === sel)) {
         onSelectedChangeRef.current(list[0]?.id ?? null)
       }
     })
