@@ -293,6 +293,8 @@ export const api = {
     cancel: () => invoke<void>('imap_cancel'),
     delete: (id: string, uids: number[], permanent: boolean) =>
       invoke<DeleteResult>('imap_delete', { id, uids, permanent }),
+    onDeleteProgress: (cb: (p: { done: number; total: number }) => void) =>
+      onEvent<{ done: number; total: number }>('imap:delete-progress', cb),
     fetchBody: (id: string, uid: number) =>
       invoke<EmailBody>('imap_fetch_body', { id, uid })
   },

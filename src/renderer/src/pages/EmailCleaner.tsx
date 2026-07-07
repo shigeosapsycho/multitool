@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImapAccountPicker } from '../components/ImapAccountPicker'
 import type { EmailHeader, ScanRange, ScanResult, EmailBody } from '../lib/api'
 import { rangeBetween } from '../lib/rangeSelect'
+import { deleteProgressBanner, deleteProgressButton } from '../lib/deleteProgress'
 import { EmailCleanerGroups, groupBySender } from './EmailCleanerGroups'
 import { EmailPreview } from './EmailPreview'
 
@@ -61,6 +62,9 @@ export function EmailCleanerPage({
   // Reset every time the dialog opens; persisted only on confirm.
   const [suppressChecked, setSuppressChecked] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(
+    null
+  )
   const [status, setStatus] = useState('Pick an account and a date range, then scan the inbox.')
   const [search, setSearch] = useState('')
   const [preview, setPreview] = useState<{
@@ -337,7 +341,15 @@ export function EmailCleanerPage({
       }
     }
     const uids = [...selected]
-    setStatus(permanent ? 'Permanently deleting emails…' : 'Moving emails to Trash…')
+    setDeleteProgress({ done: 0, total: uids.length })
+    setStatus(deleteProgressBanner(permanent, 0, uids.length))
+    // Live per-batch progress for the banner and the Delete button. The
+    // subscription only spans this call; unlistening in `finally` drops any
+    // stragglers after the invoke resolves.
+    const unlisten = window.api.imap.onDeleteProgress((p) => {
+      setDeleteProgress(p)
+      setStatus(deleteProgressBanner(permanent, p.done, p.total))
+    })
     try {
       const result = await window.api.imap.delete(selectedId, uids, permanent)
       const failedSet = new Set(result.failed)
@@ -355,6 +367,8 @@ export function EmailCleanerPage({
     } catch (e) {
       setStatus(`Delete failed: ${String(e)}`)
     } finally {
+      unlisten()
+      setDeleteProgress(null)
       setDeleting(false)
     }
   }
@@ -539,7 +553,9 @@ export function EmailCleanerPage({
               >
                 <Icons.Trash />
                 {deleting
-                  ? 'Deleting…'
+                  ? deleteProgress
+                    ? deleteProgressButton(deleteProgress.done, deleteProgress.total)
+                    : 'Deleting…'
                   : `Delete ${selectedCount.toLocaleString()} ${
                       selectedCount === 1 ? 'email' : 'emails'
                     }`}
