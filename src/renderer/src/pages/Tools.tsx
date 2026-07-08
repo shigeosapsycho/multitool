@@ -133,6 +133,12 @@ const tools: ToolMeta[] = [
     accent: '#f87171'
   },
   {
+    id: 'remove-profile-duplicates',
+    title: 'Remove Profile Duplicates',
+    description: 'Drop duplicate profiles from a Refract or Shikari export — first one wins.',
+    accent: '#fbbf24'
+  },
+  {
     id: 'reverse-list',
     title: 'Reverse List',
     description: 'Reverse the order of lines in a file.',
@@ -390,6 +396,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'randomize': DiceIcon,
   'remove-duplicates': RemoveDuplicatesIcon,
   'remove-passwords': KeyIcon,
+  'remove-profile-duplicates': RemoveDuplicatesIcon,
   'reverse-list': ReverseListIcon,
   'search-master': SearchIcon,
   'split-by-n': SplitByNumberIcon,
