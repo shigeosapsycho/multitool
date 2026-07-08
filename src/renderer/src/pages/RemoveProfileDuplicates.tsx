@@ -171,14 +171,13 @@ export function RemoveProfileDuplicatesPage({
   // Once the user clicks an output format, stop auto-following the detected source.
   const userPickedFmt = useRef(false)
 
-  // Editing the input voids a stale result.
-  const invalidate = useCallback(() => setResult(null), [])
-
+  // Unlike Profile Filter, editing the input does NOT clear the result — the
+  // previous output stays visible until the next Run replaces it or Clear
+  // resets the page (user-requested behavior).
   async function loadProfileFromPath(path: string) {
     const text = await window.api.files.read(path)
     setProfilePath(path)
     profileRef.current?.setValue(text)
-    invalidate()
     onSetStatus(`Loaded ${path}`)
   }
 
@@ -312,7 +311,6 @@ export function RemoveProfileDuplicatesPage({
           onPick={handlePickProfile}
           onDropPath={loadProfileFromPath}
           onLineCountChange={setProfileCount}
-          onUserEdit={invalidate}
           className="min-h-0 flex-1"
         />
 
