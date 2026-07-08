@@ -246,6 +246,171 @@ function filterShikari(text: string, allowed: Set<string>, requested: string[]):
   }
 }
 
+// ---------- dedupe ----------
+
+export type DedupeResult = {
+  format: ProfileFormat
+  /** Deduped file in the original format (JSON text | CSV text); '' on error. */
+  fullOutput: string
+  /** Kept profiles as canonical records, file order — drives format conversion. */
+  kept: Profile[]
+  /** Emails of kept profiles, original casing, file order (email-less entries omitted). */
+  keptEmails: string[]
+  /** Entries kept (including email-less ones). */
+  keptCount: number
+  /** Entries dropped as duplicates. */
+  removedCount: number
+  /** Entries in the source file. */
+  totalCount: number
+  /** Parse/format problem, else null. */
+  error: string | null
+}
+
+function emptyDedupe(format: ProfileFormat, error: string): DedupeResult {
+  return {
+    format,
+    fullOutput: '',
+    kept: [],
+    keptEmails: [],
+    keptCount: 0,
+    removedCount: 0,
+    totalCount: 0,
+    error
+  }
+}
+
+/**
+ * Remove duplicate profiles from an export: same email (trimmed,
+ * case-insensitive) means duplicate, the first occurrence wins, and entries
+ * without an email are never dropped. Kept entries are preserved verbatim so
+ * the output re-imports cleanly in the source format.
+ */
+export function dedupeProfiles(profileText: string): DedupeResult {
+  if (!profileText) {
+    // Completely empty — truly unknown
+    return emptyDedupe('unknown', 'Paste or load a Refract JSON or Shikari CSV export.')
+  }
+  const normalized = stripBom(profileText).replace(/^\s+/, '')
+  let format: ProfileFormat
+  if (!normalized) {
+    // Whitespace-only input — treat as shikari to get "empty CSV" error
+    format = 'shikari'
+  } else {
+    format = detectProfileFormat(profileText)
+  }
+  if (format === 'unknown') {
+    return emptyDedupe('unknown', 'Paste or load a Refract JSON or Shikari CSV export.')
+  }
+  return format === 'refract' ? dedupeRefract(profileText) : dedupeShikari(profileText)
+}
+
+function dedupeRefract(text: string): DedupeResult {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(stripBom(text))
+  } catch (e) {
+    return emptyDedupe('refract', `Invalid JSON: ${(e as Error).message}`)
+  }
+  const list = extractArray(parsed)
+  if (!list) {
+    return emptyDedupe('refract', 'Expected a JSON array of profiles.')
+  }
+
+  const seen = new Set<string>()
+  const keptElements: unknown[] = []
+  const kept: Profile[] = []
+  const keptEmails: string[] = []
+  let removed = 0
+  for (const el of list) {
+    const email = emailOf(el)
+    if (email === null) {
+      // Nothing to key on — never a duplicate; keep verbatim.
+      keptElements.push(el)
+      continue
+    }
+    const low = email.trim().toLowerCase()
+    if (seen.has(low)) {
+      removed++
+      continue
+    }
+    seen.add(low)
+    keptElements.push(el)
+    kept.push(refractToProfile(el, email))
+    keptEmails.push(email)
+  }
+
+  return {
+    format: 'refract',
+    fullOutput: JSON.stringify(keptElements),
+    kept,
+    keptEmails,
+    keptCount: keptElements.length,
+    removedCount: removed,
+    totalCount: list.length,
+    error: null
+  }
+}
+
+function dedupeShikari(text: string): DedupeResult {
+  const rows = stripBom(text).split(/\r?\n/)
+  let headerIdx = -1
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i]!.trim().length > 0) {
+      headerIdx = i
+      break
+    }
+  }
+  if (headerIdx === -1) {
+    return emptyDedupe('shikari', 'The CSV is empty.')
+  }
+
+  const headerCells = parseCsvRow(rows[headerIdx]!)
+  const emailIdx = findEmailColumn(headerCells)
+  if (emailIdx === -1) {
+    return emptyDedupe('shikari', 'No email column found in the CSV header.')
+  }
+  const colIndex = buildShikariColumnIndex(headerCells)
+
+  const seen = new Set<string>()
+  const keptRows: string[] = []
+  const kept: Profile[] = []
+  const keptEmails: string[] = []
+  let total = 0
+  let removed = 0
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const raw = rows[i]!
+    if (!raw.trim()) continue
+    total++
+    const cells = parseCsvRow(raw)
+    const email = (cells[emailIdx] ?? '').trim()
+    if (!email) {
+      // Nothing to key on — never a duplicate; keep the raw row.
+      keptRows.push(raw)
+      continue
+    }
+    const low = email.toLowerCase()
+    if (seen.has(low)) {
+      removed++
+      continue
+    }
+    seen.add(low)
+    keptRows.push(raw)
+    kept.push(shikariToProfile(cells, colIndex, email))
+    keptEmails.push(email)
+  }
+
+  return {
+    format: 'shikari',
+    fullOutput: [rows[headerIdx]!, ...keptRows].join('\n'),
+    kept,
+    keptEmails,
+    keptCount: keptRows.length,
+    removedCount: removed,
+    totalCount: total,
+    error: null
+  }
+}
+
 // ---------- canonical mapping + format conversion ----------
 
 // Canonical Profile field -> Shikari CSV column, in column order. Drives both

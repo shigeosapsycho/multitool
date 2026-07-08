@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectProfileFormat, filterProfiles, serializeRefract, serializeShikari } from './profileFilter'
+import { detectProfileFormat, filterProfiles, serializeRefract, serializeShikari, dedupeProfiles } from './profileFilter'
 import { parseCsvRow } from './transforms'
 
 const SHIKARI_HEADER =
@@ -256,5 +256,114 @@ describe('cross-format conversion', () => {
     expect(out[0].email).toBe('t@x.com')
     expect(out[0].shipping.address1).toBe('1 Main St')
     expect(out[0].payment.num).toBe('4111111111111111')
+  })
+})
+
+const DUP_REFRACT = JSON.stringify([
+  { name: 'A', email: 'Alice@Example.com', payment: { num: '1' }, custom: 'keep-me' },
+  { name: 'B', email: 'bob@example.com' },
+  { name: 'A2', email: 'alice@example.com' },
+  { name: 'NoMail' },
+  { name: 'B2', email: 'BOB@EXAMPLE.COM' }
+])
+
+const DUP_SHIKARI = [
+  'profile_name,first_name,last_name,email,phone_num',
+  'P1,A,T,Alice@Example.com,111',
+  'P2,B,T,bob@example.com,222',
+  '',
+  'P3,A2,T,alice@example.com,333',
+  'P4,,,,444',
+  'P5,B2,T,BOB@EXAMPLE.COM,555'
+].join('\n')
+
+describe('dedupeProfiles', () => {
+  describe('refract', () => {
+    it('keeps the first profile per case-insensitive email, verbatim', () => {
+      const r = dedupeProfiles(DUP_REFRACT)
+      expect(r.format).toBe('refract')
+      expect(r.error).toBeNull()
+      expect(r.totalCount).toBe(5)
+      expect(r.keptCount).toBe(3)
+      expect(r.removedCount).toBe(2)
+      const out = JSON.parse(r.fullOutput) as Array<Record<string, unknown>>
+      expect(out.map((p) => p.name)).toEqual(['A', 'B', 'NoMail'])
+      // Unknown fields survive untouched — kept elements are the originals.
+      expect(out[0]!.custom).toBe('keep-me')
+    })
+
+    it('reports kept emails in original casing, omitting email-less entries', () => {
+      const r = dedupeProfiles(DUP_REFRACT)
+      expect(r.keptEmails).toEqual(['Alice@Example.com', 'bob@example.com'])
+      expect(r.kept).toHaveLength(2)
+      expect(r.kept[0]!.name).toBe('A')
+    })
+
+    it('accepts a {profiles: []} wrapper object', () => {
+      const wrapped = JSON.stringify({ profiles: JSON.parse(DUP_REFRACT) })
+      const r = dedupeProfiles(wrapped)
+      expect(r.keptCount).toBe(3)
+      expect(r.removedCount).toBe(2)
+    })
+
+    it('reports invalid JSON', () => {
+      const r = dedupeProfiles('[{"broken"')
+      expect(r.format).toBe('refract')
+      expect(r.error).toMatch(/^Invalid JSON:/)
+      expect(r.fullOutput).toBe('')
+    })
+
+    it('reports a non-array JSON payload', () => {
+      const r = dedupeProfiles('{"a":1}')
+      expect(r.error).toBe('Expected a JSON array of profiles.')
+    })
+  })
+
+  describe('shikari', () => {
+    it('keeps the header and the first row per email, verbatim', () => {
+      const r = dedupeProfiles(DUP_SHIKARI)
+      expect(r.format).toBe('shikari')
+      expect(r.error).toBeNull()
+      const lines = r.fullOutput.split('\n')
+      expect(lines[0]).toBe('profile_name,first_name,last_name,email,phone_num')
+      expect(lines.slice(1)).toEqual([
+        'P1,A,T,Alice@Example.com,111',
+        'P2,B,T,bob@example.com,222',
+        'P4,,,,444'
+      ])
+      expect(r.totalCount).toBe(5)
+      expect(r.keptCount).toBe(3)
+      expect(r.removedCount).toBe(2)
+    })
+
+    it('maps kept rows through the canonical profile shape', () => {
+      const r = dedupeProfiles(DUP_SHIKARI)
+      expect(r.keptEmails).toEqual(['Alice@Example.com', 'bob@example.com'])
+      expect(r.kept[0]!.firstName).toBe('A')
+      expect(r.kept[0]!.phone).toBe('111')
+    })
+
+    it('is a no-op on a file without duplicates', () => {
+      const r = dedupeProfiles(FULL_SHIKARI)
+      expect(r.keptCount).toBe(1)
+      expect(r.removedCount).toBe(0)
+      expect(r.fullOutput).toBe(FULL_SHIKARI)
+    })
+
+    it('reports a missing email column', () => {
+      const r = dedupeProfiles('name,phone\nA,1')
+      expect(r.error).toBe('No email column found in the CSV header.')
+    })
+
+    it('reports an empty CSV', () => {
+      const r = dedupeProfiles('\n \n')
+      expect(r.error).toBe('The CSV is empty.')
+    })
+  })
+
+  it('reports an unknown format for empty input', () => {
+    const r = dedupeProfiles('')
+    expect(r.format).toBe('unknown')
+    expect(r.error).toBe('Paste or load a Refract JSON or Shikari CSV export.')
   })
 })
