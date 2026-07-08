@@ -19,6 +19,7 @@ export type Route =
   | 'randomize'
   | 'remove-duplicates'
   | 'remove-passwords'
+  | 'remove-profile-duplicates'
   | 'reverse-list'
   | 'search-master'
   | 'sort-list'

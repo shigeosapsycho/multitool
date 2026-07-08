@@ -25,6 +25,7 @@ import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
 import { RemoveDuplicatesPage } from './pages/RemoveDuplicates'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
+import { RemoveProfileDuplicatesPage } from './pages/RemoveProfileDuplicates'
 import { ReverseListPage } from './pages/ReverseList'
 import { SearchMasterPage } from './pages/SearchMaster'
 import { SortListPage } from './pages/SortList'
@@ -56,6 +57,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'randomize',
   'remove-duplicates',
   'remove-passwords',
+  'remove-profile-duplicates',
   'reverse-list',
   'search-master',
   'sort-list',
@@ -454,6 +456,8 @@ export default function App() {
         return <RemoveDuplicatesPage {...props} />
       case 'remove-passwords':
         return <RemovePasswordsPage {...props} />
+      case 'remove-profile-duplicates':
+        return <RemoveProfileDuplicatesPage {...props} />
       case 'reverse-list':
         return <ReverseListPage {...props} />
       case 'search-master':
