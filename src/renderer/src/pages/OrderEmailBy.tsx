@@ -320,7 +320,8 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
         onDropPath={loadFromPath}
         onLineCountChange={setLineCount}
         onUserEdit={() => {
-          invalidateResults()
+          // Keep the last ordered output on screen while editing; it refreshes on
+          // the next run. Still re-detect providers so the ordering chips track edits.
           if (editDebounce.current) clearTimeout(editDebounce.current)
           editDebounce.current = setTimeout(() => {
             reconcile(panelRef.current?.getValue() ?? '')

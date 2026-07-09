@@ -375,7 +375,6 @@ export function ProfileFilterPage({ onBack, onSetStatus, active = true, formatCs
             onPick={handlePickEmails}
             onDropPath={loadEmailsFromPath}
             onLineCountChange={setEmailsCount}
-            onUserEdit={invalidate}
             className="min-h-0 flex-1"
           />
           <FilePanel
@@ -386,7 +385,6 @@ export function ProfileFilterPage({ onBack, onSetStatus, active = true, formatCs
             onPick={handlePickProfile}
             onDropPath={loadProfileFromPath}
             onLineCountChange={setProfileCount}
-            onUserEdit={invalidate}
             className="min-h-0 flex-1"
           />
         </div>

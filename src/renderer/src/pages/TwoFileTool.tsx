@@ -242,11 +242,6 @@ export function TwoFileTool(props: TwoFileToolProps) {
   const canRun = count1 > 0 && count2 > 0 && !running
   const hasAny = count1 > 0 || count2 > 0
 
-  const invalidateResults = () => {
-    setResults(null)
-    setSavedTo(null)
-  }
-
   return (
     <ToolLayout
       title={title}
@@ -290,7 +285,6 @@ export function TwoFileTool(props: TwoFileToolProps) {
           onPick={() => pick(1)}
           onDropPath={(p) => loadInto(1, p)}
           onLineCountChange={setCount1}
-          onUserEdit={invalidateResults}
         />
         <FileBox
           ref={ref2}
@@ -299,7 +293,6 @@ export function TwoFileTool(props: TwoFileToolProps) {
           onPick={() => pick(2)}
           onDropPath={(p) => loadInto(2, p)}
           onLineCountChange={setCount2}
-          onUserEdit={invalidateResults}
         />
       </div>
       <ResultPanel
