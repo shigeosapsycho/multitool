@@ -2,10 +2,13 @@ import { describe, it, expect } from 'vitest'
 import {
   providerOf,
   detectProviders,
+  detectProxyGroups,
+  proxyCategoryOf,
   detectIspUsers,
   filterProxies,
   ispUserStemOf,
   parseProxyLine,
+  ISP_CATEGORY,
   type ProxyFilters
 } from './proxy'
 
@@ -239,5 +242,54 @@ describe('filterProxies with removed providers', () => {
     expect(
       filterProxies('gate.smartproxy.com:8080:u:p', { residential: false, isp: true }, new Set())
     ).toEqual([])
+  })
+})
+
+describe('proxyCategoryOf', () => {
+  it('returns the registrable domain for a residential host', () => {
+    expect(proxyCategoryOf('gate.smartproxy.com', '7000')).toBe('smartproxy.com')
+  })
+  it('returns the ISP category for a raw-IPv4 proxy', () => {
+    expect(proxyCategoryOf('192.168.0.1', '8080')).toBe(ISP_CATEGORY)
+  })
+  it('returns null for a host that is neither a provider nor an ISP proxy', () => {
+    expect(proxyCategoryOf('localhost', null)).toBeNull()
+    expect(proxyCategoryOf(null, null)).toBeNull()
+  })
+})
+
+describe('detectProxyGroups', () => {
+  const list = [
+    'gate.smartproxy.com:7000:u:p',
+    'gate.smartproxy.com:7000:u:p',
+    'b2b.liveproxies.io:7383:u:p',
+    '192.168.0.1:8080:u:p',
+    '10.0.0.2:9000:u:p',
+    '# comment',
+    ''
+  ].join('\n')
+
+  it('lists residential providers by count then name, with the ISP bucket appended last', () => {
+    expect(detectProxyGroups(list)).toEqual([
+      { key: 'smartproxy.com', label: 'smartproxy.com', count: 2 },
+      { key: 'liveproxies.io', label: 'liveproxies.io', count: 1 },
+      { key: ISP_CATEGORY, label: 'ISPs', count: 2 }
+    ])
+  })
+
+  it('omits the ISP bucket when there are no raw-IP proxies', () => {
+    const groups = detectProxyGroups('gate.smartproxy.com:7000:u:p')
+    expect(groups).toEqual([{ key: 'smartproxy.com', label: 'smartproxy.com', count: 1 }])
+    expect(groups.some((g) => g.key === ISP_CATEGORY)).toBe(false)
+  })
+
+  it('returns an ISP-only list when there are no residential providers', () => {
+    expect(detectProxyGroups('1.2.3.4:80\n5.6.7.8:80')).toEqual([
+      { key: ISP_CATEGORY, label: 'ISPs', count: 2 }
+    ])
+  })
+
+  it('returns nothing for blank or comment-only input', () => {
+    expect(detectProxyGroups('\n# x\n   ')).toEqual([])
   })
 })

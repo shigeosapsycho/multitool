@@ -2,14 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom'
 import { SingleFileTool } from './SingleFileTool'
 import { Button } from '../components/ToolShell'
-import { detectProviders } from '../lib/proxy'
+import { detectProxyGroups, type ProxyGroup } from '../lib/proxy'
 import { weightedShuffleProxies } from '../lib/proxyShuffle'
 
 type Props = { onBack: () => void; onSetStatus: (msg: string) => void; active?: boolean }
 
-// Favor levels the user picks per provider. `weight` feeds the shuffle: Off (0)
-// drops the provider from the map so it stays at the baseline weight of 1, while
-// higher levels pull that provider's proxies toward the top ever more strongly.
+// Favor levels the user picks per group. `weight` feeds the shuffle: Off (0)
+// drops the group from the map so it stays at the baseline weight of 1, while
+// higher levels pull that group's proxies toward the top ever more strongly.
 const LEVELS = [
   { label: 'Off', weight: 0 },
   { label: 'Low', weight: 2 },
@@ -24,9 +24,9 @@ function levelLabel(weight: number | undefined): string | null {
 }
 
 // Distinct hues (drawn from the tool-accent vocabulary, legible on both themes)
-// assigned to providers by their order in the detected list, so each provider
-// reads as one color across its chip and its favor control.
-const PROVIDER_COLORS = [
+// assigned to groups by their order in the detected list, so each group reads as
+// one color across its chip and its favor control.
+const GROUP_COLORS = [
   '#60a5fa',
   '#f472b6',
   '#4ade80',
@@ -40,10 +40,10 @@ const PROVIDER_COLORS = [
 ]
 
 function colorFor(index: number): string {
-  return PROVIDER_COLORS[index % PROVIDER_COLORS.length]!
+  return GROUP_COLORS[index % GROUP_COLORS.length]!
 }
 
-/** Off/Low/Med/High/Max control; the active segment fills with the provider's color. */
+/** Off/Low/Med/High/Max control; the active segment fills with the group's color. */
 function FavorLevels({
   value,
   color,
@@ -82,14 +82,15 @@ function FavorLevels({
 }
 
 /**
- * Right-click popover for favoring providers in the shuffle. One color-coded
- * favor control per detected provider; changes apply live. Positioning and
- * dismiss behavior mirror ProxyCleaner's ProviderLimitsPopover.
+ * Right-click popover for favoring proxy groups in the shuffle. One color-coded
+ * favor control per detected group (residential providers plus a pooled ISPs
+ * bucket); changes apply live. Positioning and dismiss behavior mirror
+ * ProxyCleaner's ProviderLimitsPopover.
  */
 function WeightingPopover({
   x,
   y,
-  providers,
+  groups,
   colors,
   weights,
   onChange,
@@ -97,7 +98,7 @@ function WeightingPopover({
 }: {
   x: number
   y: number
-  providers: { provider: string; count: number }[]
+  groups: ProxyGroup[]
   colors: Map<string, string>
   weights: Map<string, number>
   onChange: (updater: (prev: Map<string, number>) => Map<string, number>) => void
@@ -148,14 +149,14 @@ function WeightingPopover({
     }
   }, [onClose])
 
-  // Off (weight 0) drops the provider from the map so the shuffle treats it as
+  // Off (weight 0) drops the group from the map so the shuffle treats it as
   // baseline; any other level stores its weight. The functional update reads the
-  // latest map, so setting two providers in one React batch cannot clobber.
-  function setWeight(provider: string, weight: number) {
+  // latest map, so setting two groups in one React batch cannot clobber.
+  function setWeight(key: string, weight: number) {
     onChange((prev) => {
       const next = new Map(prev)
-      if (weight <= 0) next.delete(provider)
-      else next.set(provider, weight)
+      if (weight <= 0) next.delete(key)
+      else next.set(key, weight)
       return next
     })
   }
@@ -175,24 +176,24 @@ function WeightingPopover({
       <div className="pb-2 text-[12px] font-medium text-text-secondary">
         Favor providers
       </div>
-      {providers.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="pb-1 text-[12px] text-text-muted">
           No providers detected. Load a proxy list first.
         </div>
       ) : (
         <div className="flex max-h-72 flex-col gap-2.5 overflow-y-auto pr-0.5">
-          {providers.map(({ provider, count }) => {
-            const color = colors.get(provider) ?? PROVIDER_COLORS[0]!
-            const value = weights.get(provider) ?? 0
+          {groups.map(({ key, label, count }) => {
+            const color = colors.get(key) ?? GROUP_COLORS[0]!
+            const value = weights.get(key) ?? 0
             return (
-              <div key={provider} className="flex flex-col gap-1.5">
+              <div key={key} className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5 text-[12.5px]">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: color }}
                   />
                   <span className="min-w-0 flex-1 truncate text-text-primary">
-                    {provider}
+                    {label}
                     <span className="pl-1 text-[11px] text-text-muted">
                       · {count.toLocaleString()}
                     </span>
@@ -201,8 +202,8 @@ function WeightingPopover({
                 <FavorLevels
                   value={value}
                   color={color}
-                  label={`Favor ${provider}`}
-                  onChange={(w) => setWeight(provider, w)}
+                  label={`Favor ${label}`}
+                  onChange={(w) => setWeight(key, w)}
                 />
               </div>
             )
@@ -234,33 +235,34 @@ export function RandomizeProxyListPage({ onBack, onSetStatus, active }: Props) {
 
   const closePopover = useCallback(() => setPopover(null), [])
 
-  const providers = useMemo(() => detectProviders(content), [content])
+  // Residential providers plus a pooled ISPs bucket, each favorable on its own.
+  const groups = useMemo(() => detectProxyGroups(content), [content])
 
-  // Stable provider -> color mapping (by detected order), shared by the chips
-  // and the popover so a provider is the same color in both.
-  const providerColors = useMemo(
-    () => new Map(providers.map((p, i) => [p.provider, colorFor(i)])),
-    [providers]
+  // Stable group -> color mapping (by detected order), shared by the chips and
+  // the popover so a group is the same color in both.
+  const groupColors = useMemo(
+    () => new Map(groups.map((g, i) => [g.key, colorFor(i)])),
+    [groups]
   )
 
   const toolbar =
-    providers.length > 0 ? (
+    groups.length > 0 ? (
       <div className="flex flex-wrap items-center gap-1">
         <span className="pr-1 text-[12px] text-text-muted">Providers:</span>
-        {providers.map(({ provider, count }) => {
-          const level = levelLabel(weights.get(provider))
+        {groups.map(({ key, label, count }) => {
+          const level = levelLabel(weights.get(key))
           return (
             <button
-              key={provider}
+              key={key}
               onClick={(e) => setPopover({ x: e.clientX, y: e.clientY })}
-              title="Set how much to favor this provider"
+              title="Set how much to favor this group"
               className="inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[12.5px] font-medium text-text-secondary transition hover:text-text-primary"
             >
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: providerColors.get(provider) }}
+                style={{ backgroundColor: groupColors.get(key) }}
               />
-              {provider} · {count.toLocaleString()}
+              {label} · {count.toLocaleString()}
               {level && <span className="text-text-primary">· {level}</span>}
             </button>
           )
@@ -281,7 +283,7 @@ export function RandomizeProxyListPage({ onBack, onSetStatus, active }: Props) {
       >
         <SingleFileTool
           title="Randomize Proxy List"
-          hint="Shuffle a proxy list, pulling favored providers toward the top. Right-click to set how much to favor each provider."
+          hint="Shuffle a proxy list, pulling favored providers toward the top. Right-click to set how much to favor each provider or ISPs."
           taskName="randomized-proxies"
           inputLabel="Proxy List"
           resultLabel="Randomized"
@@ -301,8 +303,8 @@ export function RandomizeProxyListPage({ onBack, onSetStatus, active }: Props) {
         <WeightingPopover
           x={popover.x}
           y={popover.y}
-          providers={providers}
-          colors={providerColors}
+          groups={groups}
+          colors={groupColors}
           weights={weights}
           onChange={setWeights}
           onClose={closePopover}
