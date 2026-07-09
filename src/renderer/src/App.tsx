@@ -69,6 +69,14 @@ function isToolRoute(r: Route): boolean {
   return (TOOL_ROUTES as Route[]).includes(r)
 }
 
+/** Ctrl+<digit> → sidebar tab, in the order the tabs are drawn. */
+const SIDEBAR_SHORTCUTS: Record<string, Route> = {
+  '1': 'tools',
+  '2': 'results',
+  '3': 'settings',
+  '4': 'logs'
+}
+
 /** Read a positive-integer setting from localStorage, falling back on missing/invalid. */
 function readIntSetting(key: string, fallback: number): number {
   try {
@@ -204,7 +212,7 @@ export default function App() {
           message = `Update v${status.version} found — downloading...`
           break
         case 'downloaded':
-          message = `Update v${status.version} downloaded. Restart to apply.`
+          message = `Update v${status.version} downloaded. Applies on restart, or when you close the app.`
           kind = 'success'
           setUpdateVersion(status.version)
           setUpdateReady(true)
@@ -282,6 +290,26 @@ export default function App() {
     },
     [navigate, restoreLastModule, lastTool]
   )
+
+  // Ctrl+1..4 jump to the sidebar tabs in order. Routed through
+  // navigateFromSidebar so Ctrl+1 honours "restore last module" exactly like
+  // clicking the Tools tab does. Yields to an open dialog or dropdown.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
+      const target = SIDEBAR_SHORTCUTS[e.key]
+      if (!target) return
+      if (
+        document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        document.querySelector('[role="listbox"]')
+      )
+        return
+      e.preventDefault()
+      navigateFromSidebar(target)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [navigateFromSidebar])
 
   // Mouse4 / Mouse5 ("Back" / "Forward" thumb buttons). Listen via three paths
   // and debounce per-direction so a single click that fires multiple events
@@ -565,8 +593,8 @@ export default function App() {
             updateError
               ? `Update failed: ${updateError}`
               : updateVersion
-                ? `Update v${updateVersion} downloaded — restart to apply.`
-                : 'Update downloaded — restart to apply.'
+                ? `Update v${updateVersion} downloaded — restart now, or it installs when you close the app.`
+                : 'Update downloaded — restart now, or it installs when you close the app.'
           }
           actionLabel={restarting ? 'Restarting…' : updateError ? 'Retry' : 'Restart now'}
           actionDisabled={restarting}

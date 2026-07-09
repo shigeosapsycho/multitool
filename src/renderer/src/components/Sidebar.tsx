@@ -75,12 +75,13 @@ export function Sidebar({ current, onNavigate }: Props) {
 
   return (
     <nav className="flex w-[88px] shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-4">
-      {items.map((item) => {
+      {items.map((item, index) => {
         const active = top === item.id
         return (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
+            title={`${item.label} (Ctrl+${index + 1})`}
             className={`group relative flex h-[68px] w-[72px] flex-col items-center justify-center gap-1.5 rounded-lg transition ${
               active
                 ? 'bg-accent-soft text-accent'
