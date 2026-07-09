@@ -1,9 +1,10 @@
 import type * as React from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { filterTools, nextSelection, parseColumnCount, type ArrowDirection } from '../lib/toolSearch'
 import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
 import { OrderTrackerLogo } from '../components/OrderTrackerLogo'
+import { dismissNewTool, getNewToolIds } from '../lib/newTools'
 import { setPendingFile } from '../lib/pending'
 import { useFlip } from '../lib/useFlip'
 
@@ -163,6 +164,10 @@ const tools: ToolMeta[] = [
     accent: '#cc0000'
   }
 ]
+
+// Resolved once per app launch, at import time. `getNewToolIds` also rewrites the
+// stored seen-list here, so a badge never outlives the session that introduced it.
+const NEW_TOOL_IDS = getNewToolIds(tools.map((t) => t.id))
 
 const ChevronIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -406,11 +411,13 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
 function ToolCard({
   tool,
   onNavigate,
-  highlighted
+  highlighted,
+  isNew
 }: {
   tool: ToolMeta
   onNavigate: (route: Route) => void
   highlighted?: boolean
+  isNew?: boolean
 }) {
   const [dragOver, setDragOver] = useState(false)
   const dropRef = useRef<HTMLButtonElement>(null)
@@ -431,15 +438,20 @@ function ToolCard({
     })
   }, [onNavigate, tool.id])
 
+  // A new card keeps its red border even while arrow-key highlighted; the ring is
+  // single-valued, so the highlight takes it and the border carries the red box.
+  const borderClass = dragOver
+    ? 'border-accent shadow-glow-accent'
+    : isNew
+      ? 'border-danger'
+      : 'border-border hover:border-border-strong'
+  const ringClass = highlighted ? 'ring-2 ring-accent' : isNew ? 'ring-2 ring-danger' : ''
+
   return (
     <button
       ref={dropRef}
       onClick={() => onNavigate(tool.id)}
-      className={`group relative flex h-full w-full flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${
-        dragOver
-          ? 'border-accent shadow-glow-accent'
-          : 'border-border hover:border-border-strong'
-      } ${highlighted ? 'ring-2 ring-accent' : ''}`}
+      className={`group relative flex h-full w-full flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${borderClass} ${ringClass}`}
     >
       <span
         className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-lg"
@@ -456,9 +468,15 @@ function ToolCard({
       <span className="text-[12px] leading-snug text-text-secondary">
         {tool.description}
       </span>
-      <span className="absolute right-3 top-4 text-text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
-        <ChevronIcon />
-      </span>
+      {isNew ? (
+        <span className="absolute right-3 top-3 rounded bg-danger px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+          New!
+        </span>
+      ) : (
+        <span className="absolute right-3 top-4 text-text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
+          <ChevronIcon />
+        </span>
+      )}
       {dragOver && (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-accent-soft text-[12px] font-semibold uppercase tracking-wider text-accent">
           Drop to open
@@ -478,8 +496,22 @@ export function ToolsPage({ onNavigate }: Props) {
   // The highlight ring stays hidden until the user navigates with the arrow
   // keys — typing alone never highlights a card.
   const [highlightActive, setHighlightActive] = useState(false)
+  // Re-seeded from the module-level set on every mount. Opening a tool unmounts
+  // this page, so a dismissal kept only in state would reappear on the way back.
+  const [newIds, setNewIds] = useState<Set<string>>(() => new Set(NEW_TOOL_IDS))
   const inputRef = useRef<HTMLInputElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+
+  // Every route into a tool — card click, Enter from the search box, and
+  // drop-a-file-on-a-card — funnels through here, so all three clear the badge.
+  const openTool = useCallback(
+    (route: Route) => {
+      dismissNewTool(route)
+      setNewIds(new Set(NEW_TOOL_IDS))
+      onNavigate(route)
+    },
+    [onNavigate]
+  )
 
   const matches = useMemo(() => filterTools(query, tools), [query])
 
@@ -597,7 +629,7 @@ export function ToolsPage({ onNavigate }: Props) {
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const target = matches[selected] ?? matches[0]
-      if (target) onNavigate(target.id)
+      if (target) openTool(target.id)
       return
     }
     if (e.key === 'Escape') {
@@ -688,8 +720,9 @@ export function ToolsPage({ onNavigate }: Props) {
               >
                 <ToolCard
                   tool={t}
-                  onNavigate={onNavigate}
+                  onNavigate={openTool}
                   highlighted={highlightActive && matchIndex === selected && matchIndex !== -1}
+                  isNew={newIds.has(t.id)}
                 />
               </div>
             )
