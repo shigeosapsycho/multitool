@@ -4,11 +4,11 @@ import { ContextMenu } from '../components/ContextMenu'
 import { VirtualGroupList } from '../components/VirtualGroupList'
 
 export type SenderGroup<T extends EmailHeader = EmailHeader> = {
-  /** Stable identity for this group — used as the React key and expand key. */
+  /** Stable identity for this group, used as the React key and expand key. */
   key: string
   /** Display name, or the address when the sender has no display name. */
   name: string
-  /** The sender address — empty when the group spans several addresses. */
+  /** The sender address, empty when the group spans several addresses. */
   addr: string
   /** How many distinct sender addresses fall under this group. */
   addrCount: number
@@ -21,7 +21,7 @@ export type SenderGroup<T extends EmailHeader = EmailHeader> = {
  *
  * Senders are keyed by display name when they have one, and by address
  * otherwise. Keying by name merges mail from senders that rotate their From
- * address per message — e.g. iCloud "Hide My Email" relay aliases, where
+ * address per message, e.g. iCloud "Hide My Email" relay aliases, where
  * every message from "Best Buy" arrives from a different address.
  */
 export function groupBySender<T extends EmailHeader>(emails: T[]): SenderGroup<T>[] {
@@ -72,7 +72,7 @@ export function formatSize(bytes: number): string {
 }
 
 export function formatDate(ms: number): string {
-  if (!ms) return '—'
+  if (!ms) return '-'
   return new Date(ms).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -151,7 +151,7 @@ type Props = {
   resetKey?: unknown
   onToggleGroup: (group: SenderGroup) => void
   onToggleEmail: (uid: number) => void
-  /** Shift+click on an email row — select the range from the anchor. */
+  /** Shift+click on an email row, select the range from the anchor. */
   onRangeSelect: (uid: number) => void
   onToggleExpand: (addr: string) => void
   onPreview: (email: EmailHeader) => void

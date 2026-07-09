@@ -26,7 +26,7 @@ type OutputFormat = 'refract' | 'shikari' | 'emails'
 const FORMAT_LABELS: Record<ProfileFormat, string> = {
   refract: 'Refract JSON',
   shikari: 'Shikari CSV',
-  unknown: '—'
+  unknown: '-'
 }
 
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -102,7 +102,7 @@ function OutputCard({
   const label = OUTPUT_LABELS[format]
 
   return (
-    <Card label={label} badge={out ? out.count.toLocaleString() : '—'} className="min-h-0 flex-1">
+    <Card label={label} badge={out ? out.count.toLocaleString() : '-'} className="min-h-0 flex-1">
       {result === null ? (
         <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
           Run to filter the profiles.
@@ -227,7 +227,7 @@ export function ProfileFilterPage({ onBack, onSetStatus, active = true, formatCs
     onSetStatus(`Loaded ${path}`)
   }
 
-  // Pick up a file dropped on the Tools landing page — treat it as the profile file.
+  // Pick up a file dropped on the Tools landing page, treat it as the profile file.
   useEffect(() => {
     if (!active) return
     const pending = consumePendingFile()

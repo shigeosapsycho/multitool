@@ -70,7 +70,7 @@ describe('detectProfileFormat', () => {
   })
 })
 
-describe('filterProfiles — refract JSON', () => {
+describe('filterProfiles, refract JSON', () => {
   it('keeps only profiles whose email is in the list, in file order', () => {
     const r = filterProfiles('alice@example.com\nbob@example.com', REFRACT)
     expect(r.format).toBe('refract')
@@ -130,7 +130,7 @@ describe('filterProfiles — refract JSON', () => {
   })
 })
 
-describe('filterProfiles — shikari CSV', () => {
+describe('filterProfiles, shikari CSV', () => {
   it('keeps the header plus matching rows verbatim, in file order', () => {
     const r = filterProfiles('alice@example.com bob@example.com', SHIKARI)
     expect(r.format).toBe('shikari')
@@ -174,7 +174,7 @@ describe('filterProfiles — shikari CSV', () => {
   })
 })
 
-describe('filterProfiles — email list parsing', () => {
+describe('filterProfiles, email list parsing', () => {
   it('splits on commas, semicolons, and whitespace, deduping case-insensitively', () => {
     const r = filterProfiles('Alice@example.com; alice@example.com\n  BOB@example.com , dave@example.com', REFRACT)
     expect(r.emailsRequested).toBe(3)
@@ -288,7 +288,7 @@ describe('dedupeProfiles', () => {
       expect(r.removedCount).toBe(2)
       const out = JSON.parse(r.fullOutput) as Array<Record<string, unknown>>
       expect(out.map((p) => p.name)).toEqual(['A', 'B', 'NoMail'])
-      // Unknown fields survive untouched — kept elements are the originals.
+      // Unknown fields survive untouched, kept elements are the originals.
       expect(out[0]!.custom).toBe('keep-me')
     })
 

@@ -172,15 +172,6 @@ pub fn run() {
             email_unsubscribe::unsub_cancel,
             email_unsubscribe::unsub_run,
         ])
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        // A staged update the user never restarted into is installed here, on
-        // the way out, so closing the app is enough to land on the new build.
-        // `updater_apply_and_restart` calls `process::exit`, which skips this
-        // event entirely — no double-swap.
-        .run(|_app, event| {
-            if matches!(event, tauri::RunEvent::Exit) {
-                update::apply_on_exit();
-            }
-        });
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

@@ -132,7 +132,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
       const senderCount = groupBySender(result.emails).length
       if (result.cancelled) {
         setStatus(
-          `Scan stopped — found ${senderCount} ${
+          `Scan stopped, found ${senderCount} ${
             senderCount === 1 ? 'sender' : 'senders'
           } before stopping.`
         )
@@ -254,7 +254,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
       }
     }
     if (targets.length === 0) {
-      setStatus('Nothing to unsubscribe — the selected senders have no web link.')
+      setStatus('Nothing to unsubscribe, the selected senders have no web link.')
       return
     }
     setUnsubscribing(true)
@@ -271,7 +271,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
       const failed = items.length - ok
       summary =
         failed > 0
-          ? `Unsubscribed from ${ok} of ${items.length} senders — ${failed} failed.`
+          ? `Unsubscribed from ${ok} of ${items.length} senders, ${failed} failed.`
           : `Unsubscribed from ${ok} ${ok === 1 ? 'sender' : 'senders'}.`
     } catch (e) {
       setUnsubscribing(false)
@@ -294,7 +294,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
           setEmails((prev) => (prev ? prev.filter((e) => !gone.has(e.uid)) : prev))
           summary = `${summary} Moved ${result.deleted.toLocaleString()} emails to Trash.`
           if (result.failed.length > 0) {
-            const cause = result.error ? ` — ${result.error}` : ''
+            const cause = result.error ? `, ${result.error}` : ''
             summary = `${summary} ${result.failed.length} could not be deleted${cause}.`
           }
         } catch (e) {
@@ -413,7 +413,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
       </Card>
 
       {/* Right column: mailing lists */}
-      <Card label="Mailing lists" badge={emails ? allGroups.length.toLocaleString() : '—'}>
+      <Card label="Mailing lists" badge={emails ? allGroups.length.toLocaleString() : '-'}>
         {emails === null ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
             Scan an inbox to find mailing lists you can leave.
@@ -481,7 +481,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
                 {emailOnlyCount > 0
                   ? `${emailOnlyCount} ${
                       emailOnlyCount === 1 ? 'sender offers' : 'senders offer'
-                    } email-only unsubscribe — use “Open”.`
+                    } email-only unsubscribe, use “Open”.`
                   : ''}
               </span>
               <Button
@@ -507,7 +507,7 @@ export function EmailUnsubscribePage({ onBack, active }: Props) {
         }?`}
         message={
           `This sends an unsubscribe request to each selected sender’s server. ` +
-          `It cannot be undone from here — re-subscribing means signing up again.` +
+          `It cannot be undone from here, re-subscribing means signing up again.` +
           (deleteEmails
             ? ' The scanned emails from those senders will also be moved to Trash.'
             : '')

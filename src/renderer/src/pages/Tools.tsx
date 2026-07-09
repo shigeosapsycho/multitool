@@ -52,13 +52,13 @@ const tools: ToolMeta[] = [
   {
     id: 'find-duplicates',
     title: 'Find Duplicates',
-    description: 'Lines that appear more than once — in one file or across two.',
+    description: 'Lines that appear more than once, in one file or across two.',
     accent: '#7c5cff'
   },
   {
     id: 'find-non-duplicates',
     title: 'Find Non-Duplicates',
-    description: 'Lines that appear only once — in one file or across two.',
+    description: 'Lines that appear only once, in one file or across two.',
     accent: '#f59e0b'
   },
   {
@@ -88,7 +88,7 @@ const tools: ToolMeta[] = [
   {
     id: 'order-email-by',
     title: 'Order Email By',
-    description: 'Sort a list of emails by provider — drag icloud, gmail, yahoo… into your order.',
+    description: 'Sort a list of emails by provider, drag icloud, gmail, yahoo… into your order.',
     accent: '#0ea5e9'
   },
   {
@@ -122,9 +122,15 @@ const tools: ToolMeta[] = [
     accent: '#f472b6'
   },
   {
+    id: 'randomize-proxy-list',
+    title: 'Randomize Proxy List',
+    description: 'Shuffle a proxy list, favoring providers you weight higher toward the top.',
+    accent: '#06b6d4'
+  },
+  {
     id: 'remove-duplicates',
     title: 'Remove Duplicates',
-    description: 'Keep one copy of each line, drop the repeats — in one file or across two.',
+    description: 'Keep one copy of each line, drop the repeats, in one file or across two.',
     accent: '#14b8a6'
   },
   {
@@ -136,7 +142,7 @@ const tools: ToolMeta[] = [
   {
     id: 'remove-profile-duplicates',
     title: 'Remove Profile Duplicates',
-    description: 'Drop duplicate profiles from a Refract or Shikari export — first one wins.',
+    description: 'Drop duplicate profiles from a Refract or Shikari export, first one wins.',
     accent: '#fbbf24'
   },
   {
@@ -378,6 +384,16 @@ const SortListIcon = () => (
   </svg>
 )
 
+const ShuffleIcon = () => (
+  <svg {...SVG_PROPS}>
+    <polyline points="16 3 21 3 21 8" />
+    <line x1="4" y1="20" x2="21" y2="3" />
+    <polyline points="21 16 21 21 16 21" />
+    <line x1="15" y1="15" x2="21" y2="21" />
+    <line x1="4" y1="4" x2="9" y2="9" />
+  </svg>
+)
+
 const OrderTrackerIcon = () => <OrderTrackerLogo className="h-full w-full" />
 
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
@@ -399,6 +415,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
+  'randomize-proxy-list': ShuffleIcon,
   'remove-duplicates': RemoveDuplicatesIcon,
   'remove-passwords': KeyIcon,
   'remove-profile-duplicates': RemoveDuplicatesIcon,
@@ -494,7 +511,7 @@ export function ToolsPage({ onNavigate }: Props) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
   // The highlight ring stays hidden until the user navigates with the arrow
-  // keys — typing alone never highlights a card.
+  // keys, typing alone never highlights a card.
   const [highlightActive, setHighlightActive] = useState(false)
   // Re-seeded from the module-level set on every mount. Opening a tool unmounts
   // this page, so a dismissal kept only in state would reappear on the way back.
@@ -502,8 +519,8 @@ export function ToolsPage({ onNavigate }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
 
-  // Every route into a tool — card click, Enter from the search box, and
-  // drop-a-file-on-a-card — funnels through here, so all three clear the badge.
+  // Every route into a tool, card click, Enter from the search box, and
+  // drop-a-file-on-a-card, funnels through here, so all three clear the badge.
   const openTool = useCallback(
     (route: Route) => {
       dismissNewTool(route)
@@ -523,13 +540,13 @@ export function ToolsPage({ onNavigate }: Props) {
 
   // Cards kept in the DOM while they animate out (ids mid-exit).
   const [exiting, setExiting] = useState<Set<ToolMeta['id']>>(new Set())
-  // Mirror of `exiting` so the effect can read it without listing it as a dep —
+  // Mirror of `exiting` so the effect can read it without listing it as a dep -
   // depending on the state the effect writes would tear down its own timers.
   const exitingRef = useRef(exiting)
   exitingRef.current = exiting
   const prevMatchIds = useRef<Set<ToolMeta['id']>>(new Set(matches.map((t) => t.id)))
   // Pending unmount timers, keyed by card id. Held in a ref so a re-render
-  // never cancels them — only re-entry or page unmount does.
+  // never cancels them, only re-entry or page unmount does.
   const exitTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const reducedMotion =
@@ -542,7 +559,7 @@ export function ToolsPage({ onNavigate }: Props) {
     prevMatchIds.current = matchIds
 
     if (reducedMotion) {
-      // No exit animation — drop any leaving cards immediately.
+      // No exit animation, drop any leaving cards immediately.
       if (exitingRef.current.size) setExiting(new Set())
       return
     }
@@ -599,7 +616,7 @@ export function ToolsPage({ onNavigate }: Props) {
   const { setRef } = useFlip(rendered.map((t) => t.id).join('|'), !reducedMotion)
 
   // Type-anywhere: a printable key (no modifier) routes into the search box,
-  // even if focus drifted. Scoped to this page — it unmounts on navigation.
+  // even if focus drifted. Scoped to this page, it unmounts on navigation.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return

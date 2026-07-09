@@ -4,7 +4,7 @@ const KEY = 'tools:seen'
 /**
  * Tool ids present in `currentIds` that the user has never been shown.
  *
- * `seen === null` means no usable seen-list was stored — a first run, a corrupt
+ * `seen === null` means no usable seen-list was stored, a first run, a corrupt
  * value, or no storage at all. All three mark nothing new, so the worst case is
  * a missing badge rather than every tool badged at once.
  */
@@ -44,7 +44,7 @@ let sessionNew: Set<string> | null = null
  * The tools to badge as new, computed once per app launch.
  *
  * The seen list is rewritten immediately, so the badge lasts exactly one session
- * however the app exits — clean quit, crash, or kill. `Tools.tsx` calls this at
+ * however the app exits, clean quit, crash, or kill. `Tools.tsx` calls this at
  * module scope; later calls reuse the same set, which `dismissNewTool` mutates.
  */
 export function getNewToolIds(currentIds: string[]): Set<string> {

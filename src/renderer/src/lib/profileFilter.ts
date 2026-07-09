@@ -6,7 +6,7 @@ import { parseCsvRow } from './transforms'
 
 export type ProfileFormat = 'refract' | 'shikari' | 'unknown'
 
-/** Canonical profile shape — the superset of fields both formats carry. */
+/** Canonical profile shape, the superset of fields both formats carry. */
 export type Profile = {
   name: string
   email: string
@@ -37,7 +37,7 @@ export type FilterResult = {
   format: ProfileFormat
   /** Filtered file in the original format (JSON text | CSV text); '' on error. */
   fullOutput: string
-  /** Matched profiles as canonical records, file order — drives format conversion. */
+  /** Matched profiles as canonical records, file order, drives format conversion. */
   matched: Profile[]
   /** Emails of the kept profiles, original file casing, file order, deduped. */
   matchedEmails: string[]
@@ -75,8 +75,8 @@ function emptyResult(format: ProfileFormat, error: string, requested: string[]):
   }
 }
 
-// Pulls the address out of a decorated list line — `email:password`,
-// `Name <email>`, quoted, etc. — so those still match the bare profile email.
+// Pulls the address out of a decorated list line, `email:password`,
+// `Name <email>`, quoted, etc., so those still match the bare profile email.
 const EMAIL_RE = /[^\s,;:<>"']+@[^\s,;:<>"']+/
 
 /** Lowercased lookup set + first-seen original-casing list, deduped. */
@@ -160,7 +160,7 @@ function filterRefract(text: string, allowed: Set<string>, requested: string[]):
     if (email === null) continue
     const low = email.trim().toLowerCase()
     fileEmailsLower.add(low)
-    // Keep the first profile per email — a list of emails wants one match each,
+    // Keep the first profile per email, a list of emails wants one match each,
     // even when the export repeats an email across rows.
     if (allowed.has(low) && !seenMatched.has(low)) {
       seenMatched.add(low)
@@ -223,7 +223,7 @@ function filterShikari(text: string, allowed: Set<string>, requested: string[]):
     if (!email) continue
     const low = email.toLowerCase()
     fileEmailsLower.add(low)
-    // Keep the first row per email — one match per listed email, even when the
+    // Keep the first row per email, one match per listed email, even when the
     // export repeats an email across rows.
     if (allowed.has(low) && !seenMatched.has(low)) {
       seenMatched.add(low)
@@ -252,7 +252,7 @@ export type DedupeResult = {
   format: ProfileFormat
   /** Deduped file in the original format (JSON text | CSV text); '' on error. */
   fullOutput: string
-  /** Kept profiles as canonical records, file order — drives format conversion. */
+  /** Kept profiles as canonical records, file order, drives format conversion. */
   kept: Profile[]
   /** Emails of kept profiles, original casing, file order (email-less entries omitted). */
   keptEmails: string[]
@@ -287,13 +287,13 @@ function emptyDedupe(format: ProfileFormat, error: string): DedupeResult {
  */
 export function dedupeProfiles(profileText: string): DedupeResult {
   if (!profileText) {
-    // Completely empty — truly unknown
+    // Completely empty, truly unknown
     return emptyDedupe('unknown', 'Paste or load a Refract JSON or Shikari CSV export.')
   }
   const normalized = stripBom(profileText).replace(/^\s+/, '')
   let format: ProfileFormat
   if (!normalized) {
-    // Whitespace-only input — treat as shikari to get "empty CSV" error
+    // Whitespace-only input, treat as shikari to get "empty CSV" error
     format = 'shikari'
   } else {
     format = detectProfileFormat(profileText)
@@ -324,7 +324,7 @@ function dedupeRefract(text: string): DedupeResult {
   for (const el of list) {
     const email = emailOf(el)
     if (email === null) {
-      // Nothing to key on — never a duplicate; keep verbatim.
+      // Nothing to key on, never a duplicate; keep verbatim.
       keptElements.push(el)
       continue
     }
@@ -384,7 +384,7 @@ function dedupeShikari(text: string): DedupeResult {
     const cells = parseCsvRow(raw)
     const email = (cells[emailIdx] ?? '').trim()
     if (!email) {
-      // Nothing to key on — never a duplicate; keep the raw row.
+      // Nothing to key on, never a duplicate; keep the raw row.
       keptRows.push(raw)
       continue
     }

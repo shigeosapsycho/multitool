@@ -64,8 +64,8 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
 
   // Accounts come from the shared in-memory cache: instant after the first
   // fetch this app run, and kept live across both email tools. When an
-  // update removes the selected account (deleted from the other tool) — or
-  // arrives while nothing is selected — fall back to the first available one.
+  // update removes the selected account (deleted from the other tool), or
+  // arrives while nothing is selected, fall back to the first available one.
   useEffect(() => {
     getAccounts()
       .then((list) => {
@@ -122,7 +122,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
     }
   }
 
-  // When editing, an empty password means "keep the stored one" — but the
+  // When editing, an empty password means "keep the stored one", but the
   // backend refuses that when the host or username changed (the stored
   // credential would be sent to a different server), so require a password
   // again in that case. A port-only change keeps the stored password.
@@ -161,7 +161,7 @@ export function ImapAccountPicker({ selectedId, onSelectedChange, onStatus }: Pr
       onSelectedChange(saved.id)
       setForm((f) => ({ ...f, mode: 'edit', id: saved.id }))
       await window.api.imap.test(saved.id)
-      setTestStatus('Connection works — account saved.')
+      setTestStatus('Connection works, account saved.')
     } catch (e) {
       setTestStatus(`Connection failed: ${String(e)}`)
     } finally {

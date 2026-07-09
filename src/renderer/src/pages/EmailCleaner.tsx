@@ -157,7 +157,7 @@ export function EmailCleanerPage({
       setScanSeq((s) => s + 1)
       if (result.cancelled) {
         setStatus(
-          `Scan stopped — showing ${result.emails.length.toLocaleString()} ${
+          `Scan stopped, showing ${result.emails.length.toLocaleString()} ${
             result.emails.length === 1 ? 'email' : 'emails'
           } found before stopping.`
         )
@@ -256,7 +256,7 @@ export function EmailCleanerPage({
   // delete flow, Esc clears the selection (and only then falls through to
   // App's Esc-returns-to-Tools). Registered without a dependency array so
   // the handler always closes over the latest state; gated to the active
-  // route, and inert while typing or while a dialog/dropdown is open —
+  // route, and inert while typing or while a dialog/dropdown is open -
   // the same guards App.tsx uses. Capture phase so a selection-clearing
   // Esc wins over App's bubble-phase back-navigation.
   useEffect(() => {
@@ -337,7 +337,7 @@ export function EmailCleanerPage({
         await window.api.config.setConfirmPermanentDelete(false)
         onConfirmPermanentDeleteChange(false)
       } catch (e) {
-        setStatus(`Could not save setting: ${String(e)} — deleting anyway.`)
+        setStatus(`Could not save setting: ${String(e)}, deleting anyway.`)
       }
     }
     const uids = [...selected]
@@ -358,7 +358,7 @@ export function EmailCleanerPage({
       setSelected(new Set())
       setAnchorUid((a) => (a !== null && deletedSet.has(a) ? null : a))
       const base = `Deleted ${result.deleted.toLocaleString()} emails.`
-      const cause = result.error ? ` — ${result.error}` : ''
+      const cause = result.error ? `, ${result.error}` : ''
       setStatus(
         result.failed.length > 0
           ? `${base} ${result.failed.length} could not be deleted${cause}.`
@@ -474,7 +474,7 @@ export function EmailCleanerPage({
       </Card>
 
       {/* Right column: results */}
-      <Card label="Inbox" badge={emails ? emails.length.toLocaleString() : '—'}>
+      <Card label="Inbox" badge={emails ? emails.length.toLocaleString() : '-'}>
         {emails === null ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
             Scan an inbox to see emails grouped by sender.

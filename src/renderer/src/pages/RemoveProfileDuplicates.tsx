@@ -26,7 +26,7 @@ type OutputFormat = 'refract' | 'shikari' | 'emails'
 const FORMAT_LABELS: Record<ProfileFormat, string> = {
   refract: 'Refract JSON',
   shikari: 'Shikari CSV',
-  unknown: '—'
+  unknown: '-'
 }
 
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -101,7 +101,7 @@ function OutputCard({
   const label = OUTPUT_LABELS[format]
 
   return (
-    <Card label={label} badge={out ? out.count.toLocaleString() : '—'} className="min-h-0 flex-1">
+    <Card label={label} badge={out ? out.count.toLocaleString() : '-'} className="min-h-0 flex-1">
       {result === null ? (
         <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
           Run to remove duplicate profiles.
@@ -171,7 +171,7 @@ export function RemoveProfileDuplicatesPage({
   // Once the user clicks an output format, stop auto-following the detected source.
   const userPickedFmt = useRef(false)
 
-  // Unlike Profile Filter, editing the input does NOT clear the result — the
+  // Unlike Profile Filter, editing the input does NOT clear the result, the
   // previous output stays visible until the next Run replaces it or Clear
   // resets the page (user-requested behavior).
   async function loadProfileFromPath(path: string) {

@@ -10,14 +10,14 @@ export type UnsubMethod = 'one-click' | 'link' | 'email'
 
 export type GroupUnsub = {
   method: UnsubMethod
-  /** `http(s)` URL — present for `one-click` and `link`. */
+  /** `http(s)` URL, present for `one-click` and `link`. */
   url: string | null
-  /** `mailto:` URI — present for `email` (and sometimes as an extra). */
+  /** `mailto:` URI, present for `email` (and sometimes as an extra). */
   mailto: string | null
 }
 
 /**
- * Derive a sender group's unsubscribe action from its newest email — the
+ * Derive a sender group's unsubscribe action from its newest email, the
  * freshest `List-Unsubscribe` link is the one most likely to still work.
  * Every scanned email carries at least one unsubscribe option, so the newest
  * email always yields a usable method.
@@ -116,7 +116,7 @@ const METHOD_BADGE: Record<UnsubMethod, { label: string; cls: string; hint: stri
   email: {
     label: 'Email only',
     cls: 'bg-surface-3 text-text-muted',
-    hint: 'This sender only offers a mailto: unsubscribe — open it to finish.'
+    hint: 'This sender only offers a mailto: unsubscribe, open it to finish.'
   }
 }
 

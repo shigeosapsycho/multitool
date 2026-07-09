@@ -178,7 +178,7 @@ function ProviderLimitsPopover({
       </div>
       {providers.length === 0 ? (
         <div className="pb-1 text-[12px] text-text-muted">
-          No providers detected — load a proxy list first.
+          No providers detected, load a proxy list first.
         </div>
       ) : (
         <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
@@ -237,7 +237,7 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
   const [providerLimits, setProviderLimits] = useState<Map<string, number>>(() => new Map())
   const [limitPopover, setLimitPopover] = useState<{ x: number; y: number } | null>(null)
 
-  // Pages stay mounted (display:none) while the popover portals to body —
+  // Pages stay mounted (display:none) while the popover portals to body -
   // close it when the page deactivates (back/forward nav, IPC nav) so it
   // can't float orphaned over another page.
   useEffect(() => {
@@ -317,7 +317,7 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
 
   return (
     <>
-      {/* display:contents — no layout box, but right-click anywhere on the
+      {/* display:contents, no layout box, but right-click anywhere on the
           page bubbles here and opens the limit popover at the cursor. */}
       <div
         className="contents"
@@ -328,7 +328,7 @@ export function ProxyCleanerPage({ onBack, onSetStatus, onNavigate, active }: Pr
       >
       <SingleFileTool
         title="Proxy Cleaner"
-        hint="Keep only Residential and/or ISP proxies. Remove specific providers or ISP accounts with the chips in the header. Right-click anywhere to cap how many proxies each provider keeps."
+        hint="Keep Residential or ISP proxies. Use the header chips to remove providers or accounts, or right-click to cap a provider."
         taskName="filtered-proxies"
         inputLabel="Proxy List"
         resultLabel="Filtered Proxies"

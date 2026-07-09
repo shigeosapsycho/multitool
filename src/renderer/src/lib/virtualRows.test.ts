@@ -6,7 +6,7 @@ import {
   visibleRowRange
 } from './virtualRows'
 
-/** A minimal group shape — RowGroup only requires `key` and `emails`. */
+/** A minimal group shape, RowGroup only requires `key` and `emails`. */
 const group = (key: string, count: number) => ({
   key,
   emails: Array.from({ length: count }, (_, i) => ({ uid: i }))

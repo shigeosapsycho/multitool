@@ -86,8 +86,8 @@ function agoLabel(since: number): string {
 
 /**
  * Catalog freshness label (search bar, right side). Owns the 30s tick that
- * keeps "updated N ago" current, so the timer re-renders only this label —
- * not the whole page — and stops entirely while the page is hidden.
+ * keeps "updated N ago" current, so the timer re-renders only this label -
+ * not the whole page, and stops entirely while the page is hidden.
  */
 function SyncLabel({
   active,
@@ -251,7 +251,7 @@ function ReorderRow({
   /** Listing color, set only when this SKU shares its listing with another. */
   color?: string
   dragging: boolean
-  /** While a search filter is active, drag is off — the visible subset can't
+  /** While a search filter is active, drag is off, the visible subset can't
    * map back onto the full `order`, so reordering is done via right-click. */
   dragDisabled?: boolean
   onPointerDown: (e: React.PointerEvent) => void
@@ -324,7 +324,7 @@ function ExportSection({
   const [copied, setCopied] = useState(false)
   const [savedTo, setSavedTo] = useState<string | null>(null)
 
-  // A changed value voids the "Saved to …" note — it no longer matches.
+  // A changed value voids the "Saved to …" note, it no longer matches.
   useEffect(() => {
     setSavedTo(null)
   }, [value])
@@ -415,7 +415,7 @@ function MonitorSection({
   const allText = lists.join('\n')
   const has = lists.length > 0
 
-  // A changed list set voids the "Saved to …" note — it no longer matches.
+  // A changed list set voids the "Saved to …" note, it no longer matches.
   useEffect(() => {
     setSavedTo(null)
   }, [allText])
@@ -525,7 +525,7 @@ export function TargetSkuPage({
   const [order, setOrder] = useState<string[]>(() => loadSavedSkus(SELECTION_STORAGE_KEY))
   // Membership view of `order` for O(1) checkbox lookups.
   const selected = useMemo(() => new Set(order), [order])
-  // The export text. Editable — typing here re-checks the matching boxes.
+  // The export text. Editable, typing here re-checks the matching boxes.
   const [draft, setDraft] = useState(() =>
     formatSkus(loadSavedSkus(SELECTION_STORAGE_KEY), 'shikari')
   )
@@ -534,7 +534,7 @@ export function TargetSkuPage({
   const [query, setQuery] = useState('')
   // Group keys that are collapsed in the checklist.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  // Last row clicked without Shift — the anchor for Shift-click range selects.
+  // Last row clicked without Shift, the anchor for Shift-click range selects.
   const [anchor, setAnchor] = useState<string | null>(null)
   // Right-click context menu in the checklist (Select tab).
   const [menu, setMenu] = useState<{ sku: string; x: number; y: number } | null>(null)
@@ -643,7 +643,7 @@ export function TargetSkuPage({
     return () => clearInterval(id)
   }, [active, refreshCatalog])
 
-  // Persist the order + stars so they survive app restarts. Best-effort —
+  // Persist the order + stars so they survive app restarts. Best-effort -
   // a full or unavailable localStorage just means they aren't remembered.
   useEffect(() => {
     try {
@@ -669,7 +669,7 @@ export function TargetSkuPage({
       if (rows.length === 0) return
       // Insertion slot: index of the first row whose midpoint sits below the
       // pointer, else rows.length (drop at the very end). rows.length-1 here
-      // would cap the drop at second-to-last — the can't-reach-bottom bug.
+      // would cap the drop at second-to-last, the can't-reach-bottom bug.
       let target = rows.length
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i]!.getBoundingClientRect()
@@ -726,7 +726,7 @@ export function TargetSkuPage({
   }, [menu, orderMenu, posPrompt])
 
   // The page stays mounted while hidden (keep-alive). A lingering aria-modal
-  // popover would swallow Escape app-wide — the documented overlay misfire — so
+  // popover would swallow Escape app-wide, the documented overlay misfire, so
   // close all transient overlays the moment the page goes inactive.
   useEffect(() => {
     if (!active) {
@@ -755,7 +755,7 @@ export function TargetSkuPage({
     return group.children ? group.children.flatMap(leafItems) : group.items
   }
 
-  // Flat SKU order as currently rendered — used to resolve Shift-click ranges.
+  // Flat SKU order as currently rendered, used to resolve Shift-click ranges.
   // Collapsed groups (at any level) contribute nothing; their rows aren't shown.
   const visibleOrder = useMemo(() => {
     const walk = (gs: SkuGroup[]): string[] =>
@@ -938,7 +938,7 @@ export function TargetSkuPage({
   }
 
   // Shikari Monitor view: the Tasks SKUs split into comma lists, none longer
-  // than SHIKARI_MONITOR_MAX — one list per monitor group, each copyable on
+  // than SHIKARI_MONITOR_MAX, one list per monitor group, each copyable on
   // its own.
   const monitorLists = useMemo(
     () =>
@@ -948,7 +948,7 @@ export function TargetSkuPage({
     [draft]
   )
 
-  // Distinct SKUs in the draft that aren't in the catalog — drives the
+  // Distinct SKUs in the draft that aren't in the catalog, drives the
   // "Remove invalid" button.
   const invalidCount = useMemo(() => {
     const bad = new Set<string>()
@@ -993,7 +993,7 @@ export function TargetSkuPage({
             </span>
           </button>
           <span className="flex-1" />
-          {/* Era groups skip Select all — selection is done per set / per row. */}
+          {/* Era groups skip Select all, selection is done per set / per row. */}
           {!group.key.startsWith('era:') && (
             <button
               onClick={() => setGroup(items, !allOn)}
@@ -1070,7 +1070,7 @@ export function TargetSkuPage({
               onSaved={(p) => onSetStatus(`Saved to ${shortOutputPath(p)}`)}
             />
             <MonitorSection
-              label={`Monitor — lists of ${SHIKARI_MONITOR_MAX} max`}
+              label={`Monitor, lists of ${SHIKARI_MONITOR_MAX} max`}
               lists={monitorLists}
               taskName="target-skus-shikari-monitor"
               onSaved={(p) => onSetStatus(`Saved to ${shortOutputPath(p)}`)}
@@ -1149,7 +1149,7 @@ export function TargetSkuPage({
 
   // Order tab: the selected SKUs as draggable rows, in export order.
   // Order tab card. Not the shared <Card> (which forces h-full and leaves a
-  // tall empty box for short lists) — this hugs its rows and only scrolls once
+  // tall empty box for short lists), this hugs its rows and only scrolls once
   // the list outgrows the available height.
   const orderCard = (
     <div className="flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-surface">
@@ -1390,7 +1390,7 @@ export function TargetSkuPage({
           role="dialog"
           aria-modal="true"
           // Keep clicks inside the popover from reaching the window-level
-          // dismiss listener (both phases — it closes on `click`).
+          // dismiss listener (both phases, it closes on `click`).
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           className="fixed z-50 w-[224px] overflow-hidden rounded-lg border border-border bg-surface p-3 shadow-card"

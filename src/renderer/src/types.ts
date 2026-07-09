@@ -17,6 +17,7 @@ export type Route =
   | 'proxy-cleaner'
   | 'proxy-tester'
   | 'randomize'
+  | 'randomize-proxy-list'
   | 'remove-duplicates'
   | 'remove-passwords'
   | 'remove-profile-duplicates'

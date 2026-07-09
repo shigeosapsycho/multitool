@@ -74,7 +74,7 @@ export function matchEmailPassByEmails(emailsText: string, emailPassText: string
 }
 
 // Remove emails from `masterText` that also appear in `successText`
-// (which is `email:password` format — we take just the email portion).
+// (which is `email:password` format, we take just the email portion).
 // Case-insensitive comparison; preserves the master list's original casing.
 export function filterEmailsBySuccess(successText: string, masterText: string): string[] {
   const successEmails = new Set<string>()

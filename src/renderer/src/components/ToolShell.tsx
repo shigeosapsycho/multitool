@@ -251,7 +251,7 @@ export function ResultPanel({
   return (
     <Card
       label={label}
-      badge={results !== null ? results.length.toLocaleString() : '—'}
+      badge={results !== null ? results.length.toLocaleString() : '-'}
     >
       {results === null ? (
         <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
@@ -311,7 +311,7 @@ type ToolLayoutProps = {
   /**
    * Whether this tool is the visible one. App keeps visited tools mounted
    * behind display:none, so the Ctrl+Enter shortcut must only bind on the
-   * active tool — otherwise one keypress runs every hidden tool too.
+   * active tool, otherwise one keypress runs every hidden tool too.
    */
   active?: boolean
   running?: boolean

@@ -3,7 +3,7 @@ import type { ImapAccount, ImapAccountInput } from './api'
 /**
  * Shared in-memory cache of the saved IMAP accounts. The backend list is
  * fetched once per app run; every later read is served from memory, and
- * account mutations refresh the cache and notify all subscribers — so the
+ * account mutations refresh the cache and notify all subscribers, so the
  * Email Cleaner and Email Unsubscribe pickers stay in lockstep without each
  * refetching on mount.
  */

@@ -79,7 +79,7 @@ describe('mutations', () => {
     expect(saved).toEqual(acct('new'))
     expect(listAccountsApi).toHaveBeenCalledTimes(1)
     expect(seen).toEqual([[acct('a'), acct('new')]])
-    // The refreshed list is now the cache — no further backend call.
+    // The refreshed list is now the cache, no further backend call.
     expect(await getAccounts()).toEqual([acct('a'), acct('new')])
     expect(listAccountsApi).toHaveBeenCalledTimes(1)
   })

@@ -11,7 +11,7 @@ export type VirtualRow<G extends RowGroup> =
       kind: 'email'
       group: G
       email: G['emails'][number]
-      /** True for the final email of its group — that row draws the group's bottom border. */
+      /** True for the final email of its group, that row draws the group's bottom border. */
       last: boolean
       top: number
     }
@@ -21,7 +21,7 @@ export type VirtualRow<G extends RowGroup> =
  * contributes a group row, and an expanded group additionally contributes one
  * row per email. Each row knows its `top` offset so the scroll window can be
  * found by binary search. O(total rows); runs only when groups or expansion
- * change — never per scroll frame.
+ * change, never per scroll frame.
  */
 export function flattenGroups<G extends RowGroup>(
   groups: readonly G[],
@@ -62,7 +62,7 @@ export function visibleRowRange(
 ): { first: number; last: number } {
   if (rows.length === 0) return { first: 0, last: 0 }
 
-  // Rightmost row whose top edge is at or above the viewport's top edge —
+  // Rightmost row whose top edge is at or above the viewport's top edge -
   // the first row that can be (even partially) visible.
   let lo = 0
   let hi = rows.length - 1
@@ -77,7 +77,7 @@ export function visibleRowRange(
     }
   }
 
-  // Leftmost row that starts at or below the viewport's bottom edge — the
+  // Leftmost row that starts at or below the viewport's bottom edge, the
   // exclusive end of the visible window.
   const bottom = scrollTop + viewHeight
   lo = first

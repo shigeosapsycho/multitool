@@ -26,7 +26,7 @@ export function OrderTrackerPage({ onBack, onSetStatus, active = true }: Props) 
       // from throwing; in the packaged app this opens the default browser.
       window.api?.files?.openUrl(DASHBOARD_URL)?.catch(() => {})
     } catch {
-      // window.api unavailable outside Tauri — nothing to do.
+      // window.api unavailable outside Tauri, nothing to do.
     }
     onSetStatus('Opened Order Tracker in your browser')
   }, [onSetStatus])

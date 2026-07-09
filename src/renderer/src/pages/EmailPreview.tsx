@@ -27,7 +27,7 @@ export function EmailPreview({ email, body, loading, error, onClose }: Props) {
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const date = email.dateMs ? new Date(email.dateMs).toLocaleString() : '—'
+  const date = email.dateMs ? new Date(email.dateMs).toLocaleString() : '-'
 
   return createPortal(
     <div

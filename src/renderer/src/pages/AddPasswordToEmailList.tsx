@@ -34,7 +34,7 @@ export function AddPasswordToEmailListPage({ onBack, onSetStatus, active }: Prop
       ? { kind: 'fixed', password }
       : { kind: 'random', length, sets: charsets }
 
-  // Toggle a character set, but never let the user turn off the last one — an
+  // Toggle a character set, but never let the user turn off the last one, an
   // empty alphabet can't generate a password.
   function toggleCharset(key: keyof CharSets) {
     setCharsets((prev) => {

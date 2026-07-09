@@ -38,7 +38,7 @@ export type TwoFileToolProps = {
 
 /**
  * Counts non-whitespace lines in a single pass. Duplicated from ToolShell's
- * FilePanel so this internal FileBox doesn't have to import the helper —
+ * FilePanel so this internal FileBox doesn't have to import the helper -
  * the two implementations are kept in sync intentionally.
  */
 function countNonEmptyLines(s: string): number {
@@ -260,7 +260,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
           <>
             <Stat value={totalLines.toLocaleString()} label="lines loaded" />
             <Stat
-              value={results ? results.length.toLocaleString() : '—'}
+              value={results ? results.length.toLocaleString() : '-'}
               label={resultUnit}
               separator={false}
             />

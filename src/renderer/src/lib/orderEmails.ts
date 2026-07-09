@@ -1,5 +1,5 @@
 // A line is a valid email when (trimmed) it is local@domain.tld with one '@',
-// non-empty local part, and a dotted domain — no whitespace anywhere.
+// non-empty local part, and a dotted domain, no whitespace anywhere.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Lowercased domain of a valid email line, or null if the line isn't a valid email. */
