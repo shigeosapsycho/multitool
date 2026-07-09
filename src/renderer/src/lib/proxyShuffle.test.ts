@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { weightedShuffleProxies } from './proxyShuffle'
+import { ISP_CATEGORY } from './proxy'
 
 // A tiny deterministic PRNG so tests pin an exact ordering without Math.random.
 function lcg(seed: number): () => number {
@@ -65,5 +66,14 @@ describe('weightedShuffleProxies', () => {
   it('returns an empty array for empty or whitespace-only input', () => {
     expect(weightedShuffleProxies('', new Map(), () => 0.5)).toEqual([])
     expect(weightedShuffleProxies('   \n\t\n', new Map(), () => 0.5)).toEqual([])
+  })
+
+  it('lifts raw-IP ISP proxies via the ISP category weight', () => {
+    // One residential line (baseline weight 1) and one raw-IP ISP line weighted
+    // heavily through the ISP bucket. The ISP line leads despite a higher draw.
+    const input = 'a.smartproxy.com:1\n1.2.3.4:8080'
+    const weights = new Map([[ISP_CATEGORY, 100]])
+    const out = weightedShuffleProxies(input, weights, queued([0.9, 0.5]))
+    expect(out[0]).toBe('1.2.3.4:8080')
   })
 })

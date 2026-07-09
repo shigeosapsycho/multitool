@@ -118,6 +118,50 @@ export function providerOf(host: string | null): string | null {
 }
 
 /**
+ * Category key for the pooled ISP (raw-IPv4) bucket. Safe as a Map key alongside
+ * residential providers because `providerOf` only ever returns registrable
+ * domains, which always contain a dot; this key has none.
+ */
+export const ISP_CATEGORY = 'isp'
+
+/**
+ * The favor category a proxy line belongs to: its provider's registrable domain
+ * when residential, the shared ISP bucket when a raw-IPv4 proxy, or null when it
+ * is neither (so callers leave it at the baseline weight).
+ */
+export function proxyCategoryOf(host: string | null, port: string | null): string | null {
+  return providerOf(host) ?? (isIspProxy(host, port) ? ISP_CATEGORY : null)
+}
+
+export type ProxyGroup = { key: string; label: string; count: number }
+
+/**
+ * Group a proxy list into favor categories: one per residential provider plus a
+ * single pooled ISPs bucket. Residential providers come first, sorted by count
+ * descending then name ascending (matching detectProviders); the ISPs bucket is
+ * appended last and omitted when the list has no raw-IP proxies. Blank and
+ * comment (#) lines are ignored.
+ */
+export function detectProxyGroups(text: string): ProxyGroup[] {
+  const counts = new Map<string, number>()
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const { host, port } = parseProxyLine(line)
+    const category = proxyCategoryOf(host, port)
+    if (!category) continue
+    counts.set(category, (counts.get(category) ?? 0) + 1)
+  }
+  const groups: ProxyGroup[] = [...counts.entries()]
+    .filter(([key]) => key !== ISP_CATEGORY)
+    .map(([key, count]) => ({ key, label: key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+  const ispCount = counts.get(ISP_CATEGORY) ?? 0
+  if (ispCount > 0) groups.push({ key: ISP_CATEGORY, label: 'ISPs', count: ispCount })
+  return groups
+}
+
+/**
  * Collapse an ISP proxy username to its account stem. Providers issue username
  * batches that share an alpha prefix and vary only in a numeric (or separator +
  * numeric) tail, `xyz377`, `xyz6028`, `xyz1970` are all one purchase, `xyz`.
