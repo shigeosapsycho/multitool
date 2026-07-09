@@ -297,7 +297,7 @@ export function SettingsPage({
                 options={[
                   { value: 'name', label: 'Name' },
                   { value: 'size', label: 'Size' },
-                  { value: 'modified', label: 'Modified' }
+                  { value: 'modified', label: 'Date Modified' }
                 ]}
                 onChange={handleChangeOutputSort}
                 ariaLabel="Output sort order"
