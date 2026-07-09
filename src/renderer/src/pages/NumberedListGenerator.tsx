@@ -122,7 +122,7 @@ export function NumberedListGeneratorPage({ onBack, onSetStatus, active }: Props
       <ResultPanel
         label="Result"
         results={ran ? result : null}
-        emptyMessage="Nothing to generate — check that Start ≤ End and the range is under 1,000,000."
+        emptyMessage="Nothing to generate, check that Start ≤ End and the range is under 1,000,000."
         initialMessage={'Set a prefix and range, then "Generate".'}
         taskName="numbered-list"
         savedTo={savedTo}

@@ -20,7 +20,7 @@ type Props<G extends RowGroup> = {
 /**
  * Windowed sender-group list: only the rows inside the viewport (plus a small
  * overscan) exist in the DOM, so a 300k-email inbox scrolls as smoothly as a
- * 300-email one. Same technique as CsvTable — fixed row heights, a full-height
+ * 300-email one. Same technique as CsvTable, fixed row heights, a full-height
  * spacer, absolute-positioned rows, scrollTop + ResizeObserver.
  *
  * Row markup stays with the caller via render props; their roots render into a

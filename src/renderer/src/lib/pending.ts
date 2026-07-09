@@ -12,7 +12,7 @@ export function consumePendingFile(): string | null {
   return p
 }
 
-// Handoff for "Send to Proxy Tester" — passes proxy list text (not a path)
+// Handoff for "Send to Proxy Tester", passes proxy list text (not a path)
 // from one tool to another. Same module-scope pattern as pendingFilePath.
 let pendingProxies: string | null = null
 

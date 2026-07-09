@@ -120,7 +120,7 @@ export function SplitTool(props: SplitToolProps) {
           <>
             <Stat value={lineCount.toLocaleString()} label="lines loaded" />
             <Stat
-              value={outputs ? outputs.length.toString() : '—'}
+              value={outputs ? outputs.length.toString() : '-'}
               label="files written"
               separator={false}
             />
@@ -164,7 +164,7 @@ export function SplitTool(props: SplitToolProps) {
 
         <Card
           label="Output Files"
-          badge={outputs ? outputs.length.toString() : '—'}
+          badge={outputs ? outputs.length.toString() : '-'}
           className="min-h-0 flex-1"
         >
           {error ? (

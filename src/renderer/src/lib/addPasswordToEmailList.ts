@@ -20,7 +20,7 @@ export const SYMBOLS = '!@#$%^&*()-_=+'
 /**
  * Concatenated allowed characters for the selected sets, in a fixed
  * upper/lower/numbers/symbols order. Falls back to lowercase when nothing is
- * selected (defensive — the UI keeps at least one set on).
+ * selected (defensive, the UI keeps at least one set on).
  */
 export function buildAlphabet(sets: CharSets): string {
   let out = ''
@@ -33,7 +33,7 @@ export function buildAlphabet(sets: CharSets): string {
 
 /**
  * `count` unbiased integers in [0, max), drawn from crypto.getRandomValues with
- * rejection sampling — values in the biased tail are discarded so no character
+ * rejection sampling, values in the biased tail are discarded so no character
  * is favored by the modulo.
  */
 function secureRandomInts(count: number, max: number): number[] {

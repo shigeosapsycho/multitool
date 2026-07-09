@@ -74,7 +74,7 @@ type PokemonSet = {
   era: PokemonEra
   /** Lowercase substrings that identify the set in an item title. */
   keywords: string[]
-  /** Era base set — matched only after the era's specific sets. */
+  /** Era base set, matched only after the era's specific sets. */
   base?: boolean
   /**
    * Set that ships as two named variants (e.g. Black Bolt / White Flare). The
@@ -84,7 +84,7 @@ type PokemonSet = {
   splitTag?: boolean
 }
 
-// Sets per era, in release order — drives both display order and matching.
+// Sets per era, in release order, drives both display order and matching.
 const POKEMON_SETS: PokemonSet[] = [
   { name: 'Sword & Shield', era: SS, keywords: ['sword & shield'], base: true },
   { name: 'Rebel Clash', era: SS, keywords: ['rebel clash'] },
@@ -132,14 +132,14 @@ const POKEMON_SETS: PokemonSet[] = [
   { name: 'Pitch Black', era: ME, keywords: ['pitch black'] }
 ]
 
-// Match specific sets before era base sets, so "Mega Evolution—Ascended Heroes"
+// Match specific sets before era base sets, so "Mega Evolution-Ascended Heroes"
 // resolves to Ascended Heroes rather than the Mega Evolution base set.
 const SET_MATCH_ORDER: PokemonSet[] = [
   ...POKEMON_SETS.filter((s) => !s.base),
   ...POKEMON_SETS.filter((s) => s.base)
 ]
 
-// Lowercase set keyword(s) keyed by set name — drives row-label set stripping.
+// Lowercase set keyword(s) keyed by set name, drives row-label set stripping.
 const SET_KEYWORDS: Record<string, string[]> = Object.fromEntries(
   POKEMON_SETS.map((s) => [s.name, s.keywords])
 )
@@ -168,15 +168,15 @@ const TCG_PREFIX = /^.*?(?:Trading Card Game|Card Game|TCG|The Gathering)\s*:\s*
 const GAME_PREFIX =
   /^(?:Bandai\s+)?(?:Pok[eé]mon(?!\s+Day)|One Piece|Magic(?::?\s*The Gathering)?)\s+/i
 
-/** Cleaned item title for display — see TCG_PREFIX / GAME_PREFIX. */
+/** Cleaned item title for display, see TCG_PREFIX / GAME_PREFIX. */
 export function displayName(item: string): string {
   return item.replace(TCG_PREFIX, '').replace(GAME_PREFIX, '').trim()
 }
 
-// Item titles also lead with the era name ("Scarlet & Violet—…", "Sword &
+// Item titles also lead with the era name ("Scarlet & Violet-…", "Sword &
 // Shield …"), which is redundant once the row sits under its era/set group.
-// Target's punctuation is loose — em/en dash or hyphen separators, a missing
-// "&", an optional set code like "S3.5" — so each era gets a permissive
+// Target's punctuation is loose, em/en dash or hyphen separators, a missing
+// "&", an optional set code like "S3.5", so each era gets a permissive
 // leading matcher that also eats the trailing code and separators.
 const ERA_PREFIX: Record<PokemonEra, RegExp> = {
   'Sword & Shield Era': /^sword\s*&?\s*shield(?:\s+s\d+(?:\.\d+)?)?[\s:—–-]*/i,
@@ -195,10 +195,10 @@ function titleCase(s: string): string {
 
 /**
  * Display title for a checklist row. Like `displayName`, but drops the leading
- * Pokémon era name — the row already sits under its era/set group, so
+ * Pokémon era name, the row already sits under its era/set group, so
  * repeating "Scarlet & Violet" on every line is just noise. When `stripSet` is
  * set (the row also sits under a set group), the leading set name is dropped
- * too — except for split-tag sets (Black Bolt / White Flare), where the
+ * too, except for split-tag sets (Black Bolt / White Flare), where the
  * variant is kept as a "[Variant]" tag so the rows stay distinguishable.
  * Falls back to the full name if stripping would leave nothing.
  */
@@ -340,7 +340,7 @@ export const SKUS_REMOTE_URL =
 
 /**
  * Fetch and parse the remote SKU catalog. Rejects when no URL is configured,
- * the request fails, or the file yields no entries — callers fall back to
+ * the request fails, or the file yields no entries, callers fall back to
  * BUNDLED_SKUS on rejection. Returns the raw CSV text alongside the parsed
  * entries so callers can cheaply skip identical re-fetches.
  */
@@ -419,7 +419,7 @@ export function buildGroups(entries: SkuEntry[], mode: GroupingMode): SkuGroup[]
   const unmatched = pokemon.filter((e) => e.set === null)
   if (unmatched.length) groups.push(leaf('pokemon:other', POKEMON_OTHER, unmatched))
 
-  // Non-Pokémon categories — always a single group each.
+  // Non-Pokémon categories, always a single group each.
   for (const category of ['One Piece', 'Magic: The Gathering', 'Other'] as const) {
     const items = entries.filter((e) => e.category === category)
     if (items.length) groups.push(leaf(`cat:${category}`, category, items))

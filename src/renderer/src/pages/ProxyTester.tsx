@@ -53,7 +53,7 @@ export function ProxyTesterPage({
     try {
       localStorage.setItem(URL_STORAGE_KEY, url)
     } catch {
-      // ignore (private mode / quota — non-fatal)
+      // ignore (private mode / quota, non-fatal)
     }
   }, [url])
   const [filePath, setFilePath] = useState<string | null>(null)
@@ -124,7 +124,7 @@ export function ProxyTesterPage({
     setSavedTo(null)
     onSetStatus(`Testing ${proxies.length.toLocaleString()} proxies against ${targetUrl}...`)
     unsubProgressRef.current = window.api.net.onProxyProgress(({ done, total, ok }) => {
-      onSetStatus(`Testing… ${done.toLocaleString()}/${total.toLocaleString()} — ${ok.toLocaleString()} working`)
+      onSetStatus(`Testing… ${done.toLocaleString()}/${total.toLocaleString()}, ${ok.toLocaleString()} working`)
     })
     const start = Date.now()
     try {
@@ -250,7 +250,7 @@ export function ProxyTesterPage({
           <>
             <Stat value={okCount.toLocaleString()} label="working" />
             <Stat value={failCount.toLocaleString()} label="failed" />
-            <Stat value={avgLatency != null ? `${avgLatency}` : '—'} label="avg ms" separator={false} />
+            <Stat value={avgLatency != null ? `${avgLatency}` : '-'} label="avg ms" separator={false} />
           </>
         ) : lineCount > 0 ? (
           <>
@@ -310,7 +310,7 @@ export function ProxyTesterPage({
 
       </div>
 
-      <Card label="Results" badge={results ? `${okCount}/${results.length}` : '—'}>
+      <Card label="Results" badge={results ? `${okCount}/${results.length}` : '-'}>
         {results === null ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
             Load a list and click "Test All".
@@ -360,12 +360,12 @@ export function ProxyTesterPage({
                 <tbody>
                   {(visibleResults ?? []).map((r, i) => (
                     <tr key={i} className="border-b border-border/40 hover:bg-surface-2">
-                      <td className="px-3 py-1.5 text-text-primary break-all">{r.raw || '—'}</td>
+                      <td className="px-3 py-1.5 text-text-primary break-all">{r.raw || '-'}</td>
                       <td className={`px-3 py-1.5 text-right ${MS_COLOR[categoryOf(r)]}`}>
-                        {r.latencyMs != null ? r.latencyMs.toLocaleString() : '—'}
+                        {r.latencyMs != null ? r.latencyMs.toLocaleString() : '-'}
                       </td>
                       <td className={`px-3 py-1.5 text-right ${r.error == null ? 'text-green-400' : 'text-text-muted'}`}>
-                        {r.status != null ? r.status : '—'}
+                        {r.status != null ? r.status : '-'}
                       </td>
                       <td className="px-3 py-1.5 text-red-400 break-all">{r.error ?? ''}</td>
                     </tr>

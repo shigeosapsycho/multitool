@@ -141,7 +141,7 @@ export function SingleFileTool(props: SingleFileToolProps) {
           <>
             <Stat value={lineCount.toLocaleString()} label="lines loaded" />
             <Stat
-              value={results ? results.length.toLocaleString() : '—'}
+              value={results ? results.length.toLocaleString() : '-'}
               label={resultUnit}
               separator={false}
             />

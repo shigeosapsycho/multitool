@@ -23,6 +23,7 @@ import { ProfileFilterPage } from './pages/ProfileFilter'
 import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
+import { RandomizeProxyListPage } from './pages/RandomizeProxyList'
 import { RemoveDuplicatesPage } from './pages/RemoveDuplicates'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { RemoveProfileDuplicatesPage } from './pages/RemoveProfileDuplicates'
@@ -55,6 +56,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'proxy-cleaner',
   'proxy-tester',
   'randomize',
+  'randomize-proxy-list',
   'remove-duplicates',
   'remove-passwords',
   'remove-profile-duplicates',
@@ -67,14 +69,6 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
 
 function isToolRoute(r: Route): boolean {
   return (TOOL_ROUTES as Route[]).includes(r)
-}
-
-/** Ctrl+<digit> → sidebar tab, in the order the tabs are drawn. */
-const SIDEBAR_SHORTCUTS: Record<string, Route> = {
-  '1': 'tools',
-  '2': 'results',
-  '3': 'settings',
-  '4': 'logs'
 }
 
 /** Read a positive-integer setting from localStorage, falling back on missing/invalid. */
@@ -130,7 +124,7 @@ export default function App() {
   }
   const [systemDark, setSystemDark] = useState(true)
   const [visitedTools, setVisitedTools] = useState<Set<Route>>(new Set())
-  // The most recently opened module — the Tools tab returns here.
+  // The most recently opened module, the Tools tab returns here.
   const [lastTool, setLastTool] = useState<Route | null>(null)
   const noopStatus = () => {}
 
@@ -187,7 +181,7 @@ export default function App() {
   }, [effectiveLight])
 
   // Title-bar sun/moon button: flip to the opposite of what's on screen. Sets
-  // an explicit theme (leaving 'system') — the Settings select can restore it.
+  // an explicit theme (leaving 'system'), the Settings select can restore it.
   const toggleTheme = useCallback(() => {
     const next = effectiveLight ? 'dark' : 'light'
     setTheme(next)
@@ -209,10 +203,10 @@ export default function App() {
           kind = 'success'
           break
         case 'available':
-          message = `Update v${status.version} found — downloading...`
+          message = `Update v${status.version} found, downloading...`
           break
         case 'downloaded':
-          message = `Update v${status.version} downloaded. Applies on restart, or when you close the app.`
+          message = `Update v${status.version} downloaded. Restart to apply.`
           kind = 'success'
           setUpdateVersion(status.version)
           setUpdateReady(true)
@@ -291,31 +285,11 @@ export default function App() {
     [navigate, restoreLastModule, lastTool]
   )
 
-  // Ctrl+1..4 jump to the sidebar tabs in order. Routed through
-  // navigateFromSidebar so Ctrl+1 honours "restore last module" exactly like
-  // clicking the Tools tab does. Yields to an open dialog or dropdown.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
-      const target = SIDEBAR_SHORTCUTS[e.key]
-      if (!target) return
-      if (
-        document.querySelector('[role="dialog"][aria-modal="true"]') ||
-        document.querySelector('[role="listbox"]')
-      )
-        return
-      e.preventDefault()
-      navigateFromSidebar(target)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [navigateFromSidebar])
-
   // Mouse4 / Mouse5 ("Back" / "Forward" thumb buttons). Listen via three paths
   // and debounce per-direction so a single click that fires multiple events
   // (mousedown + mouseup + auxclick + APPCOMMAND IPC) only triggers one nav.
   //   1. DOM mousedown/mouseup (e.button === 3 for back, === 4 for forward).
-  //   2. DOM auxclick — fallback when Chromium swallows mousedown for X-buttons.
+  //   2. DOM auxclick, fallback when Chromium swallows mousedown for X-buttons.
   //   3. Windows APPCOMMAND messages forwarded from the main process via IPC.
   // The debounce window must cover the worst-case spread between these events,
   // which can be 100ms+ between DOM and IPC. 250ms still feels snappy for
@@ -383,8 +357,8 @@ export default function App() {
   // Opening a module focuses its primary input so Ctrl+V pastes immediately
   // without clicking the box first. Prefer a paste-box textarea; fall back to
   // the first free-text input (tools whose main control is a single field).
-  // Scoped to the active tool's wrapper — hidden keep-alive tools can't steal
-  // focus — and preventScroll keeps revisits from yanking pane scroll.
+  // Scoped to the active tool's wrapper, hidden keep-alive tools can't steal
+  // focus, and preventScroll keeps revisits from yanking pane scroll.
   useEffect(() => {
     if (!autoFocusInput || !isToolRoute(route)) return
     // Yield to an open dialog or dropdown (mirrors the Escape handler above):
@@ -401,14 +375,14 @@ export default function App() {
       'textarea:not([readonly]):not([disabled])'
     )
     if (textarea) {
-      // Only an empty paste box wants the caret — a populated one means the
+      // Only an empty paste box wants the caret, a populated one means the
       // user is past the paste step and expects page-level shortcuts to work
       // (e.g. Listify's Ctrl+A / Delete row operations).
       if (textarea.value === '') textarea.focus({ preventScroll: true })
       return
     }
     // :not([inputmode]) skips numeric fields like the IMAP tools' day-count
-    // filter — those are not paste targets.
+    // filter, those are not paste targets.
     const input = wrap.querySelector<HTMLElement>(
       'input[type="text"]:not([disabled]), input[type="search"]:not([disabled]), input:not([type]):not([inputmode]):not([disabled])'
     )
@@ -417,7 +391,7 @@ export default function App() {
 
   // Disable the native (WebView2) right-click context menu app-wide. The app's
   // own right-click menus (Listify, Target SKUs) use React onContextMenu and are
-  // unaffected — this only suppresses the default browser menu everywhere else.
+  // unaffected, this only suppresses the default browser menu everywhere else.
   useEffect(() => {
     const onContextMenu = (e: MouseEvent) => e.preventDefault()
     window.addEventListener('contextmenu', onContextMenu)
@@ -427,7 +401,7 @@ export default function App() {
   function renderTool(r: Route, active: boolean): JSX.Element | null {
     const props = {
       // A tool's back arrow always returns to the Tools grid. History-based
-      // goBack would land on whatever tab preceded the tool — e.g. Settings,
+      // goBack would land on whatever tab preceded the tool, e.g. Settings,
       // when the Tools tab reopened the tool from there (restore last module).
       onBack: () => navigate('tools'),
       onSetStatus: noopStatus,
@@ -480,6 +454,8 @@ export default function App() {
         return <ProxyTesterPage {...props} />
       case 'randomize':
         return <RandomizePage {...props} />
+      case 'randomize-proxy-list':
+        return <RandomizeProxyListPage {...props} />
       case 'remove-duplicates':
         return <RemoveDuplicatesPage {...props} />
       case 'remove-passwords':
@@ -593,8 +569,8 @@ export default function App() {
             updateError
               ? `Update failed: ${updateError}`
               : updateVersion
-                ? `Update v${updateVersion} downloaded — restart now, or it installs when you close the app.`
-                : 'Update downloaded — restart now, or it installs when you close the app.'
+                ? `Update v${updateVersion} downloaded, restart to apply.`
+                : 'Update downloaded, restart to apply.'
           }
           actionLabel={restarting ? 'Restarting…' : updateError ? 'Retry' : 'Restart now'}
           actionDisabled={restarting}

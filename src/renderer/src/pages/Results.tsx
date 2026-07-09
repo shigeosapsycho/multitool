@@ -81,7 +81,7 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort, formatCsv 
     try {
       const list = await window.api.files.listOutput(outputSort)
       setEntries(list)
-      // Refresh the selection to the fresh Entry from the new list — keeps
+      // Refresh the selection to the fresh Entry from the new list, keeps
       // selection if path still exists, drops it if not. Using the new object
       // reference also triggers the preview useEffect so the pane re-reads
       // when the file's content changed (e.g. after a shuffle).
@@ -146,7 +146,7 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort, formatCsv 
             cache.set(e.path, { mtime: e.mtime, lines })
             next[e.path] = lines
           } catch {
-            // Unreadable file — leave it out so the row shows a placeholder.
+            // Unreadable file, leave it out so the row shows a placeholder.
           }
         })
       )

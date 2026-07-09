@@ -7,7 +7,7 @@ const NUM_W = 52
 const COL_W = 152
 
 /**
- * Renders CSV text as a scrollable table — sticky header, row numbers, zebra
+ * Renders CSV text as a scrollable table, sticky header, row numbers, zebra
  * rows, horizontal scroll for the many columns. Rows are virtualized (only the
  * visible window is in the DOM) so a few-thousand-row file stays smooth.
  * Display only; the caller still owns the raw text for Copy / Save.

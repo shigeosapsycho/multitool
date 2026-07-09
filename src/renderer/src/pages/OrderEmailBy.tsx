@@ -54,7 +54,7 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
   const editDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Pointer-based drag reorder for provider chips. HTML5 drag events don't fire
   // under Tauri's OS-level drag-drop (dragDropEnabled), so we hold the dragged
-  // chip and reorder live by pointer position — same approach as Listify / Target SKUs.
+  // chip and reorder live by pointer position, same approach as Listify / Target SKUs.
   const [dragDomain, setDragDomain] = useState<string | null>(null)
   const dragDomainRef = useRef<string | null>(null)
   const chipsRef = useRef<HTMLDivElement>(null)
@@ -292,7 +292,7 @@ export function OrderEmailByPage({ onBack, onSetStatus, active = true }: Props) 
         hasContent ? (
           <>
             <Stat value={lineCount.toLocaleString()} label="emails loaded" />
-            <Stat value={results ? results.length.toLocaleString() : '—'} label="sorted" />
+            <Stat value={results ? results.length.toLocaleString() : '-'} label="sorted" />
             <Stat value={invalidCount.toLocaleString()} label="invalid" separator={false} />
           </>
         ) : (

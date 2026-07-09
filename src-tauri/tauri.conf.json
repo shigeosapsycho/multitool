@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BeuMultiTool",
-  "version": "3.20.6",
+  "version": "3.20.7",
   "identifier": "com.beu.multitool",
   "build": {
     "beforeDevCommand": "npm run vite:dev",

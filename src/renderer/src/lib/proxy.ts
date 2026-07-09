@@ -4,7 +4,7 @@
 //   - Residential: the host is a hostname/domain (residential/rotating
 //     gateways are addressed this way, e.g. gate.smartproxy.com).
 //   - ISP: the host is a raw numeric IPv4 address with a numeric port.
-// Classification is fully offline — no network calls.
+// Classification is fully offline, no network calls.
 
 export type ParsedProxy = {
   scheme: string | null
@@ -22,7 +22,7 @@ const PORT_RE = /^\d{1,5}$/
 /**
  * Pull the scheme, host, and port out of one proxy line. Accepts the formats
  * the Proxy Tester documents: `host:port`, `host:port:user:pass`,
- * `user:pass@host:port`, `user:pass:host:port` — each with an optional
+ * `user:pass@host:port`, `user:pass:host:port`, each with an optional
  * `http://` / `https://` / `socks5://` prefix.
  */
 export function parseProxyLine(raw: string): ParsedProxy {
@@ -120,7 +120,7 @@ export function providerOf(host: string | null): string | null {
 /**
  * Collapse an ISP proxy username to its account stem. Providers issue username
  * batches that share an alpha prefix and vary only in a numeric (or separator +
- * numeric) tail — `xyz377`, `xyz6028`, `xyz1970` are all one purchase, `xyz`.
+ * numeric) tail, `xyz377`, `xyz6028`, `xyz1970` are all one purchase, `xyz`.
  * The stem is the lowercased username with that variable tail stripped. A
  * username with no alpha part (or none left after stripping) keeps its full
  * lowercased form so distinct numeric accounts don't collapse to ''.
@@ -176,7 +176,7 @@ export function detectProviders(text: string): { provider: string; count: number
 /**
  * Keep only the proxy lines matching the selected filters. A line is kept when
  * it matches ANY checked type filter (residential OR isp), its provider is not
- * in `removed`, and — for ISP lines — its username stem is not in
+ * in `removed`, and, for ISP lines, its username stem is not in
  * `removedUsers`. `providerLimits` caps providers independently: a provider
  * mapped to N keeps only its first N surviving lines; unmapped providers are
  * uncapped, and lines with no provider name (raw IPs) are never counted.
@@ -201,11 +201,11 @@ export function filterProxies(
     if (!typeMatch) continue
     const provider = providerOf(host)
     if (removed && removed.size > 0) {
-      // null provider (raw IP, etc.) means there's nothing to match against — keep the line.
+      // null provider (raw IP, etc.) means there's nothing to match against, keep the line.
       if (provider && removed.has(provider)) continue
     }
     if (isIsp && removedUsers && removedUsers.size > 0) {
-      // null stem (no username on the line) means nothing to match — keep the line.
+      // null stem (no username on the line) means nothing to match, keep the line.
       const stem = ispUserStemOf(user)
       if (stem && removedUsers.has(stem)) continue
     }

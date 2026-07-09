@@ -389,7 +389,7 @@ export function ListifyPage({ onBack, onSetStatus, active = true }: Props) {
         placeholder={'Paste your list here (one item per line),\nor drop / choose a text file.'}
       />
 
-      <Card label="List" badge={hasItems ? items.length.toLocaleString() : '—'}>
+      <Card label="List" badge={hasItems ? items.length.toLocaleString() : '-'}>
         {!hasItems ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">
             Load a list to start. Drag the grip or right-click rows to reorder, mark, or delete.

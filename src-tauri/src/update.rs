@@ -247,43 +247,8 @@ mod win {
         Ok(target)
     }
 
-    /// Renames `exe` aside to `.old` and moves the staged `.new` into its place.
-    /// Windows permits renaming a running exe, so this is safe to do mid-process.
-    ///
-    /// On a failed second rename the first is rolled back, so the caller is
-    /// never left without an exe at the expected path.
-    fn swap_staged_exe_at(exe: &std::path::Path) -> Result<()> {
-        let dir = exe.parent().context("exe parent")?;
-        let new_exe = dir.join(format!("{ASSET_NAME}.new"));
-        let old_exe = dir.join(format!("{ASSET_NAME}.old"));
-
-        if !new_exe.is_file() {
-            return Err(anyhow!("no staged update at {}", new_exe.display()));
-        }
-        // Best-effort wipe of a leftover from a prior swap. The rename below
-        // replaces an existing `.old` on its own, but not while a lingering
-        // instance still has it mapped — unlinking frees the name in that case.
-        let _ = std::fs::remove_file(&old_exe);
-
-        std::fs::rename(exe, &old_exe)
-            .with_context(|| format!("rename {} -> {}", exe.display(), old_exe.display()))?;
-        if let Err(e) = std::fs::rename(&new_exe, exe) {
-            // Roll back so the user isn't left with no exe in place.
-            let _ = std::fs::rename(&old_exe, exe);
-            return Err(anyhow::Error::from(e).context("rename .new -> current"));
-        }
-        Ok(())
-    }
-
-    /// `swap_staged_exe_at` against the running exe. Returns the path the
-    /// updated exe now occupies.
-    fn swap_staged_exe() -> Result<PathBuf> {
-        let exe = std::env::current_exe().context("current_exe")?;
-        swap_staged_exe_at(&exe)?;
-        Ok(exe)
-    }
-
-    /// Swaps the staged `.new` exe into place and relaunches.
+    /// Swaps the staged `.new` exe into place and relaunches. Windows allows
+    /// renaming a running exe, so this is just two renames + spawn + exit.
     pub fn apply_and_restart(app: &AppHandle) -> Result<()> {
         // Never swap while a download is in flight — any `.new` on disk is
         // from an older check, and exiting now would kill the stream mid-write.
@@ -297,7 +262,24 @@ mod win {
         use tauri_plugin_window_state::{AppHandleExt, StateFlags};
         let _ = app.save_window_state(StateFlags::all());
 
-        let exe = swap_staged_exe()?;
+        let exe = std::env::current_exe().context("current_exe")?;
+        let dir = exe.parent().context("exe parent")?;
+        let new_exe = dir.join(format!("{ASSET_NAME}.new"));
+        let old_exe = dir.join(format!("{ASSET_NAME}.old"));
+
+        if !new_exe.is_file() {
+            return Err(anyhow!("no staged update at {}", new_exe.display()));
+        }
+        // Wipe any leftover from a prior swap; Windows won't reuse a taken name.
+        let _ = std::fs::remove_file(&old_exe);
+
+        std::fs::rename(&exe, &old_exe)
+            .with_context(|| format!("rename {} -> {}", exe.display(), old_exe.display()))?;
+        if let Err(e) = std::fs::rename(&new_exe, &exe) {
+            // Roll back so the user isn't left with no exe in place.
+            let _ = std::fs::rename(&old_exe, &exe);
+            return Err(anyhow::Error::from(e).context("rename .new -> current"));
+        }
 
         std::process::Command::new(&exe)
             .spawn()
@@ -305,17 +287,6 @@ mod win {
 
         // Bypass Tauri's shutdown choreography — get out of the file's way fast.
         std::process::exit(0);
-    }
-
-    /// Swaps the staged `.new` exe into place without relaunching. Runs as the
-    /// app exits so the next launch is the updated build.
-    pub fn apply_on_exit() {
-        // A download still streaming into `.new.part` means the `.new` on disk
-        // (if any) is stale; and the writer thread dies with the process.
-        if DOWNLOAD_IN_FLIGHT.load(Ordering::SeqCst) {
-            return;
-        }
-        let _ = swap_staged_exe();
     }
 
     /// Sweeps `beu-multitool.exe.old` leftovers from a prior self-update. Returns
@@ -439,96 +410,7 @@ mod win {
 
     #[cfg(test)]
     mod tests {
-        use super::{is_strictly_newer, parse_sha256_digest, swap_staged_exe_at, ASSET_NAME};
-        use std::path::PathBuf;
-
-        /// A scratch dir holding a fake install: `beu-multitool.exe` plus
-        /// whatever staging files the test writes next to it.
-        struct Fixture {
-            dir: PathBuf,
-        }
-
-        impl Fixture {
-            fn new(name: &str) -> Self {
-                let dir = std::env::temp_dir().join(format!("beu-swap-test-{name}"));
-                let _ = std::fs::remove_dir_all(&dir);
-                std::fs::create_dir_all(&dir).expect("create fixture dir");
-                let me = Self { dir };
-                me.write(ASSET_NAME, b"current");
-                me
-            }
-            fn write(&self, name: &str, bytes: &[u8]) {
-                std::fs::write(self.dir.join(name), bytes).expect("write fixture file");
-            }
-            fn read(&self, name: &str) -> Option<Vec<u8>> {
-                std::fs::read(self.dir.join(name)).ok()
-            }
-            fn exe(&self) -> PathBuf {
-                self.dir.join(ASSET_NAME)
-            }
-        }
-
-        impl Drop for Fixture {
-            fn drop(&mut self) {
-                let _ = std::fs::remove_dir_all(&self.dir);
-            }
-        }
-
-        #[test]
-        fn swap_installs_staged_and_parks_the_old_exe() {
-            let f = Fixture::new("happy");
-            f.write(&format!("{ASSET_NAME}.new"), b"updated");
-
-            swap_staged_exe_at(&f.exe()).expect("swap succeeds");
-
-            assert_eq!(f.read(ASSET_NAME).as_deref(), Some(&b"updated"[..]));
-            assert_eq!(
-                f.read(&format!("{ASSET_NAME}.old")).as_deref(),
-                Some(&b"current"[..]),
-                "the replaced exe is parked as .old for startup cleanup"
-            );
-            assert!(
-                f.read(&format!("{ASSET_NAME}.new")).is_none(),
-                "the staged file is consumed, so a later swap is a no-op"
-            );
-        }
-
-        #[test]
-        fn swap_without_a_staged_update_leaves_the_exe_alone() {
-            let f = Fixture::new("nostage");
-
-            swap_staged_exe_at(&f.exe()).expect_err("nothing staged");
-
-            assert_eq!(f.read(ASSET_NAME).as_deref(), Some(&b"current"[..]));
-        }
-
-        /// A `.new.part` is a half-finished download, not an installable update.
-        #[test]
-        fn swap_ignores_a_partial_download() {
-            let f = Fixture::new("partial");
-            f.write(&format!("{ASSET_NAME}.new.part"), b"half");
-
-            swap_staged_exe_at(&f.exe()).expect_err("a .part is not a staged update");
-
-            assert_eq!(f.read(ASSET_NAME).as_deref(), Some(&b"current"[..]));
-        }
-
-        /// Windows won't rename onto a taken name, so a `.old` left by an
-        /// earlier swap has to be cleared before this one renames into it.
-        #[test]
-        fn swap_overwrites_a_stale_old_exe() {
-            let f = Fixture::new("staleold");
-            f.write(&format!("{ASSET_NAME}.new"), b"updated");
-            f.write(&format!("{ASSET_NAME}.old"), b"ancient");
-
-            swap_staged_exe_at(&f.exe()).expect("swap succeeds");
-
-            assert_eq!(f.read(ASSET_NAME).as_deref(), Some(&b"updated"[..]));
-            assert_eq!(
-                f.read(&format!("{ASSET_NAME}.old")).as_deref(),
-                Some(&b"current"[..])
-            );
-        }
+        use super::{is_strictly_newer, parse_sha256_digest};
 
         #[test]
         fn semver_compare() {
@@ -657,16 +539,6 @@ mod mac {
         update.install(bytes).map_err(|e| e.to_string())?;
         app.restart();
     }
-
-    /// Installs the staged bundle without relaunching. Runs as the app exits so
-    /// the next launch is the updated build. A poisoned lock means a panic
-    /// already ate the staged bytes, so there is nothing to install.
-    pub fn apply_on_exit() {
-        let staged = PENDING_UPDATE.lock().ok().and_then(|mut g| g.take());
-        if let Some((update, bytes)) = staged {
-            let _ = update.install(bytes);
-        }
-    }
 }
 
 // ---------- tauri commands (shared contract, platform dispatch) ----------
@@ -724,24 +596,6 @@ pub fn updater_apply_and_restart(app: AppHandle) -> Result<(), String> {
         let _ = &app;
         Err("Self-update is not supported on this platform.".into())
     }
-}
-
-/// Installs a staged update without relaunching, so a user who never clicked
-/// "Restart now" still lands on the new build next launch. Called once from the
-/// exit path. Silent and best-effort by design: there is no UI left to report a
-/// failure to, and leaving the staged file untouched means the next launch (or
-/// the next click of "Restart now") simply tries again.
-pub fn apply_on_exit() {
-    // Mirrors the `updater_check` gate: dev never stages an update, and
-    // `current_exe()` there is the debug build, which must never be swapped.
-    if cfg!(debug_assertions) {
-        return;
-    }
-
-    #[cfg(target_os = "windows")]
-    win::apply_on_exit();
-    #[cfg(target_os = "macos")]
-    mac::apply_on_exit();
 }
 
 /// Sweeps leftovers from a prior self-update. Returns true if we just upgraded

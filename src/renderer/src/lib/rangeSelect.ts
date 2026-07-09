@@ -1,6 +1,6 @@
 /**
  * Inclusive span of `visibleUids` between the anchor and the target, in
- * either direction — the uids Shift+click selects. Empty when there is no
+ * either direction, the uids Shift+click selects. Empty when there is no
  * anchor or when either end is not in the visible list (collapsed group or
  * filtered out); the caller falls back to a single toggle in that case.
  */

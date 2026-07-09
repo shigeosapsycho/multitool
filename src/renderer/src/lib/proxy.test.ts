@@ -137,7 +137,7 @@ describe('filterProxies with removed ISP users', () => {
     expect(filterProxies(list, BOTH, undefined, new Set(['xyz']))).toEqual([
       '64.205.47.232:3120:alpinewekkprk6:proxies',
       '9.9.9.9:1080',
-      // Residential line shares the stem but is not an ISP line — kept.
+      // Residential line shares the stem but is not an ISP line, kept.
       'gate.smartproxy.com:8080:xyz999:p'
     ])
   })
@@ -199,7 +199,7 @@ describe('filterProxies with per-provider limits', () => {
     expect(out.filter((l) => l.includes('fleetproxy'))).toHaveLength(2)
     expect(out.filter((l) => l.includes('pizzaproxy'))).toHaveLength(7)
   })
-  it('never caps ISP (raw-IP) lines — they have no provider name', () => {
+  it('never caps ISP (raw-IP) lines, they have no provider name', () => {
     const mixed = ['1.2.3.4:8080:u:p', '5.6.7.8:8080:u:p', 'a.fleetproxy.io:1:u:p'].join('\n')
     const out = filterProxies(mixed, BOTH, undefined, undefined, new Map([['fleetproxy.io', 0]]))
     expect(out).toEqual(['1.2.3.4:8080:u:p', '5.6.7.8:8080:u:p'])

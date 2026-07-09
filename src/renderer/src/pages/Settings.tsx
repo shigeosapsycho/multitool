@@ -79,7 +79,7 @@ export function SettingsPage({
   proxyOkMs,
   onProxyOkMsChange
 }: Props) {
-  const [outputDir, setOutputDir] = useState('—')
+  const [outputDir, setOutputDir] = useState('-')
 
   useEffect(() => {
     void window.api.files.getOutputDir().then(setOutputDir)
@@ -196,7 +196,7 @@ export function SettingsPage({
                 <div className="text-[14px] text-text-primary">Resume last module</div>
                 <div className="mt-0.5 text-[12.5px] text-text-secondary">
                   When on, the Tools tab reopens the module you had open instead of the
-                  tool list — so switching to Settings or Output and back keeps your place.
+                  tool list, so switching to Settings or Output and back keeps your place.
                 </div>
               </div>
               <Toggle

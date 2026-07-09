@@ -100,7 +100,7 @@ type UpdaterStatus =
 
 // ---------- drag-drop routing ----------
 // With `dragDropEnabled: true` in tauri.conf.json the webview's HTML5 drag
-// events (`dragover`/`dragleave`/`drop`) never fire — Tauri intercepts at the
+// events (`dragover`/`dragleave`/`drop`) never fire, Tauri intercepts at the
 // OS layer and emits its own enter/over/leave/drop events. We hit-test by
 // position to dispatch to whichever registered zone is under the cursor.
 
@@ -221,7 +221,7 @@ export const api = {
     pickOutputDir: () => invoke<string | null>('files_pick_output_dir'),
     /**
      * Electron-era API: returned the absolute path for an HTML5-dropped File.
-     * In Tauri, drops never reach the DOM — paths come from the OS-level
+     * In Tauri, drops never reach the DOM, paths come from the OS-level
      * drag-drop event. The renderer should call `registerDropZone` instead;
      * `pathForFile` is retained as a no-op so call sites compile during the
      * migration but should be removed.
@@ -313,7 +313,7 @@ export const api = {
     onUpgradeApplied: (cb: (version: string) => void) =>
       onEvent<string>('upgrade-applied', cb),
     check: () => invoke<{ ok: boolean; error?: string }>('updater_check'),
-    /** Swaps in the staged exe and relaunches. Does not resolve on success — the process exits. */
+    /** Swaps in the staged exe and relaunches. Does not resolve on success, the process exits. */
     applyAndRestart: () => invoke<void>('updater_apply_and_restart')
   }
 }

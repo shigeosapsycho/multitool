@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-/** Which input shape a merged tool is showing — one file or two. */
+/** Which input shape a merged tool is showing, one file or two. */
 export type FileMode = 'single' | 'double'
 
 const FileIcon = () => (
@@ -39,7 +39,7 @@ type Props = {
 /**
  * Segmented control to swap a tool between its one-file and two-file layouts.
  * Switching modes swaps the underlying tool shell, so loaded content does not
- * carry over — an explicit, deliberate action.
+ * carry over, an explicit, deliberate action.
  */
 export function ModeToggle({ mode, onChange }: Props) {
   return (

@@ -23,7 +23,7 @@ export function useFlip(key: string, enabled: boolean) {
 
   useLayoutEffect(() => {
     // 1. Measure every current node's natural position FIRST (before any
-    //    transform is applied — transforms change getBoundingClientRect).
+    //    transform is applied, transforms change getBoundingClientRect).
     const newRects = new Map<string, DOMRect>()
     nodes.current.forEach((el, id) => newRects.set(id, el.getBoundingClientRect()))
 
