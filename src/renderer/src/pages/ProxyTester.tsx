@@ -299,11 +299,6 @@ export function ProxyTesterPage({
           onPick={handlePick}
           onDropPath={loadFromPath}
           onLineCountChange={setLineCount}
-          onUserEdit={() => {
-            setResults(null)
-            setSpeedFilter('all')
-            setSavedTo(null)
-          }}
           placeholder={'One proxy per line. Accepts:\n\n  host:port\n  host:port:user:pass\n  user:pass@host:port\n  user:pass:host:port\n\nOptional scheme prefix: http://, https://, socks5://'}
           className="min-h-0 flex-1"
         />

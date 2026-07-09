@@ -171,8 +171,8 @@ export function SingleFileTool(props: SingleFileToolProps) {
         onDropPath={loadFromPath}
         onLineCountChange={setLineCount}
         onUserEdit={() => {
-          setResults(null)
-          setSavedTo(null)
+          // Editing the input leaves the last results on screen; they refresh on
+          // the next run. Only loading a new file or Clear replaces them.
           if (!onContentChange) return
           if (editDebounce.current) clearTimeout(editDebounce.current)
           editDebounce.current = setTimeout(() => {

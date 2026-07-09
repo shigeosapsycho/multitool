@@ -1,6 +1,6 @@
 [package]
 name = "beu-multitool"
-version = "3.20.8"
+version = "3.20.9"
 description = "Beu MultiTool - desktop edition"
 authors = ["beu"]
 edition = "2021"

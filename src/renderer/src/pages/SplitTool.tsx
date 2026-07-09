@@ -150,7 +150,8 @@ export function SplitTool(props: SplitToolProps) {
         onDropPath={loadFromPath}
         onLineCountChange={setLineCount}
         onUserEdit={() => {
-          setOutputs(null)
+          // Keep the previous split output visible while editing; only clear a
+          // stale error. The output refreshes on the next run.
           setError(null)
         }}
       />
