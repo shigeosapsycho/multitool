@@ -276,13 +276,16 @@ export default function App() {
 
   // Sidebar nav. When "restore last module" is on, the Tools tab reopens the
   // last-used module instead of the tool grid, so a detour through Settings or
-  // Output and back keeps the user's place. Other tabs navigate normally.
+  // Output and back keeps the user's place. From inside a module the Tools tab
+  // instead returns to the tool grid (mirrors the back arrow) — restoring the
+  // last module there would be a no-op. Other tabs navigate normally.
   const navigateFromSidebar = useCallback(
     (next: Route) => {
-      if (next === 'tools' && restoreLastModule && lastTool) navigate(lastTool)
+      if (next === 'tools' && isToolRoute(route)) navigate('tools')
+      else if (next === 'tools' && restoreLastModule && lastTool) navigate(lastTool)
       else navigate(next)
     },
-    [navigate, restoreLastModule, lastTool]
+    [navigate, restoreLastModule, lastTool, route]
   )
 
   // Mouse4 / Mouse5 ("Back" / "Forward" thumb buttons). Listen via three paths
