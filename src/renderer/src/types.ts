@@ -2,6 +2,7 @@ export type Route =
   | 'tools'
   | 'add-passwords'
   | 'csv-email-pass'
+  | 'csv-filter'
   | 'email-cleaner'
   | 'email-filter'
   | 'email-unsubscribe'
