@@ -8,6 +8,7 @@ import { StatusBar } from './components/StatusBar'
 import { ToolsPage } from './pages/Tools'
 import { AddPasswordToEmailListPage } from './pages/AddPasswordToEmailList'
 import { CsvEmailPassPage } from './pages/CsvEmailPass'
+import { CsvFilterPage } from './pages/CsvFilter'
 import { EmailCleanerPage } from './pages/EmailCleaner'
 import { EmailFilterPage } from './pages/EmailFilter'
 import { EmailUnsubscribePage } from './pages/EmailUnsubscribe'
@@ -41,6 +42,7 @@ type NavState = { history: Route[]; index: number }
 const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] = [
   'add-passwords',
   'csv-email-pass',
+  'csv-filter',
   'email-cleaner',
   'email-filter',
   'email-unsubscribe',
@@ -421,6 +423,8 @@ export default function App() {
         return <AddPasswordToEmailListPage {...props} />
       case 'csv-email-pass':
         return <CsvEmailPassPage {...props} />
+      case 'csv-filter':
+        return <CsvFilterPage {...props} />
       case 'email-cleaner':
         return (
           <EmailCleanerPage

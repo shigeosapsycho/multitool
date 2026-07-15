@@ -5,6 +5,7 @@ import type { Route, ToolMeta } from '../types'
 import { PageHeader } from '../components/PageHeader'
 import { OrderTrackerLogo } from '../components/OrderTrackerLogo'
 import { dismissNewTool, getNewToolIds } from '../lib/newTools'
+import { loadFavorites, saveFavorites, sortFavoritesFirst, toggleFavorite } from '../lib/favorites'
 import { setPendingFile } from '../lib/pending'
 import { useFlip } from '../lib/useFlip'
 
@@ -30,6 +31,12 @@ const tools: ToolMeta[] = [
     title: 'CSV → Email:Password',
     description: 'Pull email & password columns from a CSV into an email:password list.',
     accent: '#60a5fa'
+  },
+  {
+    id: 'csv-filter',
+    title: 'CSV Filter',
+    description: 'Keep only the CSV columns you pick, reorder them, and choose the separator.',
+    accent: '#f97316'
   },
   {
     id: 'email-cleaner',
@@ -175,12 +182,6 @@ const tools: ToolMeta[] = [
 // stored seen-list here, so a badge never outlives the session that introduced it.
 const NEW_TOOL_IDS = getNewToolIds(tools.map((t) => t.id))
 
-const ChevronIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
-)
-
 const ClearIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -237,6 +238,19 @@ const StarIcon = () => (
   </svg>
 )
 
+const FavoriteStarIcon = ({ filled }: { filled: boolean }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill={filled ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinejoin="round"
+    className="h-4 w-4"
+  >
+    <polygon points="12 3 14.5 9 21 9.5 16 13.5 17.5 20 12 16.5 6.5 20 8 13.5 3 9.5 9.5 9" />
+  </svg>
+)
+
 const SplitByNumberIcon = () => (
   <svg {...SVG_PROPS}>
     <rect x="3" y="3" width="18" height="3" rx="0.8" />
@@ -275,6 +289,13 @@ const CsvEmailPassIcon = () => (
     <rect x="3" y="3" width="14" height="18" rx="2" />
     <path d="M7 8h6M7 12h6M7 16h4" />
     <path d="M15 14l4 0M19 12l2 2-2 2" />
+  </svg>
+)
+
+const CsvFilterIcon = () => (
+  <svg {...SVG_PROPS}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M9 4v16M15 4v16" />
   </svg>
 )
 
@@ -400,6 +421,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'add-passwords': AddPasswordIcon,
   'sort-list': SortListIcon,
   'csv-email-pass': CsvEmailPassIcon,
+  'csv-filter': CsvFilterIcon,
   'email-cleaner': EmailCleanerIcon,
   'email-filter': FunnelIcon,
   'email-unsubscribe': EmailUnsubscribeIcon,
@@ -429,12 +451,16 @@ function ToolCard({
   tool,
   onNavigate,
   highlighted,
-  isNew
+  isNew,
+  favorite,
+  onToggleFavorite
 }: {
   tool: ToolMeta
   onNavigate: (route: Route) => void
   highlighted?: boolean
   isNew?: boolean
+  favorite: boolean
+  onToggleFavorite: (id: ToolMeta['id']) => void
 }) {
   const [dragOver, setDragOver] = useState(false)
   const dropRef = useRef<HTMLButtonElement>(null)
@@ -465,41 +491,55 @@ function ToolCard({
   const ringClass = highlighted ? 'ring-2 ring-accent' : isNew ? 'ring-2 ring-danger' : ''
 
   return (
-    <button
-      ref={dropRef}
-      onClick={() => onNavigate(tool.id)}
-      className={`group relative flex h-full w-full flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 ${borderClass} ${ringClass}`}
-    >
-      <span
-        className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-lg"
-        style={{
-          backgroundColor: `${tool.accent}1f`,
-          color: tool.accent
-        }}
+    <div className="group relative h-full transition hover:-translate-y-0.5">
+      <button
+        ref={dropRef}
+        onClick={() => onNavigate(tool.id)}
+        className={`relative flex h-full w-full flex-col items-start gap-1.5 rounded-xl border bg-surface p-4 text-left transition hover:bg-surface-2 ${borderClass} ${ringClass}`}
       >
-        {(TOOL_ICONS[tool.id] ?? DuplicatesIcon)()}
-      </span>
-      <span className="text-[14px] font-semibold tracking-tight text-text-primary">
-        {tool.title}
-      </span>
-      <span className="text-[12px] leading-snug text-text-secondary">
-        {tool.description}
-      </span>
-      {isNew ? (
-        <span className="absolute right-3 top-3 rounded bg-danger px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-          New!
+        <span
+          className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-lg"
+          style={{
+            backgroundColor: `${tool.accent}1f`,
+            color: tool.accent
+          }}
+        >
+          {(TOOL_ICONS[tool.id] ?? DuplicatesIcon)()}
         </span>
-      ) : (
-        <span className="absolute right-3 top-4 text-text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
-          <ChevronIcon />
+        <span className="text-[14px] font-semibold tracking-tight text-text-primary">
+          {tool.title}
         </span>
+        <span className="text-[12px] leading-snug text-text-secondary">
+          {tool.description}
+        </span>
+        {isNew && (
+          <span className="absolute right-3 top-3 rounded bg-danger px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+            New!
+          </span>
+        )}
+        {dragOver && (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-accent-soft text-[12px] font-semibold uppercase tracking-wider text-accent">
+            Drop to open
+          </span>
+        )}
+      </button>
+      {/* Star lives outside the card button: nesting buttons is invalid HTML. */}
+      {!isNew && !dragOver && (
+        <button
+          type="button"
+          aria-label={favorite ? `Unfavorite ${tool.title}` : `Favorite ${tool.title}`}
+          aria-pressed={favorite}
+          onClick={() => onToggleFavorite(tool.id)}
+          className={`absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-surface-3 ${
+            favorite
+              ? 'text-warning'
+              : 'text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100'
+          }`}
+        >
+          <FavoriteStarIcon filled={favorite} />
+        </button>
       )}
-      {dragOver && (
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-accent-soft text-[12px] font-semibold uppercase tracking-wider text-accent">
-          Drop to open
-        </span>
-      )}
-    </button>
+    </div>
   )
 }
 
@@ -516,8 +556,21 @@ export function ToolsPage({ onNavigate }: Props) {
   // Re-seeded from the module-level set on every mount. Opening a tool unmounts
   // this page, so a dismissal kept only in state would reappear on the way back.
   const [newIds, setNewIds] = useState<Set<string>>(() => new Set(NEW_TOOL_IDS))
+  // Favorited tool ids; persisted so they survive relaunches. Favorites sort
+  // to the front of the grid, keeping their relative order within each group.
+  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites())
   const inputRef = useRef<HTMLInputElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+
+  const handleToggleFavorite = useCallback((id: ToolMeta['id']) => {
+    setFavorites((prev) => {
+      const next = toggleFavorite(prev, id)
+      saveFavorites(next)
+      return next
+    })
+  }, [])
+
+  const orderedTools = useMemo(() => sortFavoritesFirst(tools, favorites), [favorites])
 
   // Every route into a tool, card click, Enter from the search box, and
   // drop-a-file-on-a-card, funnels through here, so all three clear the badge.
@@ -530,7 +583,7 @@ export function ToolsPage({ onNavigate }: Props) {
     [onNavigate]
   )
 
-  const matches = useMemo(() => filterTools(query, tools), [query])
+  const matches = useMemo(() => filterTools(query, orderedTools), [query, orderedTools])
 
   // Reset the highlight to the first match (and hide it) whenever the query changes.
   useEffect(() => {
@@ -609,9 +662,9 @@ export function ToolsPage({ onNavigate }: Props) {
     return () => timers.forEach((t) => clearTimeout(t))
   }, [])
 
-  // Cards to render: current matches, in tools order, plus any still exiting.
+  // Cards to render: current matches, favorites first, plus any still exiting.
   const matchIdSet = new Set(matches.map((t) => t.id))
-  const rendered = tools.filter((t) => matchIdSet.has(t.id) || exiting.has(t.id))
+  const rendered = orderedTools.filter((t) => matchIdSet.has(t.id) || exiting.has(t.id))
 
   const { setRef } = useFlip(rendered.map((t) => t.id).join('|'), !reducedMotion)
 
@@ -740,6 +793,8 @@ export function ToolsPage({ onNavigate }: Props) {
                   onNavigate={openTool}
                   highlighted={highlightActive && matchIndex === selected && matchIndex !== -1}
                   isNew={newIds.has(t.id)}
+                  favorite={favorites.has(t.id)}
+                  onToggleFavorite={handleToggleFavorite}
                 />
               </div>
             )
