@@ -61,7 +61,7 @@ pub fn start_output_watcher(app: &AppHandle) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn timestamp() -> String {
+pub(crate) fn timestamp() -> String {
     let n = Local::now();
     format!(
         "{:02}{:02}{:04}_{:02}{:02}{:02}",
@@ -501,6 +501,7 @@ pub struct ConfigSnapshot {
     pub auto_focus_input: bool,
     pub format_csv: bool,
     pub confirm_permanent_delete: bool,
+    pub discord_webhook_url: String,
 }
 
 #[tauri::command]
@@ -522,6 +523,7 @@ pub async fn config_get(app: AppHandle) -> Result<ConfigSnapshot, String> {
         auto_focus_input: cfg.auto_focus_input(),
         format_csv: cfg.format_csv(),
         confirm_permanent_delete: cfg.confirm_permanent_delete(),
+        discord_webhook_url: cfg.discord_webhook_url(),
     })
 }
 
@@ -613,6 +615,21 @@ pub async fn config_set_confirm_permanent_delete(
 ) -> Result<bool, String> {
     mutate_config(&app, |cfg| cfg.confirm_permanent_delete = Some(enabled))?;
     Ok(enabled)
+}
+
+#[tauri::command]
+pub async fn config_set_discord_webhook_url(app: AppHandle, url: String) -> Result<String, String> {
+    let url = url.trim().to_string();
+    // Empty clears the setting; anything else must be a real webhook URL.
+    if !url.is_empty() && !crate::discord::is_webhook_url(&url) {
+        let state = app.state::<AppState>();
+        let cfg = state.config.lock().unwrap();
+        return Ok(cfg.discord_webhook_url());
+    }
+    mutate_config(&app, |cfg| {
+        cfg.discord_webhook_url = if url.is_empty() { None } else { Some(url.clone()) }
+    })?;
+    Ok(url)
 }
 
 // ---------- app ----------

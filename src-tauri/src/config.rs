@@ -42,6 +42,9 @@ pub struct Config {
     /// When true (default), Email Cleaner asks for confirmation before
     /// permanently deleting emails. Users can opt out from the dialog.
     pub confirm_permanent_delete: Option<bool>,
+    /// Discord webhook URL for "Send to Discord". None/empty = feature hidden.
+    /// Note the URL embeds a secret token; keep it out of logs and errors.
+    pub discord_webhook_url: Option<String>,
     /// Deprecated; migrated to `theme`. Retained so old configs still deserialize.
     pub light: Option<bool>,
     /// Saved IMAP accounts for the Email Cleaner module.
@@ -151,6 +154,10 @@ impl Config {
         // Default true — permanent deletion is irreversible, so confirm.
         self.confirm_permanent_delete.unwrap_or(true)
     }
+
+    pub fn discord_webhook_url(&self) -> String {
+        self.discord_webhook_url.clone().unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
@@ -236,6 +243,19 @@ mod tests {
         assert!(json.contains("\"confirmPermanentDelete\":false"));
         let back: Config = serde_json::from_str(&json).unwrap();
         assert!(!back.confirm_permanent_delete());
+    }
+
+    #[test]
+    fn discord_webhook_url_defaults_empty_and_round_trips() {
+        let cfg: Config = serde_json::from_str("{}").unwrap();
+        assert_eq!(cfg.discord_webhook_url(), "");
+        let mut cfg = Config::default();
+        cfg.discord_webhook_url = Some("https://discord.com/api/webhooks/1/t".into());
+        let json = serde_json::to_string(&cfg).unwrap();
+        // Serializes under the camelCase contract shared with the renderer.
+        assert!(json.contains("\"discordWebhookUrl\":\"https://discord.com/api/webhooks/1/t\""));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.discord_webhook_url(), "https://discord.com/api/webhooks/1/t");
     }
 
     #[test]

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LogEntry, Route } from './types'
 import type { GroupingMode } from './lib/targetSkus'
 import { PROXY_SPEED_DEFAULTS } from './lib/proxySpeed'
+import { setDiscordWebhookUrl } from './lib/discord'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
@@ -147,6 +148,7 @@ export default function App() {
         setAutoFocusInput(cfg.autoFocusInput)
         setFormatCsv(cfg.formatCsv)
         setConfirmPermanentDelete(cfg.confirmPermanentDelete)
+        setDiscordWebhookUrl(cfg.discordWebhookUrl)
       })
       .catch(() => {})
     // Check for updates once on launch (the Rust side no longer polls).

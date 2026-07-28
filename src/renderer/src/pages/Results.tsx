@@ -4,6 +4,7 @@ import { Icons } from '../components/ToolShell'
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { CsvTable } from '../components/CsvTable'
+import { isDiscordWebhookUrl, useDiscordWebhookUrl } from '../lib/discord'
 
 type Entry = { path: string; name: string; size: number; mtime: number }
 
@@ -75,6 +76,26 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort, formatCsv 
   // Cached by path+mtime so unchanged files aren't re-read on every refresh.
   const [lineCounts, setLineCounts] = useState<Record<string, number>>({})
   const countCacheRef = useRef<Map<string, { mtime: number; lines: number }>>(new Map())
+  // "Send to Discord" only exists while a valid webhook URL is configured.
+  const webhookConfigured = isDiscordWebhookUrl(useDiscordWebhookUrl())
+  const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null)
+  const noticeTimer = useRef<number | null>(null)
+
+  // No auto-clear ms = the notice stays until replaced (e.g. "Sending…").
+  const showNotice = useCallback((next: { text: string; error?: boolean }, clearMs?: number) => {
+    if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+    noticeTimer.current = null
+    setNotice(next)
+    if (clearMs) {
+      noticeTimer.current = window.setTimeout(() => setNotice(null), clearMs)
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -203,6 +224,18 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort, formatCsv 
           </>
         }
       />
+
+      {notice && (
+        <div
+          className={`mx-8 mb-4 rounded-lg border px-4 py-2.5 text-[13px] ${
+            notice.error
+              ? 'border-danger/40 bg-danger/10 text-danger'
+              : 'border-border bg-surface text-text-secondary'
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 px-8 pb-8">
         {entries.length === 0 ? (
@@ -409,8 +442,27 @@ export function ResultsPage({ filePreview, deleteToTrash, outputSort, formatCsv 
                   // selection effect (mtime changed → list re-sorted → still
                   // selected, content reloads on next render).
                 },
-                separatorAfter: true
+                separatorAfter: !webhookConfigured
               },
+              ...(webhookConfigured
+                ? [
+                    {
+                      label: 'Send to Discord',
+                      icon: <Icons.Send />,
+                      onClick: async () => {
+                        const target = menu.entry
+                        showNotice({ text: `Sending ${target.name} to Discord…` })
+                        try {
+                          await window.api.discord.sendFile(target.path)
+                          showNotice({ text: `Sent ${target.name} to Discord.` }, 3000)
+                        } catch (e) {
+                          showNotice({ text: String(e), error: true }, 6000)
+                        }
+                      },
+                      separatorAfter: true
+                    }
+                  ]
+                : []),
               {
                 label: 'Delete',
                 icon: <Icons.Trash />,

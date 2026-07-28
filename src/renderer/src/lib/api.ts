@@ -251,6 +251,7 @@ export const api = {
         autoFocusInput: boolean
         formatCsv: boolean
         confirmPermanentDelete: boolean
+        discordWebhookUrl: string
       }>('config_get'),
     setFilePreview: (enabled: boolean) =>
       invoke<boolean>('config_set_file_preview', { enabled }),
@@ -269,7 +270,19 @@ export const api = {
     setFormatCsv: (enabled: boolean) =>
       invoke<boolean>('config_set_format_csv', { enabled }),
     setConfirmPermanentDelete: (enabled: boolean) =>
-      invoke<boolean>('config_set_confirm_permanent_delete', { enabled })
+      invoke<boolean>('config_set_confirm_permanent_delete', { enabled }),
+    /** Returns the value actually stored (the previous one if `url` was rejected). */
+    setDiscordWebhookUrl: (url: string) =>
+      invoke<string>('config_set_discord_webhook_url', { url })
+  },
+  discord: {
+    /** Send in-memory tool output as a file attachment; resolves to the sent filename. */
+    sendContent: (taskName: string, content: string, ext?: string) =>
+      invoke<string>('discord_send_content', { taskName, content, ext }),
+    /** Send a saved output file as an attachment; resolves to the sent filename. */
+    sendFile: (path: string) => invoke<string>('discord_send_file', { path }),
+    /** Post a plain test message to the configured webhook. */
+    sendTest: () => invoke<void>('discord_send_test')
   },
   nav: {
     onBack: (cb: () => void) => onEvent<unknown>('nav:back', () => cb()),
