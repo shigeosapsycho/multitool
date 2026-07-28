@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod discord;
 mod email_unsubscribe;
 mod http;
 mod imap_cleaner;
@@ -155,7 +156,11 @@ pub fn run() {
             commands::config_set_auto_focus_input,
             commands::config_set_format_csv,
             commands::config_set_confirm_permanent_delete,
+            commands::config_set_discord_webhook_url,
             commands::app_get_version,
+            discord::discord_send_content,
+            discord::discord_send_file,
+            discord::discord_send_test,
             commands::net_test_proxies,
             commands::net_cancel_proxies,
             update::updater_check,

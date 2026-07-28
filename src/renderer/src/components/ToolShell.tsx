@@ -11,6 +11,7 @@ import { PageHeader, Button } from './PageHeader'
 import { StatusBanner, Stat } from './StatusBanner'
 import { Card } from './Card'
 import { shortOutputPath } from '../lib/paths'
+import { isDiscordWebhookUrl, useDiscordWebhookUrl } from '../lib/discord'
 
 const FolderIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -56,13 +57,21 @@ const CopyIcon = () => (
   </svg>
 )
 
+const SendIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <path d="M22 2 11 13" />
+    <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+  </svg>
+)
+
 export const Icons = {
   Folder: FolderIcon,
   Play: PlayIcon,
   Trash: TrashIcon,
   Save: SaveIcon,
   Reveal: RevealIcon,
-  Copy: CopyIcon
+  Copy: CopyIcon,
+  Send: SendIcon
 }
 
 export type FilePanelHandle = {
@@ -230,11 +239,32 @@ export function ResultPanel({
   footerActions
 }: ResultPanelProps) {
   const [copied, setCopied] = useState(false)
+  // Configured via Settings; the button below only exists while the stored
+  // webhook URL is valid.
+  const webhookConfigured = isDiscordWebhookUrl(useDiscordWebhookUrl())
+  const [discordState, setDiscordState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [discordError, setDiscordError] = useState('')
 
   async function handleSave() {
     if (!results || results.length === 0) return
     const path = await window.api.files.writeOutput(taskName, results.join('\n') + '\n')
     onSaved(path)
+  }
+
+  async function handleSendToDiscord() {
+    if (!results || results.length === 0 || discordState === 'sending') return
+    setDiscordState('sending')
+    try {
+      // Same serialization as handleSave, so the attachment matches what
+      // "Save to Output" would have written.
+      await window.api.discord.sendContent(taskName, results.join('\n') + '\n')
+      setDiscordState('sent')
+      setTimeout(() => setDiscordState('idle'), 1500)
+    } catch (e) {
+      setDiscordError(String(e))
+      setDiscordState('error')
+      setTimeout(() => setDiscordState('idle'), 4000)
+    }
   }
 
   async function handleCopy() {
@@ -281,6 +311,23 @@ export function ResultPanel({
               <CopyIcon />
               {copied ? 'Copied!' : 'Copy all'}
             </Button>
+            {webhookConfigured && (
+              <Button
+                onClick={handleSendToDiscord}
+                variant="ghost"
+                disabled={discordState === 'sending'}
+                title={discordState === 'error' ? discordError : undefined}
+              >
+                <SendIcon />
+                {discordState === 'idle'
+                  ? 'Send to Discord'
+                  : discordState === 'sending'
+                    ? 'Sending…'
+                    : discordState === 'sent'
+                      ? 'Sent!'
+                      : 'Failed'}
+              </Button>
+            )}
             {footerActions?.(results)}
             {savedTo ? (
               <Button onClick={() => window.api.files.reveal(savedTo)} variant="ghost">

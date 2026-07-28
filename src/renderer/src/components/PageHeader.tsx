@@ -45,9 +45,11 @@ type ButtonProps = {
   onClick?: () => void
   variant?: 'primary' | 'secondary' | 'ghost'
   disabled?: boolean
+  /** Native tooltip, e.g. the full error message behind a "Failed" label. */
+  title?: string
 }
 
-export function Button({ children, onClick, variant = 'secondary', disabled }: ButtonProps) {
+export function Button({ children, onClick, variant = 'secondary', disabled, title }: ButtonProps) {
   const base =
     'inline-flex h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:opacity-40'
   const styles =
@@ -57,7 +59,7 @@ export function Button({ children, onClick, variant = 'secondary', disabled }: B
         ? 'text-text-secondary hover:bg-surface hover:text-text-primary'
         : 'border border-border bg-surface text-text-primary hover:border-border-strong hover:bg-surface-2'
   return (
-    <button onClick={onClick} disabled={disabled} className={`${base} ${styles}`}>
+    <button onClick={onClick} disabled={disabled} title={title} className={`${base} ${styles}`}>
       {children}
     </button>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PageHeader, Button } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { Toggle } from '../components/Toggle'
@@ -6,6 +6,11 @@ import { Select } from '../components/Select'
 import { Icons } from '../components/ToolShell'
 import type { GroupingMode } from '../lib/targetSkus'
 import { PROXY_SPEED_DEFAULTS } from '../lib/proxySpeed'
+import {
+  isDiscordWebhookUrl,
+  setDiscordWebhookUrl,
+  useDiscordWebhookUrl
+} from '../lib/discord'
 
 const PencilIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -138,6 +143,43 @@ export function SettingsPage({
   async function handleToggleFormatCsv(next: boolean) {
     await window.api.config.setFormatCsv(next)
     onFormatCsvChange(next)
+  }
+
+  // --- Discord webhook ---
+  const storedWebhookUrl = useDiscordWebhookUrl()
+  const [webhookDraft, setWebhookDraft] = useState(storedWebhookUrl)
+  const webhookTouched = useRef(false)
+  // Config hydration can land after mount; adopt it unless the user typed.
+  useEffect(() => {
+    if (!webhookTouched.current) setWebhookDraft(storedWebhookUrl)
+  }, [storedWebhookUrl])
+  const webhookTrimmed = webhookDraft.trim()
+  const webhookInvalid = webhookTrimmed !== '' && !isDiscordWebhookUrl(webhookTrimmed)
+  const [webhookTest, setWebhookTest] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [webhookTestError, setWebhookTestError] = useState('')
+
+  async function handleCommitWebhookUrl() {
+    if (webhookInvalid) return
+    // The setter returns what was actually stored (the previous value if the
+    // backend rejected this one); sync both the field and the module store.
+    const saved = await window.api.config.setDiscordWebhookUrl(webhookTrimmed)
+    webhookTouched.current = false
+    setWebhookDraft(saved)
+    setDiscordWebhookUrl(saved)
+  }
+
+  async function handleSendWebhookTest() {
+    if (webhookTest === 'sending') return
+    setWebhookTest('sending')
+    try {
+      await window.api.discord.sendTest()
+      setWebhookTest('sent')
+      setTimeout(() => setWebhookTest('idle'), 2000)
+    } catch (e) {
+      setWebhookTestError(String(e))
+      setWebhookTest('error')
+      setTimeout(() => setWebhookTest('idle'), 4000)
+    }
   }
 
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -406,6 +448,63 @@ export function SettingsPage({
                 variant="ghost"
               >
                 Reset to defaults
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card label="Discord">
+          <div className="space-y-4 p-4 text-[13px]">
+            <div>
+              <div className="text-[14px] text-text-primary">Webhook URL</div>
+              <div className="mt-0.5 text-[12.5px] text-text-secondary">
+                Adds a “Send to Discord” action to tool output and the Output tab that
+                posts files to this channel. The URL contains a secret token — treat it
+                like a password. Leave empty to hide the feature.
+              </div>
+            </div>
+            <input
+              type="text"
+              value={webhookDraft}
+              spellCheck={false}
+              placeholder="https://discord.com/api/webhooks/…"
+              onChange={(e) => {
+                webhookTouched.current = true
+                setWebhookDraft(e.target.value)
+              }}
+              onBlur={() => void handleCommitWebhookUrl()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+              }}
+              className="h-9 w-full rounded-lg border border-border bg-surface px-3 font-mono text-[12.5px] text-text-primary outline-none transition focus:border-accent"
+              aria-label="Discord webhook URL"
+            />
+            {webhookInvalid && (
+              <div className="text-[12px] text-danger">
+                Enter a full Discord webhook URL
+                (https://discord.com/api/webhooks/&lt;id&gt;/&lt;token&gt;), or leave the
+                field empty to disable.
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleSendWebhookTest}
+                variant="ghost"
+                disabled={
+                  !isDiscordWebhookUrl(storedWebhookUrl) ||
+                  webhookTrimmed !== storedWebhookUrl ||
+                  webhookTest === 'sending'
+                }
+                title={webhookTest === 'error' ? webhookTestError : undefined}
+              >
+                <Icons.Send />
+                {webhookTest === 'idle'
+                  ? 'Send test'
+                  : webhookTest === 'sending'
+                    ? 'Sending…'
+                    : webhookTest === 'sent'
+                      ? 'Sent!'
+                      : 'Failed'}
               </Button>
             </div>
           </div>
