@@ -260,6 +260,8 @@ export type DedupeResult = {
   keptCount: number
   /** Entries dropped as duplicates. */
   removedCount: number
+  /** Email of each dropped entry, original casing, file order (one per drop). */
+  removedEmails: string[]
   /** Entries in the source file. */
   totalCount: number
   /** Parse/format problem, else null. */
@@ -274,6 +276,7 @@ function emptyDedupe(format: ProfileFormat, error: string): DedupeResult {
     keptEmails: [],
     keptCount: 0,
     removedCount: 0,
+    removedEmails: [],
     totalCount: 0,
     error
   }
@@ -320,6 +323,7 @@ function dedupeRefract(text: string): DedupeResult {
   const keptElements: unknown[] = []
   const kept: Profile[] = []
   const keptEmails: string[] = []
+  const removedEmails: string[] = []
   let removed = 0
   for (const el of list) {
     const email = emailOf(el)
@@ -331,6 +335,7 @@ function dedupeRefract(text: string): DedupeResult {
     const low = email.trim().toLowerCase()
     if (seen.has(low)) {
       removed++
+      removedEmails.push(email)
       continue
     }
     seen.add(low)
@@ -346,6 +351,7 @@ function dedupeRefract(text: string): DedupeResult {
     keptEmails,
     keptCount: keptElements.length,
     removedCount: removed,
+    removedEmails,
     totalCount: list.length,
     error: null
   }
@@ -375,6 +381,7 @@ function dedupeShikari(text: string): DedupeResult {
   const keptRows: string[] = []
   const kept: Profile[] = []
   const keptEmails: string[] = []
+  const removedEmails: string[] = []
   let total = 0
   let removed = 0
   for (let i = headerIdx + 1; i < rows.length; i++) {
@@ -391,6 +398,7 @@ function dedupeShikari(text: string): DedupeResult {
     const low = email.toLowerCase()
     if (seen.has(low)) {
       removed++
+      removedEmails.push(email)
       continue
     }
     seen.add(low)
@@ -406,6 +414,7 @@ function dedupeShikari(text: string): DedupeResult {
     keptEmails,
     keptCount: keptRows.length,
     removedCount: removed,
+    removedEmails,
     totalCount: total,
     error: null
   }

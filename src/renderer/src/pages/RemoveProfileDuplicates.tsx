@@ -156,6 +156,48 @@ function OutputCard({
   )
 }
 
+/** Emails of the dropped duplicate entries. Hidden when nothing was removed. */
+function RemovedCard({ removedEmails }: { removedEmails: string[] }) {
+  const [copied, setCopied] = useState(false)
+  const text = removedEmails.join('\n')
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard can reject when the window isn't focused; the user can retry.
+    }
+  }
+
+  return (
+    <Card
+      label="Removed duplicates"
+      badge={removedEmails.length.toLocaleString()}
+      className="max-h-[34%] shrink-0"
+    >
+      <div className="flex h-full min-h-0 flex-col">
+        <textarea
+          readOnly
+          value={text}
+          spellCheck={false}
+          className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-text-secondary outline-none"
+        />
+        <div className="flex items-center gap-2 border-t border-border p-3">
+          <span className="flex-1 truncate text-[12px] text-text-muted">
+            Dropped from the file; one line per removed entry.
+          </span>
+          <Button onClick={copy} variant="ghost">
+            <Icons.Copy />
+            {copied ? 'Copied!' : 'Copy'}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export function RemoveProfileDuplicatesPage({
   onBack,
   onSetStatus,
@@ -314,7 +356,12 @@ export function RemoveProfileDuplicatesPage({
           className="min-h-0 flex-1"
         />
 
-        <OutputCard result={result} format={outFmt} formatCsv={formatCsv} onSetStatus={onSetStatus} />
+        <div className="flex min-h-0 flex-col gap-4">
+          <OutputCard result={result} format={outFmt} formatCsv={formatCsv} onSetStatus={onSetStatus} />
+          {result && !result.error && result.removedEmails.length > 0 && (
+            <RemovedCard removedEmails={result.removedEmails} />
+          )}
+        </div>
       </div>
     </div>
   )

@@ -299,6 +299,12 @@ describe('dedupeProfiles', () => {
       expect(r.kept[0]!.name).toBe('A')
     })
 
+    it('reports each removed entry by its own email casing, in file order', () => {
+      const r = dedupeProfiles(DUP_REFRACT)
+      expect(r.removedEmails).toEqual(['alice@example.com', 'BOB@EXAMPLE.COM'])
+      expect(r.removedEmails).toHaveLength(r.removedCount)
+    })
+
     it('accepts a {profiles: []} wrapper object', () => {
       const wrapped = JSON.stringify({ profiles: JSON.parse(DUP_REFRACT) })
       const r = dedupeProfiles(wrapped)
@@ -347,7 +353,26 @@ describe('dedupeProfiles', () => {
       const r = dedupeProfiles(FULL_SHIKARI)
       expect(r.keptCount).toBe(1)
       expect(r.removedCount).toBe(0)
+      expect(r.removedEmails).toEqual([])
       expect(r.fullOutput).toBe(FULL_SHIKARI)
+    })
+
+    it('reports each removed row by its own email casing, in file order', () => {
+      const r = dedupeProfiles(DUP_SHIKARI)
+      expect(r.removedEmails).toEqual(['alice@example.com', 'BOB@EXAMPLE.COM'])
+      expect(r.removedEmails).toHaveLength(r.removedCount)
+    })
+
+    it('lists an email once per removed row when it repeats more than twice', () => {
+      const csv = [
+        'profile_name,email',
+        'P1,a@x.com',
+        'P2,a@x.com',
+        'P3,A@X.com'
+      ].join('\n')
+      const r = dedupeProfiles(csv)
+      expect(r.keptCount).toBe(1)
+      expect(r.removedEmails).toEqual(['a@x.com', 'A@X.com'])
     })
 
     it('reports a missing email column', () => {
