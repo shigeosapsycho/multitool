@@ -10,6 +10,7 @@ import {
   dedupeProfiles,
   serializeRefract,
   serializeShikari,
+  serializeStellar,
   type DedupeResult,
   type ProfileFormat
 } from '../lib/profileFilter'
@@ -21,22 +22,25 @@ type Props = {
   formatCsv?: boolean
 }
 
-type OutputFormat = 'refract' | 'shikari' | 'emails'
+type OutputFormat = 'refract' | 'stellar' | 'shikari' | 'emails'
 
 const FORMAT_LABELS: Record<ProfileFormat, string> = {
   refract: 'Refract JSON',
+  stellar: 'Stellar JSON',
   shikari: 'Shikari CSV',
   unknown: '-'
 }
 
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
   refract: 'Refract JSON',
+  stellar: 'Stellar JSON',
   shikari: 'Shikari CSV',
   emails: 'Kept emails'
 }
 
 const OUTPUTS: { id: OutputFormat; label: string }[] = [
   { id: 'refract', label: 'Refract JSON' },
+  { id: 'stellar', label: 'Stellar JSON' },
   { id: 'shikari', label: 'Shikari CSV' },
   { id: 'emails', label: 'Emails only' }
 ]
@@ -52,7 +56,12 @@ function outputFor(result: DedupeResult, fmt: OutputFormat): { text: string; cou
   if (fmt === result.format) {
     return { text: result.fullOutput, count: result.keptCount, ext: fmt === 'shikari' ? 'csv' : 'json' }
   }
-  const text = fmt === 'refract' ? serializeRefract(result.kept) : serializeShikari(result.kept)
+  const text =
+    fmt === 'refract'
+      ? serializeRefract(result.kept)
+      : fmt === 'stellar'
+        ? serializeStellar(result.kept)
+        : serializeShikari(result.kept)
   return { text, count: result.kept.length, ext: fmt === 'shikari' ? 'csv' : 'json' }
 }
 
@@ -232,7 +241,7 @@ export function RemoveProfileDuplicatesPage({
 
   async function handlePickProfile() {
     const paths = await window.api.files.open({
-      title: 'Select a Refract JSON or Shikari CSV',
+      title: 'Select a Refract JSON, Stellar JSON, or Shikari CSV',
       filters: [
         { name: 'Profiles', extensions: ['json', 'csv', 'txt'] },
         { name: 'All files', extensions: ['*'] }
@@ -246,7 +255,7 @@ export function RemoveProfileDuplicatesPage({
     if (!profile.trim()) return
     const r = dedupeProfiles(profile)
     setResult(r)
-    if (!userPickedFmt.current && (r.format === 'refract' || r.format === 'shikari')) {
+    if (!userPickedFmt.current && r.format !== 'unknown') {
       setOutFmt(r.format)
     }
     if (r.error) onSetStatus(r.error)
@@ -292,7 +301,7 @@ export function RemoveProfileDuplicatesPage({
     ) : result?.error ? (
       <span className="text-warning">{result.error}</span>
     ) : (
-      <span>Paste a Refract JSON or Shikari CSV export, then Run.</span>
+      <span>Paste a Refract JSON, Stellar JSON, or Shikari CSV export, then Run.</span>
     )
 
   return (
@@ -347,9 +356,9 @@ export function RemoveProfileDuplicatesPage({
       <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-1 gap-4 px-8 pb-8 pt-4">
         <FilePanel
           ref={profileRef}
-          label="Profile file (Refract JSON / Shikari CSV)"
+          label="Profile file (Refract / Stellar / Shikari)"
           filePath={profilePath}
-          placeholder={'Paste or load a Refract JSON export or a Shikari CSV export.'}
+          placeholder={'Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.'}
           onPick={handlePickProfile}
           onDropPath={loadProfileFromPath}
           onLineCountChange={setProfileCount}

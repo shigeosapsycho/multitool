@@ -107,7 +107,7 @@ const tools: ToolMeta[] = [
   {
     id: 'profile-filter',
     title: 'Profile Filter',
-    description: 'Filter a Refract JSON or Shikari CSV export down to a list of emails.',
+    description: 'Filter a Refract, Stellar, or Shikari export down to a list of emails.',
     accent: '#eab308'
   },
   {
@@ -149,7 +149,7 @@ const tools: ToolMeta[] = [
   {
     id: 'remove-profile-duplicates',
     title: 'Remove Profile Duplicates',
-    description: 'Drop duplicate profiles from a Refract or Shikari export, first one wins.',
+    description: 'Drop duplicate profiles from a Refract, Stellar, or Shikari export, first one wins.',
     accent: '#fbbf24'
   },
   {
