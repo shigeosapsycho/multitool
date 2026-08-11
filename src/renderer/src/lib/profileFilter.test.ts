@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { detectProfileFormat, filterProfiles, serializeRefract, serializeShikari, dedupeProfiles } from './profileFilter'
+import {
+  detectProfileFormat,
+  filterProfiles,
+  serializeRefract,
+  serializeShikari,
+  serializeStellar,
+  dedupeProfiles
+} from './profileFilter'
 import { parseCsvRow } from './transforms'
 
 const SHIKARI_HEADER =
@@ -37,6 +44,44 @@ const FULL_SHIKARI = [
   'Profile 1,Alice,Smith,alice@example.com,5559999,4222222222222,11,2029,456,2 Oak Ave,,Austin,TX,73301,US,Alice,Smith,2 Oak Ave,,Austin,TX,73301,US'
 ].join('\n')
 
+const FULL_STELLAR = JSON.stringify([
+  {
+    profileName: 'S1',
+    email: 'stel@x.com',
+    phone: '5550001',
+    shipping: {
+      firstName: 'Cal',
+      lastName: 'Acie',
+      country: 'US',
+      address: '2110 Deodar St',
+      address2: 'Unit 7',
+      state: 'CA',
+      city: 'Santa Ana',
+      zipcode: '92705'
+    },
+    billingAsShipping: false,
+    oneCheckoutPerProfile: false,
+    billing: {
+      firstName: 'Bill',
+      lastName: 'Acie',
+      country: 'US',
+      address: '9 Bill Rd',
+      address2: '',
+      state: 'NV',
+      city: 'Reno',
+      zipcode: '89501'
+    },
+    payment: {
+      cardName: 'Cal Acie',
+      cardType: 'Visa',
+      cardNumber: '4147202603409184',
+      cardMonth: '04',
+      cardYear: '28',
+      cardCvv: '185'
+    }
+  }
+])
+
 const REFRACT = JSON.stringify([
   { name: 'A', email: 'Alice@Example.com', payment: { num: '1' } },
   { name: 'B', email: 'bob@example.com' },
@@ -67,6 +112,19 @@ describe('detectProfileFormat', () => {
   it('returns unknown for empty or whitespace-only input', () => {
     expect(detectProfileFormat('')).toBe('unknown')
     expect(detectProfileFormat('   \n  ')).toBe('unknown')
+  })
+  it('detects a Stellar AIO export by its profile keys', () => {
+    expect(detectProfileFormat(FULL_STELLAR)).toBe('stellar')
+    expect(detectProfileFormat(JSON.stringify([{ email: 'a@b.c', billingAsShipping: true }]))).toBe(
+      'stellar'
+    )
+    expect(detectProfileFormat(JSON.stringify({ profiles: JSON.parse(FULL_STELLAR) }))).toBe(
+      'stellar'
+    )
+  })
+  it('keeps refract for JSON without stellar keys, including unparseable JSON', () => {
+    expect(detectProfileFormat(REFRACT)).toBe('refract')
+    expect(detectProfileFormat('[{bad json')).toBe('refract')
   })
 })
 
@@ -171,6 +229,81 @@ describe('filterProfiles, shikari CSV', () => {
     expect(r.format).toBe('shikari')
     expect(r.error).toBeTruthy()
     expect(r.matchedCount).toBe(0)
+  })
+})
+
+describe('filterProfiles, stellar JSON', () => {
+  it('keeps matching profiles verbatim, format tagged stellar', () => {
+    const r = filterProfiles('STEL@X.COM', FULL_STELLAR)
+    expect(r.format).toBe('stellar')
+    expect(r.matchedCount).toBe(1)
+    expect(r.error).toBeNull()
+    const out = JSON.parse(r.fullOutput) as Array<Record<string, unknown>>
+    // Kept elements are the originals, stellar-only fields survive untouched.
+    expect(out[0]!.profileName).toBe('S1')
+    expect(out[0]!.oneCheckoutPerProfile).toBe(false)
+  })
+
+  it('maps stellar fields to the canonical profile, expanding the 2-digit year', () => {
+    const r = filterProfiles('stel@x.com', FULL_STELLAR)
+    const p = r.matched[0]!
+    expect(p.name).toBe('S1')
+    expect(p.phone).toBe('5550001')
+    expect(p.ccNumber).toBe('4147202603409184')
+    expect(p.ccYear).toBe('2028')
+    expect(p.shipStreet).toBe('2110 Deodar St')
+    expect(p.shipState).toBe('CA')
+    expect(p.shipZip).toBe('92705')
+    expect(p.billFirstName).toBe('Bill')
+    expect(p.billStreet).toBe('9 Bill Rd')
+    expect(p.billState).toBe('NV')
+  })
+
+  it('copies shipping into billing when billingAsShipping is set', () => {
+    const doc = JSON.parse(FULL_STELLAR) as Array<Record<string, unknown>>
+    doc[0]!.billingAsShipping = true
+    const r = filterProfiles('stel@x.com', JSON.stringify(doc))
+    const p = r.matched[0]!
+    expect(p.billFirstName).toBe('Cal')
+    expect(p.billStreet).toBe('2110 Deodar St')
+    expect(p.billStreet2).toBe('Unit 7')
+    expect(p.billState).toBe('CA')
+  })
+
+  it('converts stellar matches to a Shikari CSV row', () => {
+    const r = filterProfiles('stel@x.com', FULL_STELLAR)
+    const c = parseCsvRow(serializeShikari(r.matched).split('\n')[1]!)
+    expect(c[0]).toBe('S1') // profile_name <- profileName
+    expect(c[3]).toBe('stel@x.com') // email
+    expect(c[4]).toBe('5550001') // phone_num <- top-level phone
+    expect(c[7]).toBe('2028') // cc_exp_year expanded from "28"
+    expect(c[9]).toBe('2110 Deodar St') // shipping_street <- shipping.address
+    expect(c[13]).toBe('92705') // shipping_zip_code <- shipping.zipcode
+    expect(c[17]).toBe('9 Bill Rd') // billing_street <- billing.address
+  })
+
+  it('serializes refract-sourced matches to the stellar shape', () => {
+    const r = filterProfiles('t@x.com', FULL_REFRACT)
+    const out = JSON.parse(serializeStellar(r.matched))
+    expect(out).toHaveLength(1)
+    expect(out[0].profileName).toBe('P1')
+    expect(out[0].phone).toBe('5551234')
+    expect(out[0].shipping.address).toBe('1 Main St')
+    expect(out[0].shipping.zipcode).toBe('89501')
+    expect(out[0].billingAsShipping).toBe(false)
+    expect(out[0].payment.cardNumber).toBe('4111111111111111')
+    expect(out[0].payment.cardYear).toBe('30') // 2030 compressed
+    expect(out[0].payment.cardType).toBe('Visa') // derived from the number
+    expect(out[0].payment.cardName).toBe('Jane Doe')
+  })
+
+  it('round-trips stellar -> shikari -> stellar preserving core fields', () => {
+    const a = filterProfiles('stel@x.com', FULL_STELLAR)
+    const b = filterProfiles('stel@x.com', serializeShikari(a.matched))
+    const out = JSON.parse(serializeStellar(b.matched))
+    expect(out[0].email).toBe('stel@x.com')
+    expect(out[0].shipping.address).toBe('2110 Deodar St')
+    expect(out[0].payment.cardYear).toBe('28')
   })
 })
 
@@ -386,9 +519,28 @@ describe('dedupeProfiles', () => {
     })
   })
 
+  describe('stellar', () => {
+    const DUP_STELLAR = JSON.stringify([
+      { profileName: 'S1', email: 'Stel@X.com', billingAsShipping: false },
+      { profileName: 'S2', email: 'other@x.com', billingAsShipping: false },
+      { profileName: 'S3', email: 'STEL@X.COM', billingAsShipping: false }
+    ])
+
+    it('dedupes by email and reports the removed entries, format tagged stellar', () => {
+      const r = dedupeProfiles(DUP_STELLAR)
+      expect(r.format).toBe('stellar')
+      expect(r.error).toBeNull()
+      expect(r.keptCount).toBe(2)
+      expect(r.removedCount).toBe(1)
+      expect(r.removedEmails).toEqual(['STEL@X.COM'])
+      const out = JSON.parse(r.fullOutput) as Array<Record<string, unknown>>
+      expect(out.map((p) => p.profileName)).toEqual(['S1', 'S2'])
+    })
+  })
+
   it('reports an unknown format for empty input', () => {
     const r = dedupeProfiles('')
     expect(r.format).toBe('unknown')
-    expect(r.error).toBe('Paste or load a Refract JSON or Shikari CSV export.')
+    expect(r.error).toBe('Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.')
   })
 })

@@ -1,10 +1,11 @@
 import { parseCsvRow } from './transforms'
 
-// Filters a profile export (Refract JSON or Shikari CSV) down to the rows whose
-// `email` is in a user-supplied list. The output preserves the source format so
-// it re-imports cleanly: a JSON array for Refract, header + rows for Shikari.
+// Filters a profile export (Refract JSON, Stellar AIO JSON, or Shikari CSV)
+// down to the rows whose `email` is in a user-supplied list. The output
+// preserves the source format so it re-imports cleanly: a JSON array for
+// Refract/Stellar, header + rows for Shikari.
 
-export type ProfileFormat = 'refract' | 'shikari' | 'unknown'
+export type ProfileFormat = 'refract' | 'stellar' | 'shikari' | 'unknown'
 
 /** Canonical profile shape, the superset of fields both formats carry. */
 export type Profile = {
@@ -75,6 +76,8 @@ function emptyResult(format: ProfileFormat, error: string, requested: string[]):
   }
 }
 
+const UNKNOWN_FORMAT_ERROR = 'Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.'
+
 // Pulls the address out of a decorated list line, `email:password`,
 // `Name <email>`, quoted, etc., so those still match the bare profile email.
 const EMAIL_RE = /[^\s,;:<>"']+@[^\s,;:<>"']+/
@@ -100,22 +103,42 @@ function computeMisses(requested: string[], fileEmailsLower: Set<string>): strin
   return requested.filter((e) => !fileEmailsLower.has(e.toLowerCase()))
 }
 
+/** True for an element shaped like a Stellar AIO profile rather than a Refract one. */
+function isStellarElement(el: unknown): boolean {
+  if (!el || typeof el !== 'object') return false
+  const o = el as Record<string, unknown>
+  if ('profileName' in o || 'billingAsShipping' in o) return true
+  const pay = o.payment
+  return !!pay && typeof pay === 'object' && 'cardNumber' in (pay as Record<string, unknown>)
+}
+
 export function detectProfileFormat(text: string): ProfileFormat {
   const t = stripBom(text).replace(/^\s+/, '')
   if (!t) return 'unknown'
   const c = t[0]
-  return c === '[' || c === '{' ? 'refract' : 'shikari'
+  if (c !== '[' && c !== '{') return 'shikari'
+  // Refract and Stellar are both JSON arrays with a top-level `email`; telling
+  // them apart needs the first profile's keys. Unparseable JSON stays 'refract'
+  // so the JSON path reports the parse error.
+  try {
+    const list = extractArray(JSON.parse(t))
+    const first = list?.find((el) => el && typeof el === 'object')
+    if (first !== undefined && isStellarElement(first)) return 'stellar'
+  } catch {
+    // fall through
+  }
+  return 'refract'
 }
 
 export function filterProfiles(emailsText: string, profileText: string): FilterResult {
   const { set: allowed, ordered: requested } = parseEmailList(emailsText)
   const format = detectProfileFormat(profileText)
   if (format === 'unknown') {
-    return emptyResult('unknown', 'Paste or load a Refract JSON or Shikari CSV export.', requested)
+    return emptyResult('unknown', UNKNOWN_FORMAT_ERROR, requested)
   }
-  return format === 'refract'
-    ? filterRefract(profileText, allowed, requested)
-    : filterShikari(profileText, allowed, requested)
+  return format === 'shikari'
+    ? filterShikari(profileText, allowed, requested)
+    : filterJson(profileText, format, allowed, requested)
 }
 
 /** The profile array, whether the JSON is a bare array or a `{profiles:[…]}` wrapper. */
@@ -138,17 +161,23 @@ function emailOf(el: unknown): string | null {
   return null
 }
 
-function filterRefract(text: string, allowed: Set<string>, requested: string[]): FilterResult {
+function filterJson(
+  text: string,
+  format: 'refract' | 'stellar',
+  allowed: Set<string>,
+  requested: string[]
+): FilterResult {
   let parsed: unknown
   try {
     parsed = JSON.parse(stripBom(text))
   } catch (e) {
-    return emptyResult('refract', `Invalid JSON: ${(e as Error).message}`, requested)
+    return emptyResult(format, `Invalid JSON: ${(e as Error).message}`, requested)
   }
   const list = extractArray(parsed)
   if (!list) {
-    return emptyResult('refract', 'Expected a JSON array of profiles.', requested)
+    return emptyResult(format, 'Expected a JSON array of profiles.', requested)
   }
+  const toProfile = format === 'stellar' ? stellarToProfile : refractToProfile
 
   const fileEmailsLower = new Set<string>()
   const kept: unknown[] = []
@@ -165,13 +194,13 @@ function filterRefract(text: string, allowed: Set<string>, requested: string[]):
     if (allowed.has(low) && !seenMatched.has(low)) {
       seenMatched.add(low)
       kept.push(el)
-      matched.push(refractToProfile(el, email))
+      matched.push(toProfile(el, email))
       matchedEmails.push(email)
     }
   }
 
   return {
-    format: 'refract',
+    format,
     fullOutput: JSON.stringify(kept),
     matched,
     matchedEmails,
@@ -291,7 +320,7 @@ function emptyDedupe(format: ProfileFormat, error: string): DedupeResult {
 export function dedupeProfiles(profileText: string): DedupeResult {
   if (!profileText) {
     // Completely empty, truly unknown
-    return emptyDedupe('unknown', 'Paste or load a Refract JSON or Shikari CSV export.')
+    return emptyDedupe('unknown', UNKNOWN_FORMAT_ERROR)
   }
   const normalized = stripBom(profileText).replace(/^\s+/, '')
   let format: ProfileFormat
@@ -302,22 +331,23 @@ export function dedupeProfiles(profileText: string): DedupeResult {
     format = detectProfileFormat(profileText)
   }
   if (format === 'unknown') {
-    return emptyDedupe('unknown', 'Paste or load a Refract JSON or Shikari CSV export.')
+    return emptyDedupe('unknown', UNKNOWN_FORMAT_ERROR)
   }
-  return format === 'refract' ? dedupeRefract(profileText) : dedupeShikari(profileText)
+  return format === 'shikari' ? dedupeShikari(profileText) : dedupeJson(profileText, format)
 }
 
-function dedupeRefract(text: string): DedupeResult {
+function dedupeJson(text: string, format: 'refract' | 'stellar'): DedupeResult {
   let parsed: unknown
   try {
     parsed = JSON.parse(stripBom(text))
   } catch (e) {
-    return emptyDedupe('refract', `Invalid JSON: ${(e as Error).message}`)
+    return emptyDedupe(format, `Invalid JSON: ${(e as Error).message}`)
   }
   const list = extractArray(parsed)
   if (!list) {
-    return emptyDedupe('refract', 'Expected a JSON array of profiles.')
+    return emptyDedupe(format, 'Expected a JSON array of profiles.')
   }
+  const toProfile = format === 'stellar' ? stellarToProfile : refractToProfile
 
   const seen = new Set<string>()
   const keptElements: unknown[] = []
@@ -340,12 +370,12 @@ function dedupeRefract(text: string): DedupeResult {
     }
     seen.add(low)
     keptElements.push(el)
-    kept.push(refractToProfile(el, email))
+    kept.push(toProfile(el, email))
     keptEmails.push(email)
   }
 
   return {
-    format: 'refract',
+    format,
     fullOutput: JSON.stringify(keptElements),
     kept,
     keptEmails,
@@ -539,6 +569,101 @@ function refractToProfile(el: unknown, email: string): Profile {
     billZip: billOr('postalCode', 'postalCode'),
     billCountry: sameAs ? str(ship.country) : str(bill.country)
   }
+}
+
+// Stellar's cardYear is 2-digit ("28"); the canonical Profile carries 4-digit
+// years like Refract, so expand on parse and compress back on serialize.
+function expandYear(y: string): string {
+  return /^\d{2}$/.test(y) ? `20${y}` : y
+}
+
+function stellarToProfile(el: unknown, email: string): Profile {
+  const o = asObject(el)
+  const ship = asObject(o.shipping)
+  const bill = asObject(o.billing)
+  const pay = asObject(o.payment)
+  // Stellar leaves billing meaningless when billingAsShipping is set; fill it
+  // for formats (like Shikari) that always carry explicit billing columns.
+  const sameAs = o.billingAsShipping === true
+  const billOr = (key: string): string => (sameAs ? str(ship[key]) : str(bill[key]))
+  return {
+    name: str(o.profileName),
+    email,
+    firstName: str(ship.firstName),
+    lastName: str(ship.lastName),
+    phone: str(o.phone),
+    ccNumber: str(pay.cardNumber),
+    ccMonth: str(pay.cardMonth),
+    ccYear: expandYear(str(pay.cardYear)),
+    ccCvv: str(pay.cardCvv),
+    shipStreet: str(ship.address),
+    shipStreet2: str(ship.address2),
+    shipCity: str(ship.city),
+    shipState: str(ship.state),
+    shipZip: str(ship.zipcode),
+    shipCountry: str(ship.country),
+    billFirstName: billOr('firstName'),
+    billLastName: billOr('lastName'),
+    billStreet: billOr('address'),
+    billStreet2: billOr('address2'),
+    billCity: billOr('city'),
+    billState: billOr('state'),
+    billZip: billOr('zipcode'),
+    billCountry: billOr('country')
+  }
+}
+
+// Rough card network from the leading digits, for Stellar's cardType field,
+// which the canonical Profile does not carry.
+function cardTypeOf(num: string): string {
+  if (/^4/.test(num)) return 'Visa'
+  if (/^(5[1-5]|2[2-7])/.test(num)) return 'Mastercard'
+  if (/^3[47]/.test(num)) return 'Amex'
+  if (/^6/.test(num)) return 'Discover'
+  return ''
+}
+
+/** Serialize canonical profiles to a Stellar AIO JSON array (2-space pretty, like its exporter). */
+export function serializeStellar(profiles: Profile[]): string {
+  return JSON.stringify(
+    profiles.map((p) => ({
+      profileName: p.name,
+      email: p.email,
+      phone: p.phone,
+      shipping: {
+        firstName: p.firstName,
+        lastName: p.lastName,
+        country: p.shipCountry,
+        address: p.shipStreet,
+        address2: p.shipStreet2,
+        state: p.shipState,
+        city: p.shipCity,
+        zipcode: p.shipZip
+      },
+      billingAsShipping: false,
+      oneCheckoutPerProfile: false,
+      billing: {
+        firstName: p.billFirstName,
+        lastName: p.billLastName,
+        country: p.billCountry,
+        address: p.billStreet,
+        address2: p.billStreet2,
+        state: p.billState,
+        city: p.billCity,
+        zipcode: p.billZip
+      },
+      payment: {
+        cardName: `${p.firstName} ${p.lastName}`.trim(),
+        cardType: cardTypeOf(p.ccNumber),
+        cardNumber: p.ccNumber,
+        cardMonth: p.ccMonth,
+        cardYear: /^\d{4}$/.test(p.ccYear) ? p.ccYear.slice(2) : p.ccYear,
+        cardCvv: p.ccCvv
+      }
+    })),
+    null,
+    2
+  )
 }
 
 function csvField(s: string): string {

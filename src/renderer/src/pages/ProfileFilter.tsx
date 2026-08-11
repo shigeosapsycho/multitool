@@ -10,6 +10,7 @@ import {
   filterProfiles,
   serializeRefract,
   serializeShikari,
+  serializeStellar,
   type FilterResult,
   type ProfileFormat
 } from '../lib/profileFilter'
@@ -21,22 +22,25 @@ type Props = {
   formatCsv?: boolean
 }
 
-type OutputFormat = 'refract' | 'shikari' | 'emails'
+type OutputFormat = 'refract' | 'stellar' | 'shikari' | 'emails'
 
 const FORMAT_LABELS: Record<ProfileFormat, string> = {
   refract: 'Refract JSON',
+  stellar: 'Stellar JSON',
   shikari: 'Shikari CSV',
   unknown: '-'
 }
 
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
   refract: 'Refract JSON',
+  stellar: 'Stellar JSON',
   shikari: 'Shikari CSV',
   emails: 'Matched emails'
 }
 
 const OUTPUTS: { id: OutputFormat; label: string }[] = [
   { id: 'refract', label: 'Refract JSON' },
+  { id: 'stellar', label: 'Stellar JSON' },
   { id: 'shikari', label: 'Shikari CSV' },
   { id: 'emails', label: 'Emails only' }
 ]
@@ -53,7 +57,9 @@ function outputFor(result: FilterResult, fmt: OutputFormat): { text: string; cou
       ? result.fullOutput
       : fmt === 'refract'
         ? serializeRefract(result.matched)
-        : serializeShikari(result.matched)
+        : fmt === 'stellar'
+          ? serializeStellar(result.matched)
+          : serializeShikari(result.matched)
   return { text, count: result.matchedCount, ext: fmt === 'shikari' ? 'csv' : 'json' }
 }
 
@@ -247,7 +253,7 @@ export function ProfileFilterPage({ onBack, onSetStatus, active = true, formatCs
 
   async function handlePickProfile() {
     const paths = await window.api.files.open({
-      title: 'Select a Refract JSON or Shikari CSV',
+      title: 'Select a Refract JSON, Stellar JSON, or Shikari CSV',
       filters: [
         { name: 'Profiles', extensions: ['json', 'csv', 'txt'] },
         { name: 'All files', extensions: ['*'] }
@@ -262,7 +268,7 @@ export function ProfileFilterPage({ onBack, onSetStatus, active = true, formatCs
     if (!emails.trim() || !profile.trim()) return
     const r = filterProfiles(emails, profile)
     setResult(r)
-    if (!userPickedFmt.current && (r.format === 'refract' || r.format === 'shikari')) {
+    if (!userPickedFmt.current && r.format !== 'unknown') {
       setOutFmt(r.format)
     }
     if (r.error) onSetStatus(r.error)
@@ -313,7 +319,7 @@ export function ProfileFilterPage({ onBack, onSetStatus, active = true, formatCs
     ) : result?.error ? (
       <span className="text-warning">{result.error}</span>
     ) : (
-      <span>Paste an email list and a Refract JSON or Shikari CSV export, then Run.</span>
+      <span>Paste an email list and a Refract JSON, Stellar JSON, or Shikari CSV export, then Run.</span>
     )
 
   return (
@@ -379,9 +385,9 @@ export function ProfileFilterPage({ onBack, onSetStatus, active = true, formatCs
           />
           <FilePanel
             ref={profileRef}
-            label="Profile file (Refract JSON / Shikari CSV)"
+            label="Profile file (Refract / Stellar / Shikari)"
             filePath={profilePath}
-            placeholder={'Paste or load a Refract JSON export or a Shikari CSV export.'}
+            placeholder={'Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.'}
             onPick={handlePickProfile}
             onDropPath={loadProfileFromPath}
             onLineCountChange={setProfileCount}
