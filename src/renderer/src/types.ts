@@ -1,6 +1,7 @@
 export type Route =
   | 'tools'
   | 'add-passwords'
+  | 'combine-profiles'
   | 'csv-email-pass'
   | 'csv-filter'
   | 'email-cleaner'
