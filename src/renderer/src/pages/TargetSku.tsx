@@ -12,7 +12,9 @@ import {
   buildGroups,
   chunkEvenly,
   detectFormat,
+  displayName,
   fetchRemoteSkus,
+  formatSkuNames,
   formatSkus,
   moveSkuToIndex,
   parseSkuList,
@@ -554,6 +556,8 @@ export function TargetSkuPage({
   const [confirmSelectAll, setConfirmSelectAll] = useState(false)
   // "Copied!" flash on the Reorder tab's Copy-list button.
   const [orderCopied, setOrderCopied] = useState(false)
+  // Same flash for the copy that also carries the item names.
+  const [orderNamesCopied, setOrderNamesCopied] = useState(false)
   // Pointer-based drag reorder. HTML5 drag events don't fire under Tauri's
   // OS-level drag-drop, so we hold the dragged SKU and reorder by pointer
   // position. Refs let the window listeners read the latest order without
@@ -920,6 +924,25 @@ export function TargetSkuPage({
     }
   }
 
+  // One `sku - item name` line per SKU instead of the export list. Uses the
+  // full `displayName` rather than the row's `rowDisplayName`: the row can drop
+  // the era prefix because it sits under an era group, but a flat clipboard
+  // list has no group headers to recover it from.
+  async function copyOrderWithNames() {
+    if (order.length === 0) return
+    const text = formatSkuNames(order, (sku) => {
+      const entry = entryBySku.get(sku)
+      return entry ? displayName(entry.item) : ''
+    })
+    try {
+      await navigator.clipboard.writeText(text)
+      setOrderNamesCopied(true)
+      setTimeout(() => setOrderNamesCopied(false), 1500)
+    } catch {
+      // Clipboard can reject when the window isn't focused; the user can retry.
+    }
+  }
+
   function removeFromOrder(sku: string) {
     applyOrder(order.filter((s) => s !== sku))
     setOrderMenu(null)
@@ -1218,6 +1241,15 @@ export function TargetSkuPage({
               Copies the list in {FORMATS.find((f) => f.id === format)?.label ?? format}{' '}
               format (set on the Select tab).
             </span>
+            <Button
+              onClick={copyOrderWithNames}
+              variant="ghost"
+              disabled={order.length === 0}
+              title="One “SKU - item name” line per SKU, in this order"
+            >
+              <Icons.Copy />
+              {orderNamesCopied ? 'Copied!' : 'Copy list and item name'}
+            </Button>
             <Button onClick={copyOrder} variant="secondary" disabled={order.length === 0}>
               <Icons.Copy />
               {orderCopied ? 'Copied!' : 'Copy list'}

@@ -270,6 +270,23 @@ export function formatSkus(skus: string[], format: ExportFormat): string {
 }
 
 /**
+ * One `sku - item name` line per SKU, in list order.
+ *
+ * Independent of `ExportFormat`: this is the human-readable companion to
+ * `formatSkus`, not another export, so the bot-specific separators have no
+ * place in it. A SKU the catalog doesn't know gets a bare `sku` line rather
+ * than a dangling separator.
+ */
+export function formatSkuNames(skus: string[], nameOf: (sku: string) => string): string {
+  return skus
+    .map((sku) => {
+      const name = nameOf(sku).trim()
+      return name ? `${sku} - ${name}` : sku
+    })
+    .join('\n')
+}
+
+/**
  * Move `sku` to a 1-based `position` within `order`, returning a new array.
  * A position past the end clamps to the last slot; a position below 1, a
  * non-numeric position, or a SKU not in the list returns the order unchanged.
