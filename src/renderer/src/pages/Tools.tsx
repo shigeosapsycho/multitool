@@ -27,6 +27,12 @@ const tools: ToolMeta[] = [
     accent: '#84cc16'
   },
   {
+    id: 'combine-profiles',
+    title: 'Combine Profiles',
+    description: 'Merge several Refract, Stellar, or Shikari exports into one, in any mix.',
+    accent: '#d946ef'
+  },
+  {
     id: 'csv-email-pass',
     title: 'CSV → Email:Password',
     description: 'Pull email & password columns from a CSV into an email:password list.',
@@ -284,6 +290,15 @@ const FunnelIcon = () => (
   </svg>
 )
 
+const CombineProfilesIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M4 4h4l4 5" />
+    <path d="M4 20h4l4-5" />
+    <path d="M12 12h8" />
+    <polyline points="17 9 20 12 17 15" />
+  </svg>
+)
+
 const CsvEmailPassIcon = () => (
   <svg {...SVG_PROPS}>
     <rect x="3" y="3" width="14" height="18" rx="2" />
@@ -420,6 +435,7 @@ const OrderTrackerIcon = () => <OrderTrackerLogo className="h-full w-full" />
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'add-passwords': AddPasswordIcon,
   'sort-list': SortListIcon,
+  'combine-profiles': CombineProfilesIcon,
   'csv-email-pass': CsvEmailPassIcon,
   'csv-filter': CsvFilterIcon,
   'email-cleaner': EmailCleanerIcon,

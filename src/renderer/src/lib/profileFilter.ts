@@ -450,6 +450,207 @@ function dedupeShikari(text: string): DedupeResult {
   }
 }
 
+// ---------- combine ----------
+
+/** One parsed profile plus the source element it came from (null for CSV rows). */
+export type ParsedProfile = { profile: Profile; raw: unknown }
+
+export type ParseResult = {
+  format: ProfileFormat
+  /** Every entry in the file, file order. Entries without an email carry `email: ''`. */
+  profiles: ParsedProfile[]
+  /** Parse/format problem, else null. */
+  error: string | null
+}
+
+/**
+ * Parse any supported export into canonical profiles.
+ *
+ * Unlike `filterProfiles` / `dedupeProfiles`, which keep source entries verbatim
+ * so a same-format run round-trips losslessly, this drops down to the canonical
+ * shape immediately: combining mixed formats has to go through it anyway. The
+ * original element rides along in `raw` so an all-one-format combine can still
+ * emit the untouched JSON.
+ */
+export function parseProfiles(text: string): ParseResult {
+  // Blank sources report the same "which format?" hint as unrecognizable ones,
+  // rather than dedupeProfiles' "The CSV is empty." guess at a format.
+  if (!stripBom(text).trim()) {
+    return { format: 'unknown', profiles: [], error: UNKNOWN_FORMAT_ERROR }
+  }
+  const format = detectProfileFormat(text)
+  if (format === 'unknown') return { format, profiles: [], error: UNKNOWN_FORMAT_ERROR }
+  return format === 'shikari' ? parseShikari(text) : parseJson(text, format)
+}
+
+function parseJson(text: string, format: 'refract' | 'stellar'): ParseResult {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(stripBom(text))
+  } catch (e) {
+    return { format, profiles: [], error: `Invalid JSON: ${(e as Error).message}` }
+  }
+  const list = extractArray(parsed)
+  if (!list) return { format, profiles: [], error: 'Expected a JSON array of profiles.' }
+  const toProfile = format === 'stellar' ? stellarToProfile : refractToProfile
+  const profiles = list.map((el) => ({
+    profile: toProfile(el, (emailOf(el) ?? '').trim()),
+    raw: el
+  }))
+  return { format, profiles, error: null }
+}
+
+function parseShikari(text: string): ParseResult {
+  const rows = stripBom(text).split(/\r?\n/)
+  const headerIdx = rows.findIndex((r) => r.trim().length > 0)
+  if (headerIdx === -1) return { format: 'shikari', profiles: [], error: 'The CSV is empty.' }
+
+  const headerCells = parseCsvRow(rows[headerIdx]!)
+  const emailIdx = findEmailColumn(headerCells)
+  if (emailIdx === -1) {
+    return { format: 'shikari', profiles: [], error: 'No email column found in the CSV header.' }
+  }
+  const colIndex = buildShikariColumnIndex(headerCells)
+
+  const profiles: ParsedProfile[] = []
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const raw = rows[i]!
+    if (!raw.trim()) continue
+    const cells = parseCsvRow(raw)
+    // Column order varies between Shikari exports, so a CSV row is never
+    // replayed verbatim; the canonical record is the only safe carrier.
+    profiles.push({
+      profile: shikariToProfile(cells, colIndex, (cells[emailIdx] ?? '').trim()),
+      raw: null
+    })
+  }
+  return { format: 'shikari', profiles, error: null }
+}
+
+/** One file (or pasted blob) fed into a combine run. */
+export type CombineInput = { name: string; text: string }
+
+/** Per-source outcome, so the UI can show which file contributed what. */
+export type CombineSourceStat = {
+  name: string
+  format: ProfileFormat
+  /** Profiles read from this source. */
+  total: number
+  /** Profiles this source contributed to the combined output. */
+  kept: number
+  /** Parse/format problem for this source, else null. Errored sources contribute nothing. */
+  error: string | null
+}
+
+export type CombineResult = {
+  sources: CombineSourceStat[]
+  /** Every kept profile, source order then file order. */
+  combined: Profile[]
+  /** Emails of the kept profiles, original casing (email-less entries omitted). */
+  emails: string[]
+  /** Profiles read across all sources, before dedupe. */
+  totalCount: number
+  /** Profiles in the combined output. */
+  keptCount: number
+  /** Profiles dropped as duplicates (0 when dedupe is off). */
+  duplicateCount: number
+  /** Email of each dropped duplicate, original casing, in drop order. */
+  duplicateEmails: string[]
+  /**
+   * Set when every contributing source is the same JSON format, letting that
+   * format's output be the untouched source elements instead of a re-serialize.
+   */
+  nativeFormat: 'refract' | 'stellar' | null
+  /** The verbatim JSON for `nativeFormat`; '' when there is no native path. */
+  nativeOutput: string
+  /** Whole-run problem (no sources at all), else null. Per-source problems live in `sources`. */
+  error: string | null
+}
+
+/**
+ * Merge several profile exports into one list, in the order the sources were
+ * added. Formats can be mixed; every source is mapped through the canonical
+ * profile, so the caller can serialize the result to any supported format.
+ *
+ * With `dedupe` (the default), the first profile per email wins and later
+ * repeats are dropped, matching `dedupeProfiles`. Entries without an email are
+ * never treated as duplicates. A source that fails to parse is reported in
+ * `sources` and skipped; the rest of the run still combines.
+ */
+export function combineProfiles(
+  inputs: CombineInput[],
+  opts: { dedupe?: boolean } = {}
+): CombineResult {
+  const dedupe = opts.dedupe !== false
+  const sources: CombineSourceStat[] = []
+  const combined: Profile[] = []
+  const rawElements: unknown[] = []
+  const emails: string[] = []
+  const duplicateEmails: string[] = []
+  const seen = new Set<string>()
+  let totalCount = 0
+  // Verbatim JSON passthrough survives only while every contributing source is
+  // the same JSON format; one Shikari or one mixed pair retires it.
+  let nativeFormat: 'refract' | 'stellar' | null = null
+  let nativeOk = true
+
+  for (const input of inputs) {
+    const parsed = parseProfiles(input.text)
+    if (parsed.error) {
+      sources.push({
+        name: input.name,
+        format: parsed.format,
+        total: 0,
+        kept: 0,
+        error: parsed.error
+      })
+      continue
+    }
+    let kept = 0
+    for (const { profile, raw } of parsed.profiles) {
+      totalCount++
+      const low = profile.email.toLowerCase()
+      if (dedupe && low && seen.has(low)) {
+        duplicateEmails.push(profile.email)
+        continue
+      }
+      if (low) {
+        seen.add(low)
+        emails.push(profile.email)
+      }
+      combined.push(profile)
+      rawElements.push(raw)
+      kept++
+    }
+    sources.push({
+      name: input.name,
+      format: parsed.format,
+      total: parsed.profiles.length,
+      kept,
+      error: null
+    })
+    if (parsed.profiles.length > 0) {
+      if (parsed.format !== 'refract' && parsed.format !== 'stellar') nativeOk = false
+      else if (nativeFormat === null) nativeFormat = parsed.format
+      else if (nativeFormat !== parsed.format) nativeOk = false
+    }
+  }
+
+  const native = nativeOk ? nativeFormat : null
+  return {
+    sources,
+    combined,
+    emails,
+    totalCount,
+    keptCount: combined.length,
+    duplicateCount: duplicateEmails.length,
+    duplicateEmails,
+    nativeFormat: native,
+    nativeOutput: native ? JSON.stringify(rawElements) : '',
+    error: inputs.length === 0 ? 'Add at least one profile source.' : null
+  }
+}
+
 // ---------- canonical mapping + format conversion ----------
 
 // Canonical Profile field -> Shikari CSV column, in column order. Drives both

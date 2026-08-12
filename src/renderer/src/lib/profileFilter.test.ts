@@ -5,7 +5,9 @@ import {
   serializeRefract,
   serializeShikari,
   serializeStellar,
-  dedupeProfiles
+  dedupeProfiles,
+  parseProfiles,
+  combineProfiles
 } from './profileFilter'
 import { parseCsvRow } from './transforms'
 
@@ -542,5 +544,214 @@ describe('dedupeProfiles', () => {
     const r = dedupeProfiles('')
     expect(r.format).toBe('unknown')
     expect(r.error).toBe('Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.')
+  })
+})
+
+describe('parseProfiles', () => {
+  it('maps a refract export to canonical profiles and keeps the source element', () => {
+    const r = parseProfiles(FULL_REFRACT)
+    expect(r.format).toBe('refract')
+    expect(r.error).toBeNull()
+    expect(r.profiles).toHaveLength(1)
+    const { profile, raw } = r.profiles[0]!
+    expect(profile.email).toBe('t@x.com')
+    expect(profile.shipStreet).toBe('1 Main St')
+    expect(profile.ccNumber).toBe('4111111111111111')
+    expect(raw).toEqual(JSON.parse(FULL_REFRACT)[0])
+  })
+
+  it('maps a stellar export, expanding the 2-digit card year', () => {
+    const r = parseProfiles(FULL_STELLAR)
+    expect(r.format).toBe('stellar')
+    expect(r.profiles[0]!.profile.ccYear).toBe('2028')
+    expect(r.profiles[0]!.profile.billCity).toBe('Reno')
+  })
+
+  it('maps shikari rows but never keeps a raw row, column order varies per export', () => {
+    const r = parseProfiles(SHIKARI)
+    expect(r.format).toBe('shikari')
+    expect(r.profiles).toHaveLength(3)
+    expect(r.profiles.map((p) => p.profile.email)).toEqual([
+      'Alice@Example.com',
+      'bob@example.com',
+      'carol@example.com'
+    ])
+    expect(r.profiles[0]!.raw).toBeNull()
+  })
+
+  it('gives an email-less entry an empty email rather than dropping it', () => {
+    const r = parseProfiles(JSON.stringify([{ name: 'X' }, { name: 'B', email: 'b@x.com' }]))
+    expect(r.profiles).toHaveLength(2)
+    expect(r.profiles[0]!.profile.email).toBe('')
+  })
+
+  it('accepts a {profiles: []} wrapper object', () => {
+    const r = parseProfiles(JSON.stringify({ profiles: JSON.parse(REFRACT) }))
+    expect(r.profiles).toHaveLength(3)
+  })
+
+  it('reports blank input as an unknown format instead of guessing a CSV', () => {
+    for (const text of ['', '   \n ']) {
+      const r = parseProfiles(text)
+      expect(r.format).toBe('unknown')
+      expect(r.error).toBe('Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.')
+      expect(r.profiles).toEqual([])
+    }
+  })
+
+  it('reports invalid JSON, a non-array payload, and a missing email column', () => {
+    expect(parseProfiles('[{"broken"').error).toMatch(/^Invalid JSON:/)
+    expect(parseProfiles('{"a":1}').error).toBe('Expected a JSON array of profiles.')
+    expect(parseProfiles('name,phone\nA,1').error).toBe('No email column found in the CSV header.')
+  })
+})
+
+describe('combineProfiles', () => {
+  const MIXED = [
+    { name: 'a.json', text: REFRACT },
+    { name: 'b.csv', text: SHIKARI }
+  ]
+
+  it('combines mixed formats in source order, first profile per email wins', () => {
+    const r = combineProfiles(MIXED)
+    expect(r.error).toBeNull()
+    expect(r.totalCount).toBe(6)
+    expect(r.keptCount).toBe(3)
+    expect(r.emails).toEqual(['Alice@Example.com', 'bob@example.com', 'carol@example.com'])
+    expect(r.duplicateCount).toBe(3)
+    // Dropped rows report their own casing, in the order they were dropped.
+    expect(r.duplicateEmails).toEqual([
+      'Alice@Example.com',
+      'bob@example.com',
+      'carol@example.com'
+    ])
+  })
+
+  it('reports per-source format, size, and contribution', () => {
+    const r = combineProfiles([
+      { name: 'a.json', text: REFRACT },
+      { name: 'b.csv', text: SHIKARI },
+      { name: 'c.json', text: FULL_STELLAR }
+    ])
+    expect(r.sources).toEqual([
+      { name: 'a.json', format: 'refract', total: 3, kept: 3, error: null },
+      { name: 'b.csv', format: 'shikari', total: 3, kept: 0, error: null },
+      { name: 'c.json', format: 'stellar', total: 1, kept: 1, error: null }
+    ])
+    expect(r.keptCount).toBe(4)
+  })
+
+  it('keeps every profile when dedupe is off', () => {
+    const r = combineProfiles(MIXED, { dedupe: false })
+    expect(r.keptCount).toBe(6)
+    expect(r.duplicateCount).toBe(0)
+    expect(r.duplicateEmails).toEqual([])
+    expect(r.emails).toHaveLength(6)
+  })
+
+  it('matches duplicates case-insensitively across sources', () => {
+    const r = combineProfiles([
+      { name: 'a', text: JSON.stringify([{ email: 'Dup@X.com' }]) },
+      { name: 'b', text: JSON.stringify([{ email: 'DUP@x.COM' }]) }
+    ])
+    expect(r.keptCount).toBe(1)
+    expect(r.emails).toEqual(['Dup@X.com'])
+    expect(r.duplicateEmails).toEqual(['DUP@x.COM'])
+  })
+
+  it('never drops email-less entries as duplicates', () => {
+    const noEmails = JSON.stringify([{ name: 'X' }, { name: 'Y' }])
+    const r = combineProfiles([
+      { name: 'a', text: noEmails },
+      { name: 'b', text: noEmails }
+    ])
+    expect(r.keptCount).toBe(4)
+    expect(r.duplicateCount).toBe(0)
+    expect(r.emails).toEqual([])
+  })
+
+  it('skips an unreadable source and still combines the rest', () => {
+    const r = combineProfiles([
+      { name: 'bad.json', text: '[{"broken"' },
+      { name: 'good.json', text: REFRACT }
+    ])
+    expect(r.sources[0]!.error).toMatch(/^Invalid JSON:/)
+    expect(r.sources[0]!.total).toBe(0)
+    expect(r.sources[1]!.error).toBeNull()
+    expect(r.keptCount).toBe(3)
+    expect(r.error).toBeNull()
+  })
+
+  it('errors only when there are no sources at all', () => {
+    const r = combineProfiles([])
+    expect(r.error).toBe('Add at least one profile source.')
+    expect(r.keptCount).toBe(0)
+  })
+
+  describe('verbatim JSON passthrough', () => {
+    it('replays the original elements when every source is the same JSON format', () => {
+      const r = combineProfiles([
+        { name: 'a.json', text: REFRACT },
+        { name: 'b.json', text: JSON.stringify([{ name: 'D', email: 'dave@example.com', extra: 1 }]) }
+      ])
+      expect(r.nativeFormat).toBe('refract')
+      expect(JSON.parse(r.nativeOutput)).toEqual([
+        ...JSON.parse(REFRACT),
+        { name: 'D', email: 'dave@example.com', extra: 1 }
+      ])
+    })
+
+    it('replays stellar elements too, dropped duplicates excluded', () => {
+      const dupe = JSON.stringify([{ profileName: 'S2', email: 'STEL@X.COM', billingAsShipping: true }])
+      const r = combineProfiles([
+        { name: 'a.json', text: FULL_STELLAR },
+        { name: 'b.json', text: dupe }
+      ])
+      expect(r.nativeFormat).toBe('stellar')
+      expect(JSON.parse(r.nativeOutput)).toEqual(JSON.parse(FULL_STELLAR))
+    })
+
+    it('has no native path once formats are mixed or a CSV is involved', () => {
+      expect(combineProfiles(MIXED).nativeFormat).toBeNull()
+      expect(combineProfiles(MIXED).nativeOutput).toBe('')
+      expect(combineProfiles([{ name: 'b.csv', text: SHIKARI }]).nativeFormat).toBeNull()
+      const jsonMix = combineProfiles([
+        { name: 'a.json', text: REFRACT },
+        { name: 'c.json', text: FULL_STELLAR }
+      ])
+      expect(jsonMix.nativeFormat).toBeNull()
+    })
+
+    it('ignores empty and unreadable sources when deciding the native format', () => {
+      const r = combineProfiles([
+        { name: 'bad.csv', text: 'name,phone\nA,1' },
+        { name: 'a.json', text: REFRACT }
+      ])
+      expect(r.nativeFormat).toBe('refract')
+    })
+  })
+
+  it('serializes a mixed combine into any target format', () => {
+    const r = combineProfiles([
+      { name: 'a.json', text: FULL_REFRACT },
+      { name: 'b.csv', text: FULL_SHIKARI },
+      { name: 'c.json', text: FULL_STELLAR }
+    ])
+    expect(r.keptCount).toBe(3)
+
+    const csv = serializeShikari(r.combined).split('\n')
+    expect(csv).toHaveLength(4)
+    expect(parseCsvRow(csv[1]!)[3]).toBe('t@x.com')
+    expect(parseCsvRow(csv[2]!)[3]).toBe('alice@example.com')
+    expect(parseCsvRow(csv[3]!)[3]).toBe('stel@x.com')
+
+    const refract = JSON.parse(serializeRefract(r.combined)) as Array<Record<string, unknown>>
+    expect(refract.map((p) => p.email)).toEqual(['t@x.com', 'alice@example.com', 'stel@x.com'])
+    // The Shikari source carries explicit billing; it survives the conversion.
+    expect((refract[1]!.billing as Record<string, unknown>).address1).toBe('2 Oak Ave')
+
+    const stellar = JSON.parse(serializeStellar(r.combined)) as Array<Record<string, unknown>>
+    expect((stellar[0]!.payment as Record<string, unknown>).cardYear).toBe('30')
+    expect((stellar[2]!.payment as Record<string, unknown>).cardYear).toBe('28')
   })
 })

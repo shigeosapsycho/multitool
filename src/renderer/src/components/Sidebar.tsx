@@ -43,6 +43,7 @@ const items: SidebarItem[] = [
 ]
 
 const TOOL_ROUTES = new Set<Route>([
+  'combine-profiles',
   'csv-email-pass',
   'email-unsubscribe',
   'find-duplicates',
