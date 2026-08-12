@@ -6,6 +6,7 @@ import { Toggle } from '../components/Toggle'
 import { Button, Icons } from '../components/ToolShell'
 import { shortOutputPath } from '../lib/paths'
 import { consumePendingFile } from '../lib/pending'
+import { isDiscordWebhookUrl, useDiscordWebhookUrl } from '../lib/discord'
 import { CsvTable } from '../components/CsvTable'
 import {
   combineProfiles,
@@ -246,6 +247,11 @@ function OutputCard({
 }) {
   const [copied, setCopied] = useState(false)
   const [savedTo, setSavedTo] = useState<string | null>(null)
+  // Configured via Settings; the Discord button below only exists while the
+  // stored webhook URL is valid.
+  const webhookConfigured = isDiscordWebhookUrl(useDiscordWebhookUrl())
+  const [discordState, setDiscordState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [discordError, setDiscordError] = useState('')
 
   const out = result && !result.error ? outputFor(result, format) : null
   const text = out?.text ?? ''
@@ -272,6 +278,22 @@ function OutputCard({
     const path = await window.api.files.writeOutput('combine-profiles', text + '\n', out.ext)
     setSavedTo(path)
     onSetStatus(`Saved to ${shortOutputPath(path)}`)
+  }
+
+  async function sendToDiscord() {
+    if (!has || !out || discordState === 'sending') return
+    setDiscordState('sending')
+    try {
+      // Same serialization and extension as save(), so the attachment matches
+      // what "Save to Output" would have written, .json or .csv per format.
+      await window.api.discord.sendContent('combine-profiles', text + '\n', out.ext)
+      setDiscordState('sent')
+      setTimeout(() => setDiscordState('idle'), 1500)
+    } catch (e) {
+      setDiscordError(String(e))
+      setDiscordState('error')
+      setTimeout(() => setDiscordState('idle'), 4000)
+    }
   }
 
   return (
@@ -312,6 +334,23 @@ function OutputCard({
               <Icons.Copy />
               {copied ? 'Copied!' : 'Copy all'}
             </Button>
+            {webhookConfigured && (
+              <Button
+                onClick={sendToDiscord}
+                variant="ghost"
+                disabled={discordState === 'sending'}
+                title={discordState === 'error' ? discordError : undefined}
+              >
+                <Icons.Send />
+                {discordState === 'idle'
+                  ? 'Send to Discord'
+                  : discordState === 'sending'
+                    ? 'Sending…'
+                    : discordState === 'sent'
+                      ? 'Sent!'
+                      : 'Failed'}
+              </Button>
+            )}
             {savedTo ? (
               <Button onClick={() => window.api.files.reveal(savedTo)} variant="ghost">
                 <Icons.Reveal />
