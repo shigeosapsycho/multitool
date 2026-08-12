@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { moveSkuToIndex } from './targetSkus'
+import { formatSkuNames, moveSkuToIndex } from './targetSkus'
 
 describe('moveSkuToIndex', () => {
   const base = () => ['a', 'b', 'c', 'd', 'e']
@@ -44,5 +44,56 @@ describe('moveSkuToIndex', () => {
     const input = base()
     moveSkuToIndex(input, 'a', 4)
     expect(input).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+})
+
+describe('formatSkuNames', () => {
+  const SKUS = ['88897904', '89444928']
+  const NAMES: Record<string, string> = {
+    '88897904': 'Scarlet Violet - 151 Booster Bundle',
+    '89444928': 'Scarlet & Violet- 151 Poster Collection'
+  }
+  const nameOf = (sku: string) => NAMES[sku] ?? ''
+
+  it('writes one "sku - name" line per SKU and nothing else', () => {
+    expect(formatSkuNames(SKUS, nameOf)).toBe(
+      [
+        '88897904 - Scarlet Violet - 151 Booster Bundle',
+        '89444928 - Scarlet & Violet- 151 Poster Collection'
+      ].join('\n')
+    )
+  })
+
+  it('carries no export list, separator, or trailing newline', () => {
+    const out = formatSkuNames(SKUS, nameOf)
+    expect(out.split('\n')).toHaveLength(2)
+    expect(out).not.toContain(', ')
+    expect(out).not.toContain(';;')
+    expect(out.endsWith('\n')).toBe(false)
+  })
+
+  it('follows the given order rather than sorting', () => {
+    expect(formatSkuNames(['89444928', '88897904'], nameOf).split('\n')).toEqual([
+      '89444928 - Scarlet & Violet- 151 Poster Collection',
+      '88897904 - Scarlet Violet - 151 Booster Bundle'
+    ])
+  })
+
+  it('writes a bare SKU line when the catalog has no name for it', () => {
+    expect(formatSkuNames(['99999999'], nameOf)).toBe('99999999')
+  })
+
+  it('trims a whitespace-only name down to the bare SKU line', () => {
+    expect(formatSkuNames(['99999999'], () => '   ')).toBe('99999999')
+  })
+
+  it('trims surrounding whitespace off a real name', () => {
+    expect(formatSkuNames(['88897904'], () => '  Booster Bundle  ')).toBe(
+      '88897904 - Booster Bundle'
+    )
+  })
+
+  it('returns an empty string for an empty list', () => {
+    expect(formatSkuNames([], nameOf)).toBe('')
   })
 })
