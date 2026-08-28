@@ -111,6 +111,13 @@ const tools: ToolMeta[] = [
     accent: '#E2B377'
   },
   {
+    id: 'profile-email-replacer',
+    title: 'Profile Email Replacer',
+    description:
+      'Swap named emails in a Refract, Stellar, or Shikari export, pairing two lists 1:1.',
+    accent: '#ec4899'
+  },
+  {
     id: 'profile-filter',
     title: 'Profile Filter',
     description: 'Filter a Refract, Stellar, or Shikari export down to a list of emails.',
@@ -394,6 +401,19 @@ const OrderEmailByIcon = () => (
   </svg>
 )
 
+const ProfileEmailReplacerIcon = () => (
+  <svg {...SVG_PROPS}>
+    {/* envelope */}
+    <rect x="3" y="3" width="18" height="7" rx="2" />
+    <path d="M4 4.5l8 4 8-4" />
+    {/* swap arrows */}
+    <path d="M6 15h11" />
+    <polyline points="14 12 17 15 14 18" />
+    <path d="M18 19H7" />
+    <polyline points="10 16 7 19 10 22" />
+  </svg>
+)
+
 const ProfileFilterIcon = () => (
   <svg {...SVG_PROPS}>
     <path d="M4 4h16l-6 7v6l-4 2v-8z" />
@@ -449,6 +469,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'numbered-list-generator': SplitByNumberIcon,
   'order-email-by': OrderEmailByIcon,
   'order-tracker': OrderTrackerIcon,
+  'profile-email-replacer': ProfileEmailReplacerIcon,
   'profile-filter': ProfileFilterIcon,
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
