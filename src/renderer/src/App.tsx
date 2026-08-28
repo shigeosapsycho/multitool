@@ -27,6 +27,7 @@ import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
 import { RandomizeProxyListPage } from './pages/RandomizeProxyList'
+import { ProfileEmailReplacerPage } from './pages/ProfileEmailReplacer'
 import { RemoveDuplicatesPage } from './pages/RemoveDuplicates'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { RemoveProfileDuplicatesPage } from './pages/RemoveProfileDuplicates'
@@ -57,6 +58,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'numbered-list-generator',
   'order-email-by',
   'order-tracker',
+  'profile-email-replacer',
   'profile-filter',
   'proxy-cleaner',
   'proxy-tester',
@@ -459,6 +461,8 @@ export default function App() {
         return <OrderEmailByPage {...props} />
       case 'order-tracker':
         return <OrderTrackerPage {...props} />
+      case 'profile-email-replacer':
+        return <ProfileEmailReplacerPage {...props} />
       case 'profile-filter':
         return <ProfileFilterPage {...props} />
       case 'proxy-cleaner':

@@ -58,7 +58,7 @@ export type FilterResult = {
 // column in a Shikari CSV. Mirrors the set used by csvToEmailPass in transforms.
 const EMAIL_HEADERS = new Set(['email', 'emailaddress', 'mail', 'username', 'user', 'login'])
 
-function stripBom(s: string): string {
+export function stripBom(s: string): string {
   return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s
 }
 
@@ -76,14 +76,14 @@ function emptyResult(format: ProfileFormat, error: string, requested: string[]):
   }
 }
 
-const UNKNOWN_FORMAT_ERROR = 'Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.'
+export const UNKNOWN_FORMAT_ERROR = 'Paste or load a Refract JSON, Stellar JSON, or Shikari CSV export.'
 
 // Pulls the address out of a decorated list line, `email:password`,
 // `Name <email>`, quoted, etc., so those still match the bare profile email.
 const EMAIL_RE = /[^\s,;:<>"']+@[^\s,;:<>"']+/
 
 /** Lowercased lookup set + first-seen original-casing list, deduped. */
-function parseEmailList(text: string): { set: Set<string>; ordered: string[] } {
+export function parseEmailList(text: string): { set: Set<string>; ordered: string[] } {
   const set = new Set<string>()
   const ordered: string[] = []
   for (const token of stripBom(text).split(/[\s,;]+/)) {
@@ -142,7 +142,7 @@ export function filterProfiles(emailsText: string, profileText: string): FilterR
 }
 
 /** The profile array, whether the JSON is a bare array or a `{profiles:[…]}` wrapper. */
-function extractArray(parsed: unknown): unknown[] | null {
+export function extractArray(parsed: unknown): unknown[] | null {
   if (Array.isArray(parsed)) return parsed
   if (parsed && typeof parsed === 'object') {
     for (const key of ['profiles', 'data', 'items']) {
@@ -212,7 +212,7 @@ function filterJson(
   }
 }
 
-function findEmailColumn(header: string[]): number {
+export function findEmailColumn(header: string[]): number {
   const norm = header.map((h) => h.trim().toLowerCase().replace(/[\s_-]+/g, ''))
   return norm.findIndex((h) => EMAIL_HEADERS.has(h))
 }
@@ -867,7 +867,7 @@ export function serializeStellar(profiles: Profile[]): string {
   )
 }
 
-function csvField(s: string): string {
+export function csvField(s: string): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 

@@ -51,6 +51,7 @@ const TOOL_ROUTES = new Set<Route>([
   'listify',
   'multiply-lines',
   'numbered-list-generator',
+  'profile-email-replacer',
   'profile-filter',
   'proxy-cleaner',
   'randomize',

@@ -15,6 +15,7 @@ export type Route =
   | 'numbered-list-generator'
   | 'order-email-by'
   | 'order-tracker'
+  | 'profile-email-replacer'
   | 'profile-filter'
   | 'proxy-cleaner'
   | 'proxy-tester'
