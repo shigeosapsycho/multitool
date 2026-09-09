@@ -6,6 +6,8 @@ import { ImapAccountPicker } from '../components/ImapAccountPicker'
 import type { EmailHeader, ScanRange, ScanResult, EmailBody } from '../lib/api'
 import { rangeBetween } from '../lib/rangeSelect'
 import { deleteProgressBanner, deleteProgressButton } from '../lib/deleteProgress'
+import { buildEmailExport } from '../lib/emailCleanerExport'
+import { shortOutputPath } from '../lib/paths'
 import { EmailCleanerGroups, groupBySender } from './EmailCleanerGroups'
 import { EmailPreview } from './EmailPreview'
 
@@ -62,6 +64,7 @@ export function EmailCleanerPage({
   // Reset every time the dialog opens; persisted only on confirm.
   const [suppressChecked, setSuppressChecked] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(
     null
   )
@@ -314,6 +317,31 @@ export function EmailCleanerPage({
     }
   }
 
+  // ---------- export ----------
+
+  // Writes every selected email, grouped by sender, to the output folder.
+  // Groups over the full scan rather than the search-filtered view so a
+  // selection made before narrowing the list is never silently dropped.
+  async function handleExport() {
+    if (!emails || selected.size === 0 || exporting) return
+    setExporting(true)
+    try {
+      const out = buildEmailExport(groupBySender(emails), selected)
+      const path = await window.api.files.writeOutput('email-cleaner-export', out.text)
+      setStatus(
+        `Exported ${out.emails.toLocaleString()} ${
+          out.emails === 1 ? 'email' : 'emails'
+        } from ${out.senders.toLocaleString()} ${
+          out.senders === 1 ? 'sender' : 'senders'
+        } to ${shortOutputPath(path)}`
+      )
+    } catch (e) {
+      setStatus(`Export failed: ${String(e)}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // ---------- delete ----------
 
   // Delete button / Delete key entry point: permanent deletes skip the
@@ -546,6 +574,15 @@ export function EmailCleanerPage({
                 Delete Permanently
               </label>
               <span className="flex-1" />
+              <Button
+                onClick={handleExport}
+                variant="secondary"
+                disabled={selectedCount === 0 || exporting}
+                title="Save the selected emails, grouped by sender, to the output folder"
+              >
+                <Icons.Save />
+                {exporting ? 'Exporting…' : 'Export selected'}
+              </Button>
               <Button
                 onClick={requestDelete}
                 variant="primary"
