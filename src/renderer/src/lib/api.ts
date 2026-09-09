@@ -44,6 +44,8 @@ export type EmailHeader = {
   uid: number
   fromName: string
   fromAddr: string
+  /** First To: recipient; the catch-all alias the mail was sent to, or empty. */
+  toAddr: string
   subject: string
   dateMs: number
   sizeBytes: number
@@ -72,6 +74,7 @@ export type UnsubEmail = {
   uid: number
   fromName: string
   fromAddr: string
+  toAddr: string
   subject: string
   dateMs: number
   sizeBytes: number
