@@ -28,7 +28,8 @@ function pluralEmails(n: number): string {
  * Only groups with at least one selected email appear, in the same order as
  * the on-screen list. Groups that span several addresses show the count in
  * the header and the address per email row, since a single header line
- * cannot name them all.
+ * cannot name them all. Every row ends with the address the mail was sent
+ * to, so users on a catch-all domain can see which alias received it.
  */
 export function buildEmailExport(
   groups: readonly SenderGroup[],
@@ -51,8 +52,9 @@ export function buildEmailExport(
     lines.push(`${who} (${pluralEmails(picked.length)})`)
     for (const e of picked) {
       const subject = e.subject || '(no subject)'
-      const tail = multi && e.fromAddr ? `  <${e.fromAddr}>` : ''
-      lines.push(`  ${isoDate(e.dateMs)}  ${subject}  [${formatSize(e.sizeBytes)}]${tail}`)
+      const from = multi && e.fromAddr ? `  <${e.fromAddr}>` : ''
+      const to = e.toAddr ? `  to: ${e.toAddr}` : ''
+      lines.push(`  ${isoDate(e.dateMs)}  ${subject}  [${formatSize(e.sizeBytes)}]${from}${to}`)
     }
     lines.push('')
   }

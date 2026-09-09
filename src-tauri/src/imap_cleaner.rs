@@ -23,6 +23,10 @@ pub struct EmailHeader {
     pub uid: u32,
     pub from_name: String,
     pub from_addr: String,
+    /// First `To:` recipient. On a catch-all domain that forwards to one
+    /// master inbox this is the alias the mail was actually sent to, which
+    /// the sender address alone cannot tell you.
+    pub to_addr: String,
     pub subject: String,
     pub date_ms: i64,
     pub size_bytes: u32,
@@ -182,6 +186,23 @@ pub(crate) fn connect_session(
     })
 }
 
+/// Join an IMAP envelope address's mailbox and host into `mailbox@host`.
+/// A missing host yields just the mailbox (group syntax / local delivery),
+/// and a missing mailbox yields an empty string.
+pub(crate) fn join_addr(mailbox: Option<&[u8]>, host: Option<&[u8]>) -> String {
+    let mailbox = mailbox
+        .map(|m| String::from_utf8_lossy(m).into_owned())
+        .unwrap_or_default();
+    let host = host
+        .map(|h| String::from_utf8_lossy(h).into_owned())
+        .unwrap_or_default();
+    if host.is_empty() {
+        mailbox
+    } else {
+        format!("{mailbox}@{host}")
+    }
+}
+
 /// Convert one IMAP FETCH result into an `EmailHeader`.
 pub(crate) fn fetch_to_header(f: &imap::types::Fetch) -> EmailHeader {
     let env = f.envelope();
@@ -189,37 +210,27 @@ pub(crate) fn fetch_to_header(f: &imap::types::Fetch) -> EmailHeader {
         .and_then(|e| e.subject.as_ref())
         .map(|s| decode_header(s))
         .unwrap_or_default();
-    let (from_name, from_addr) = env
+    let from_name = env
         .and_then(|e| e.from.as_ref())
         .and_then(|list| list.first())
-        .map(|a| {
-            let name = a
-                .name
-                .as_ref()
-                .map(|n| decode_header(n))
-                .unwrap_or_default();
-            let mailbox = a
-                .mailbox
-                .as_ref()
-                .map(|m| String::from_utf8_lossy(m).into_owned())
-                .unwrap_or_default();
-            let host = a
-                .host
-                .as_ref()
-                .map(|h| String::from_utf8_lossy(h).into_owned())
-                .unwrap_or_default();
-            let addr = if host.is_empty() {
-                mailbox
-            } else {
-                format!("{mailbox}@{host}")
-            };
-            (name, addr)
-        })
+        .and_then(|a| a.name.as_ref())
+        .map(|n| decode_header(n))
+        .unwrap_or_default();
+    let from_addr = env
+        .and_then(|e| e.from.as_ref())
+        .and_then(|list| list.first())
+        .map(|a| join_addr(a.mailbox.as_deref(), a.host.as_deref()))
+        .unwrap_or_default();
+    let to_addr = env
+        .and_then(|e| e.to.as_ref())
+        .and_then(|list| list.first())
+        .map(|a| join_addr(a.mailbox.as_deref(), a.host.as_deref()))
         .unwrap_or_default();
     EmailHeader {
         uid: f.uid.unwrap_or(0),
         from_name,
         from_addr,
+        to_addr,
         subject,
         date_ms: f.internal_date().map(|d| d.timestamp_millis()).unwrap_or(0),
         size_bytes: f.size.unwrap_or(0),
@@ -757,6 +768,21 @@ mod tests {
     fn trash_picker_returns_none_when_nothing_matches() {
         let folders = vec![FolderInfo { name: "INBOX".into(), attributes: vec![] }];
         assert_eq!(pick_trash_folder(&folders), None);
+    }
+
+    #[test]
+    fn join_addr_combines_mailbox_and_host() {
+        assert_eq!(join_addr(Some(b"shop1"), Some(b"catchall.com")), "shop1@catchall.com");
+    }
+
+    #[test]
+    fn join_addr_without_host_is_just_the_mailbox() {
+        assert_eq!(join_addr(Some(b"local"), None), "local");
+    }
+
+    #[test]
+    fn join_addr_with_nothing_is_empty() {
+        assert_eq!(join_addr(None, None), "");
     }
 
     #[test]
