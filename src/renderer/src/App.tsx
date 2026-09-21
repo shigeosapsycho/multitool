@@ -26,6 +26,7 @@ import { ProfileFilterPage } from './pages/ProfileFilter'
 import { ProxyCleanerPage } from './pages/ProxyCleaner'
 import { ProxyTesterPage } from './pages/ProxyTester'
 import { RandomizePage } from './pages/Randomize'
+import { RandomizeProfilesPage } from './pages/RandomizeProfiles'
 import { RandomizeProxyListPage } from './pages/RandomizeProxyList'
 import { ProfileEmailReplacerPage } from './pages/ProfileEmailReplacer'
 import { RemoveDuplicatesPage } from './pages/RemoveDuplicates'
@@ -63,6 +64,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'proxy-cleaner',
   'proxy-tester',
   'randomize',
+  'randomize-profiles',
   'randomize-proxy-list',
   'remove-duplicates',
   'remove-passwords',
@@ -471,6 +473,8 @@ export default function App() {
         return <ProxyTesterPage {...props} />
       case 'randomize':
         return <RandomizePage {...props} />
+      case 'randomize-profiles':
+        return <RandomizeProfilesPage {...props} />
       case 'randomize-proxy-list':
         return <RandomizeProxyListPage {...props} />
       case 'remove-duplicates':

@@ -142,6 +142,12 @@ const tools: ToolMeta[] = [
     accent: '#f472b6'
   },
   {
+    id: 'randomize-profiles',
+    title: 'Randomize Profiles',
+    description: 'Shuffle the profiles in a Refract, Stellar, or Shikari export, same format out.',
+    accent: '#f43f5e'
+  },
+  {
     id: 'randomize-proxy-list',
     title: 'Randomize Proxy List',
     description: 'Shuffle a proxy list, favoring providers you weight higher toward the top.',
@@ -450,6 +456,20 @@ const ShuffleIcon = () => (
   </svg>
 )
 
+const RandomizeProfilesIcon = () => (
+  <svg {...SVG_PROPS}>
+    {/* person */}
+    <circle cx="8" cy="7" r="3.5" />
+    <path d="M2.5 20a5.5 5.5 0 0 1 11 0" />
+    {/* shuffle arrows */}
+    <polyline points="18 9 21 9 21 12" />
+    <path d="M14 15l7-6" />
+    <polyline points="18 21 21 21 21 18" />
+    <path d="M17 17l4 4" />
+    <path d="M14 12l1.5 1.5" />
+  </svg>
+)
+
 const OrderTrackerIcon = () => <OrderTrackerLogo className="h-full w-full" />
 
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
@@ -474,6 +494,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'proxy-cleaner': ProxyCleanerIcon,
   'proxy-tester': ProxyTesterIcon,
   'randomize': DiceIcon,
+  'randomize-profiles': RandomizeProfilesIcon,
   'randomize-proxy-list': ShuffleIcon,
   'remove-duplicates': RemoveDuplicatesIcon,
   'remove-passwords': KeyIcon,

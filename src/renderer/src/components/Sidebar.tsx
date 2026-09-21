@@ -55,6 +55,7 @@ const TOOL_ROUTES = new Set<Route>([
   'profile-filter',
   'proxy-cleaner',
   'randomize',
+  'randomize-profiles',
   'remove-duplicates',
   'remove-passwords',
   'remove-profile-duplicates',
