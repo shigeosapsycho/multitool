@@ -226,6 +226,7 @@ type ResultPanelProps = {
   emptyIsError?: boolean
   /** Extra action(s) rendered in the footer when there are results. */
   footerActions?: (results: string[]) => ReactNode
+  className?: string
 }
 
 export function ResultPanel({
@@ -236,7 +237,8 @@ export function ResultPanel({
   taskName,
   savedTo,
   onSaved,
-  footerActions
+  footerActions,
+  className
 }: ResultPanelProps) {
   const [copied, setCopied] = useState(false)
   // Configured via Settings; the button below only exists while the stored
@@ -282,6 +284,7 @@ export function ResultPanel({
     <Card
       label={label}
       badge={results !== null ? results.length.toLocaleString() : '-'}
+      className={className}
     >
       {results === null ? (
         <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-text-muted">

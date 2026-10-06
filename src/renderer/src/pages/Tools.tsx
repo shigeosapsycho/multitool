@@ -160,6 +160,12 @@ const tools: ToolMeta[] = [
     accent: '#14b8a6'
   },
   {
+    id: 'remove-from-list',
+    title: 'Remove From List',
+    description: 'Drop master-list lines that match a second list, by whole line, field, or substring.',
+    accent: '#ef4444'
+  },
+  {
     id: 'remove-passwords',
     title: 'Remove Passwords',
     description: 'Strip the :password from a user:pass list.',
@@ -237,6 +243,14 @@ const RemoveDuplicatesIcon = () => (
     <rect x="3" y="3" width="11" height="11" rx="2" />
     <rect x="10" y="10" width="11" height="11" rx="2" />
     <path d="M5.5 8.5h6" />
+  </svg>
+)
+
+const RemoveFromListIcon = () => (
+  <svg {...SVG_PROPS}>
+    <path d="M4 6h12M4 12h8M4 18h6" />
+    <circle cx="17.5" cy="16.5" r="4" />
+    <path d="M15.5 16.5h4" />
   </svg>
 )
 
@@ -497,6 +511,7 @@ const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'randomize-profiles': RandomizeProfilesIcon,
   'randomize-proxy-list': ShuffleIcon,
   'remove-duplicates': RemoveDuplicatesIcon,
+  'remove-from-list': RemoveFromListIcon,
   'remove-passwords': KeyIcon,
   'remove-profile-duplicates': RemoveDuplicatesIcon,
   'reverse-list': ReverseListIcon,

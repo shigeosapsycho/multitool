@@ -57,6 +57,7 @@ const TOOL_ROUTES = new Set<Route>([
   'randomize',
   'randomize-profiles',
   'remove-duplicates',
+  'remove-from-list',
   'remove-passwords',
   'remove-profile-duplicates',
   'split-by-n',

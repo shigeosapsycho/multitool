@@ -19,6 +19,15 @@ import { Card } from '../components/Card'
 import { consumePendingFile } from '../lib/pending'
 import { shortOutputPath } from '../lib/paths'
 
+/** A second output card stacked under the main result, filled by the same run. */
+export type SecondaryOutput = {
+  label: string
+  unit: string
+  emptyResultMessage: string
+  taskName: string
+  transform: (text1: string, text2: string) => string[]
+}
+
 export type TwoFileToolProps = {
   title: string
   hint: string
@@ -31,6 +40,8 @@ export type TwoFileToolProps = {
   file1Label?: string
   file2Label?: string
   toolbar?: ReactNode
+  /** Omit to hide the card. Showing it again starts empty until the next run. */
+  secondary?: SecondaryOutput
   active?: boolean
   onBack: () => void
   onSetStatus: (msg: string) => void
@@ -161,6 +172,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
     file1Label = 'File 1',
     file2Label = 'File 2',
     toolbar,
+    secondary,
     active = true,
     onBack,
     onSetStatus
@@ -172,12 +184,28 @@ export function TwoFileTool(props: TwoFileToolProps) {
   const [count2, setCount2] = useState(0)
   const [results, setResults] = useState<string[] | null>(null)
   const [savedTo, setSavedTo] = useState<string | null>(null)
+  const [secondaryResults, setSecondaryResults] = useState<string[] | null>(null)
+  const [secondarySavedTo, setSecondarySavedTo] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
 
   const ref1 = useRef<FilePanelHandle>(null)
   const ref2 = useRef<FilePanelHandle>(null)
 
   const totalLines = count1 + count2
+  const hasSecondary = secondary !== undefined
+
+  function resetResults() {
+    setResults(null)
+    setSavedTo(null)
+    setSecondaryResults(null)
+    setSecondarySavedTo(null)
+  }
+
+  // A card that was hidden during the last run has nothing true to show.
+  useEffect(() => {
+    setSecondaryResults(null)
+    setSecondarySavedTo(null)
+  }, [hasSecondary])
 
   async function loadInto(which: 1 | 2, path: string) {
     const text = await window.api.files.read(path)
@@ -188,8 +216,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
       setPath2(path)
       ref2.current?.setValue(text)
     }
-    setResults(null)
-    setSavedTo(null)
+    resetResults()
     onSetStatus(`Loaded file ${which}: ${path}`)
   }
 
@@ -213,8 +240,7 @@ export function TwoFileTool(props: TwoFileToolProps) {
     setPath2(null)
     ref1.current?.setValue('')
     ref2.current?.setValue('')
-    setResults(null)
-    setSavedTo(null)
+    resetResults()
     onSetStatus('Ready')
   }
 
@@ -228,6 +254,8 @@ export function TwoFileTool(props: TwoFileToolProps) {
       const out = transform(content1, content2)
       setResults(out)
       setSavedTo(null)
+      setSecondaryResults(secondary ? secondary.transform(content1, content2) : null)
+      setSecondarySavedTo(null)
       onSetStatus(
         out.length === 0 ? emptyResultMessage : `${out.length.toLocaleString()} ${resultUnit}`
       )
@@ -257,8 +285,15 @@ export function TwoFileTool(props: TwoFileToolProps) {
             <Stat
               value={results ? results.length.toLocaleString() : '-'}
               label={resultUnit}
-              separator={false}
+              separator={hasSecondary}
             />
+            {secondary && (
+              <Stat
+                value={secondaryResults ? secondaryResults.length.toLocaleString() : '-'}
+                label={secondary.unit}
+                separator={false}
+              />
+            )}
           </>
         ) : (
           <span>{hint}</span>
@@ -295,18 +330,36 @@ export function TwoFileTool(props: TwoFileToolProps) {
           onLineCountChange={setCount2}
         />
       </div>
-      <ResultPanel
-        label={resultLabel}
-        results={results}
-        emptyMessage={emptyResultMessage}
-        initialMessage={`Run "${runLabel}" to populate.`}
-        taskName={taskName}
-        savedTo={savedTo}
-        onSaved={(p) => {
-          setSavedTo(p)
-          onSetStatus(`Saved to ${shortOutputPath(p)}`)
-        }}
-      />
+      <div className="flex min-h-0 flex-col gap-4">
+        <ResultPanel
+          label={resultLabel}
+          results={results}
+          emptyMessage={emptyResultMessage}
+          initialMessage={`Run "${runLabel}" to populate.`}
+          taskName={taskName}
+          savedTo={savedTo}
+          onSaved={(p) => {
+            setSavedTo(p)
+            onSetStatus(`Saved to ${shortOutputPath(p)}`)
+          }}
+          className="min-h-0 flex-1"
+        />
+        {secondary && (
+          <ResultPanel
+            label={secondary.label}
+            results={secondaryResults}
+            emptyMessage={secondary.emptyResultMessage}
+            initialMessage={`Run "${runLabel}" to populate.`}
+            taskName={secondary.taskName}
+            savedTo={secondarySavedTo}
+            onSaved={(p) => {
+              setSecondarySavedTo(p)
+              onSetStatus(`Saved to ${shortOutputPath(p)}`)
+            }}
+            className="min-h-0 flex-1"
+          />
+        )}
+      </div>
     </ToolLayout>
   )
 }

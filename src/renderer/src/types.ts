@@ -23,6 +23,7 @@ export type Route =
   | 'randomize-profiles'
   | 'randomize-proxy-list'
   | 'remove-duplicates'
+  | 'remove-from-list'
   | 'remove-passwords'
   | 'remove-profile-duplicates'
   | 'reverse-list'
