@@ -30,6 +30,7 @@ import { RandomizeProfilesPage } from './pages/RandomizeProfiles'
 import { RandomizeProxyListPage } from './pages/RandomizeProxyList'
 import { ProfileEmailReplacerPage } from './pages/ProfileEmailReplacer'
 import { RemoveDuplicatesPage } from './pages/RemoveDuplicates'
+import { RemoveFromListPage } from './pages/RemoveFromList'
 import { RemovePasswordsPage } from './pages/RemovePasswords'
 import { RemoveProfileDuplicatesPage } from './pages/RemoveProfileDuplicates'
 import { ReverseListPage } from './pages/ReverseList'
@@ -67,6 +68,7 @@ const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] =
   'randomize-profiles',
   'randomize-proxy-list',
   'remove-duplicates',
+  'remove-from-list',
   'remove-passwords',
   'remove-profile-duplicates',
   'reverse-list',
@@ -479,6 +481,8 @@ export default function App() {
         return <RandomizeProxyListPage {...props} />
       case 'remove-duplicates':
         return <RemoveDuplicatesPage {...props} />
+      case 'remove-from-list':
+        return <RemoveFromListPage {...props} />
       case 'remove-passwords':
         return <RemovePasswordsPage {...props} />
       case 'remove-profile-duplicates':
