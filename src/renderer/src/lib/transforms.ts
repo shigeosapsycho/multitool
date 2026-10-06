@@ -1,16 +1,17 @@
 import { extractContent } from './parse'
-import { findDuplicates, findNonDuplicates, dedupeKeepFirst } from './dedupe'
+import { findDuplicates, findNonDuplicates, dedupeKeepFirst, type DedupeMatch } from './dedupe'
 
 export function duplicatesFromText(text: string): string[] {
   return findDuplicates(extractContent(text))
 }
 
-export function dedupeFromText(text: string): string[] {
-  return dedupeKeepFirst(extractContent(text))
+export function dedupeFromText(text: string, match: DedupeMatch = 'line'): string[] {
+  return dedupeKeepFirst(extractContent(text), match)
 }
 
-export function dedupeFromTwoTexts(t1: string, t2: string): string[] {
-  return dedupeKeepFirst([...extractContent(t1), ...extractContent(t2)])
+// File 1 comes first, so on a tie between the files file 1's line is kept.
+export function dedupeFromTwoTexts(t1: string, t2: string, match: DedupeMatch = 'line'): string[] {
+  return dedupeKeepFirst([...extractContent(t1), ...extractContent(t2)], match)
 }
 
 export function nonDuplicatesFromText(text: string): string[] {

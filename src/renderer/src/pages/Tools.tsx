@@ -156,7 +156,7 @@ const tools: ToolMeta[] = [
   {
     id: 'remove-duplicates',
     title: 'Remove Duplicates',
-    description: 'Keep one copy of each line, drop the repeats, in one file or across two.',
+    description: 'Keep one copy of each line or each username, drop the repeats, in one file or across two.',
     accent: '#14b8a6'
   },
   {
