@@ -21,6 +21,11 @@ export function extractContent(text: string): string[] {
   return out
 }
 
+// What splits a line into fields when a tool matches on part of it, as in
+// "user:pass" or "email,password". Spaces are deliberately not a separator, so
+// "john doe" stays one field.
+export const FIELD_SEPARATORS = /[:;,|\t]/
+
 export function nonEmptyLines(text: string): string[] {
   return text.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.length > 0)
 }

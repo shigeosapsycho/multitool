@@ -1,3 +1,5 @@
+import { FIELD_SEPARATORS } from './parse'
+
 /**
  * How a remove-list entry has to line up with a master line to remove it.
  *  - line: the whole line equals the entry.
@@ -30,8 +32,6 @@ export type RemoveFromListResult = {
    */
   unused: string[]
 }
-
-const FIELD_SEPARATORS = /[:;,|\t]/
 
 // Lines of `text` that carry content. The line ending and a leading BOM are
 // stripped, blank and whitespace-only lines are dropped, and every other line
