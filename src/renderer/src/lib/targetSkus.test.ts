@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatSkuNames, moveSkuToIndex } from './targetSkus'
+import { detectSet, formatSkuNames, moveSkuToIndex } from './targetSkus'
 
 describe('moveSkuToIndex', () => {
   const base = () => ['a', 'b', 'c', 'd', 'e']
@@ -95,5 +95,12 @@ describe('formatSkuNames', () => {
 
   it('returns an empty string for an empty list', () => {
     expect(formatSkuNames([], nameOf)).toBe('')
+  })
+})
+
+describe('detectSet', () => {
+  it('files Delta Reign under the Mega Evolution era, not the base set', () => {
+    const title = 'Pokémon Trading Card Game: Mega Evolution—Delta Reign Elite Trainer Box'
+    expect(detectSet(title)).toEqual({ set: 'Delta Reign', era: 'Mega Evolution Era' })
   })
 })
