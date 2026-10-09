@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectSet, formatSkuNames, moveSkuToIndex } from './targetSkus'
+import { detectFormat, detectSet, formatSkuNames, formatSkus, moveSkuToIndex } from './targetSkus'
 
 describe('moveSkuToIndex', () => {
   const base = () => ['a', 'b', 'c', 'd', 'e']
@@ -44,6 +44,35 @@ describe('moveSkuToIndex', () => {
     const input = base()
     moveSkuToIndex(input, 'a', 4)
     expect(input).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+})
+
+describe('formatSkus and detectFormat', () => {
+  const SKUS = ['111', '222', '333']
+
+  it('joins Shikari with comma+space and Valor with a bare comma', () => {
+    expect(formatSkus(SKUS, 'shikari')).toBe('111, 222, 333')
+    expect(formatSkus(SKUS, 'valor')).toBe('111,222,333')
+  })
+
+  it('detects Valor from a comma list with no spaces', () => {
+    expect(detectFormat('111,222,333')).toBe('valor')
+  })
+
+  it('detects Shikari when any comma is followed by whitespace', () => {
+    expect(detectFormat('111, 222, 333')).toBe('shikari')
+    expect(detectFormat('111,222, 333')).toBe('shikari')
+  })
+
+  it('keeps Stellar and Refract detection', () => {
+    expect(detectFormat('111;;\n222;;')).toBe('stellar')
+    expect(detectFormat('111\n222')).toBe('refract')
+  })
+
+  it('round-trips each comma format through detectFormat', () => {
+    for (const fmt of ['shikari', 'valor'] as const) {
+      expect(detectFormat(formatSkus(SKUS, fmt))).toBe(fmt)
+    }
   })
 })
 
