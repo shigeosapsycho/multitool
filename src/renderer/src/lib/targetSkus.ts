@@ -25,11 +25,12 @@ export type SkuEntry = {
   era: PokemonEra | null
 }
 
-export type ExportFormat = 'shikari' | 'refract' | 'stellar'
+export type ExportFormat = 'shikari' | 'valor' | 'refract' | 'stellar'
 
 /** Which export formats are implemented. */
 export const FORMAT_ENABLED: Record<ExportFormat, boolean> = {
   shikari: true,
+  valor: true,
   refract: true,
   stellar: true
 }
@@ -261,6 +262,9 @@ export function formatSkus(skus: string[], format: ExportFormat): string {
     case 'shikari':
       // Shikari expects a comma+space separated SKU list.
       return skus.join(', ')
+    case 'valor':
+      // Valor expects a comma separated SKU list with no spaces.
+      return skus.join(',')
     case 'stellar':
       // Stellar expects one "SKU;;" per line.
       return skus.map((s) => `${s};;`).join('\n')
@@ -301,7 +305,7 @@ export function moveSkuToIndex(order: string[], sku: string, position: number): 
   return without
 }
 
-/** Max SKUs allowed in a single Shikari Monitor list. */
+/** Max SKUs allowed in a single Shikari or Valor Monitor list. */
 export const SHIKARI_MONITOR_MAX = 30
 
 /**
@@ -326,8 +330,8 @@ export function chunkEvenly(skus: string[], maxSize: number): string[][] {
 
 /**
  * Extract the SKU tokens from an export string. Splits on commas, semicolons
- * and any whitespace, so Shikari ("SKU, SKU"), Stellar ("SKU;;" per line) and
- * loosely pasted lists all round-trip.
+ * and any whitespace, so Shikari ("SKU, SKU"), Valor ("SKU,SKU"), Stellar
+ * ("SKU;;" per line) and loosely pasted lists all round-trip.
  */
 export function parseSkuList(text: string, _format: ExportFormat): string[] {
   return text
@@ -338,12 +342,13 @@ export function parseSkuList(text: string, _format: ExportFormat): string[] {
 
 /**
  * Guess the export format from a typed/pasted string. Stellar uses a ";;"
- * suffix per line; Shikari is comma-separated; bare SKUs (one per line) are
- * treated as Refract.
+ * suffix per line; Shikari is comma+space separated and Valor comma-only
+ * (any ", " marks Shikari); bare SKUs (one per line) are treated as Refract.
  */
 export function detectFormat(text: string): ExportFormat {
   if (text.includes(';;')) return 'stellar'
-  if (text.includes(',')) return 'shikari'
+  if (/,\s/.test(text)) return 'shikari'
+  if (text.includes(',')) return 'valor'
   return 'refract'
 }
 

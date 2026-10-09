@@ -37,6 +37,7 @@ type Props = {
 const FORMATS: { id: ExportFormat; label: string }[] = [
   { id: 'refract', label: 'Refract' },
   { id: 'shikari', label: 'Shikari' },
+  { id: 'valor', label: 'Valor' },
   { id: 'stellar', label: 'Stellar' }
 ]
 
@@ -396,7 +397,7 @@ function ExportSection({
 }
 
 /**
- * The Shikari Monitor export: the Tasks SKUs split into lists of
+ * The Shikari/Valor Monitor export: the Tasks SKUs split into lists of
  * SHIKARI_MONITOR_MAX, rendered one row per list so each can be copied into its
  * own monitor group. Owns Copy-all and Save like ExportSection.
  */
@@ -960,15 +961,15 @@ export function TargetSkuPage({
     setOrderMenu(null)
   }
 
-  // Shikari Monitor view: the Tasks SKUs split into comma lists, none longer
-  // than SHIKARI_MONITOR_MAX, one list per monitor group, each copyable on
-  // its own.
+  // Shikari/Valor Monitor view: the Tasks SKUs split into comma lists, none
+  // longer than SHIKARI_MONITOR_MAX, one list per monitor group, each copyable
+  // on its own. Joined the way the active format joins its Tasks list.
   const monitorLists = useMemo(
     () =>
-      chunkEvenly(parseSkuList(draft, 'shikari'), SHIKARI_MONITOR_MAX).map((list) =>
-        list.join(', ')
+      chunkEvenly(parseSkuList(draft, format), SHIKARI_MONITOR_MAX).map((list) =>
+        formatSkus(list, format)
       ),
-    [draft]
+    [draft, format]
   )
 
   // Distinct SKUs in the draft that aren't in the catalog, drives the
@@ -1080,14 +1081,14 @@ export function TargetSkuPage({
             })}
           </div>
         </div>
-        {format === 'shikari' ? (
+        {format === 'shikari' || format === 'valor' ? (
           <>
             <ExportSection
               label="Tasks"
               value={draft}
               onChange={handleDraftChange}
               placeholder="Start checking SKUs on the right or paste an existing SKU list"
-              taskName="target-skus-shikari-tasks"
+              taskName={`target-skus-${format}-tasks`}
               invalidCount={invalidCount}
               onRemoveInvalid={removeInvalid}
               onSaved={(p) => onSetStatus(`Saved to ${shortOutputPath(p)}`)}
@@ -1095,7 +1096,7 @@ export function TargetSkuPage({
             <MonitorSection
               label={`Monitor, lists of ${SHIKARI_MONITOR_MAX} max`}
               lists={monitorLists}
-              taskName="target-skus-shikari-monitor"
+              taskName={`target-skus-${format}-monitor`}
               onSaved={(p) => onSetStatus(`Saved to ${shortOutputPath(p)}`)}
             />
           </>
