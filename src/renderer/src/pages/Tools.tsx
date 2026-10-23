@@ -186,7 +186,7 @@ const tools: ToolMeta[] = [
   {
     id: 'search-master',
     title: 'Search Master',
-    description: 'Find items from a search list that also appear in a master list.',
+    description: 'Find the full master lines a search list matches, even from just an email or username.',
     accent: '#34d399'
   },
   {
