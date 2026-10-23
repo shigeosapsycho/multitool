@@ -1,4 +1,4 @@
-import { extractContent } from './parse'
+import { extractContent, FIELD_SEPARATORS } from './parse'
 import { findDuplicates, findNonDuplicates, dedupeKeepFirst, type DedupeMatch } from './dedupe'
 
 export function duplicatesFromText(text: string): string[] {
@@ -36,17 +36,28 @@ export function stripPasswordsFromText(text: string): string[] {
   return out
 }
 
-// Items from `searchText` that also exist in `masterText`, deduplicated.
-// Order matches first appearance in the search list (not master).
+// Master lines that `searchText` finds, whole. A search item finds a master line
+// when it equals the line or one field of it, so "alice" returns "alice:pw".
+// Fields split like Remove From List's field mode: "alice" never finds
+// "alicia:pw". Deduplicated; ordered by the search list, then master order.
 export function searchInMaster(masterText: string, searchText: string): string[] {
-  const master = new Set(extractContent(masterText))
-  const search = extractContent(searchText)
+  const byKey = new Map<string, string[]>()
+  for (const line of extractContent(masterText)) {
+    const keys = new Set([line, ...line.split(FIELD_SEPARATORS).map((f) => f.trim())])
+    for (const key of keys) {
+      if (!key) continue
+      const lines = byKey.get(key)
+      if (lines) lines.push(line)
+      else byKey.set(key, [line])
+    }
+  }
   const out: string[] = []
   const seen = new Set<string>()
-  for (const item of search) {
-    if (master.has(item) && !seen.has(item)) {
-      out.push(item)
-      seen.add(item)
+  for (const item of extractContent(searchText)) {
+    for (const line of byKey.get(item) ?? []) {
+      if (seen.has(line)) continue
+      seen.add(line)
+      out.push(line)
     }
   }
   return out
