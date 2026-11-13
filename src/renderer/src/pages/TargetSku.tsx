@@ -640,11 +640,13 @@ export function TargetSkuPage({
 
   // Show the bundled list instantly, then keep the catalog fresh while the
   // page is showing: pull the remote copy immediately on becoming active and
-  // every minute after. Hidden (keep-alive mounted) pages don't poll.
+  // every 5 minutes after, which leaves most of the GitHub API's hourly
+  // request allowance for the manual refresh button. Hidden (keep-alive
+  // mounted) pages don't poll.
   useEffect(() => {
     if (!active) return
     refreshCatalog()
-    const id = setInterval(refreshCatalog, 60_000)
+    const id = setInterval(refreshCatalog, 300_000)
     return () => clearInterval(id)
   }, [active, refreshCatalog])
 

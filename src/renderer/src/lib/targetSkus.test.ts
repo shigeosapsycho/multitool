@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { detectFormat, detectSet, formatSkuNames, formatSkus, moveSkuToIndex } from './targetSkus'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import {
+  SKUS_API_URL,
+  SKUS_REMOTE_URL,
+  detectFormat,
+  detectSet,
+  fetchRemoteSkus,
+  formatSkuNames,
+  formatSkus,
+  moveSkuToIndex
+} from './targetSkus'
 
 describe('moveSkuToIndex', () => {
   const base = () => ['a', 'b', 'c', 'd', 'e']
@@ -131,5 +140,36 @@ describe('detectSet', () => {
   it('files Delta Reign under the Mega Evolution era, not the base set', () => {
     const title = 'Pokémon Trading Card Game: Mega Evolution—Delta Reign Elite Trainer Box'
     expect(detectSet(title)).toEqual({ set: 'Delta Reign', era: 'Mega Evolution Era' })
+  })
+
+  it('files "30th Celebration" titles under the 30th Anniversary set', () => {
+    const title = 'Pokémon Trading Card Game: 30th Celebration Battle Deck—Espeon ex'
+    expect(detectSet(title)).toEqual({ set: '30th Anniversary', era: 'Mega Evolution Era' })
+  })
+})
+
+describe('fetchRemoteSkus', () => {
+  const CSV = 'SKU,ITEM\n111,Pokémon Trading Card Game: 151 Booster Bundle\n'
+  const ok = (_url?: string) => Promise.resolve(new Response(CSV))
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('pulls from the contents API, which is not behind the raw CDN cache', async () => {
+    const fetchMock = vi.fn(ok)
+    vi.stubGlobal('fetch', fetchMock)
+    const { text, entries } = await fetchRemoteSkus()
+    expect(text).toBe(CSV)
+    expect(entries.map((e) => e.sku)).toEqual(['111'])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]![0]).toBe(SKUS_API_URL)
+  })
+
+  it('falls back to the raw URL when the API refuses (rate limit)', async () => {
+    const fetchMock = vi.fn((url: string) =>
+      url === SKUS_API_URL ? Promise.resolve(new Response('', { status: 403 })) : ok()
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { entries } = await fetchRemoteSkus()
+    expect(entries.map((e) => e.sku)).toEqual(['111'])
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([SKUS_API_URL, SKUS_REMOTE_URL])
   })
 })
