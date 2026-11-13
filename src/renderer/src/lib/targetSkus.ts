@@ -129,7 +129,7 @@ const POKEMON_SETS: PokemonSet[] = [
   { name: 'Ascended Heroes', era: ME, keywords: ['ascended heroes'] },
   { name: 'Perfect Order', era: ME, keywords: ['perfect order'] },
   { name: 'Chaos Rising', era: ME, keywords: ['chaos rising'] },
-  { name: '30th Anniversary', era: ME, keywords: ['30th anniversary'] },
+  { name: '30th Anniversary', era: ME, keywords: ['30th anniversary', '30th celebration'] },
   { name: 'Pitch Black', era: ME, keywords: ['pitch black'] },
   { name: 'Delta Reign', era: ME, keywords: ['delta reign'] }
 ]
@@ -355,23 +355,35 @@ export function detectFormat(text: string): ExportFormat {
 /** SKUs parsed from the copy bundled into the app. Always available offline. */
 export const BUNDLED_SKUS: SkuEntry[] = parseSkuCsv(bundledCsv)
 
-// Raw GitHub URL for the live-updatable SKU catalog. The Target SKUs page
-// re-fetches this every minute, so editing the file on the `SKUs` branch
-// updates the catalog with no rebuild.
+// Live-updatable SKU catalog: editing SKUs.csv on the `SKUs` branch updates
+// the catalog with no rebuild. The contents API is asked first because it
+// serves the branch head, while the raw URL sits behind a CDN that keeps
+// serving the previous file for up to 5 minutes after a push (per edge node,
+// and a cache-busting query string does not change its cache key).
+export const SKUS_API_URL =
+  'https://api.github.com/repos/shigeosapsycho/multitool/contents/SKUs.csv?ref=SKUs'
 export const SKUS_REMOTE_URL =
   'https://raw.githubusercontent.com/shigeosapsycho/multitool/refs/heads/SKUs/SKUs.csv'
 
+async function fetchText(url: string, headers?: HeadersInit): Promise<string> {
+  const res = await fetch(url, { cache: 'no-store', headers })
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
+  return res.text()
+}
+
 /**
- * Fetch and parse the remote SKU catalog. Rejects when no URL is configured,
- * the request fails, or the file yields no entries, callers fall back to
- * BUNDLED_SKUS on rejection. Returns the raw CSV text alongside the parsed
- * entries so callers can cheaply skip identical re-fetches.
+ * Fetch and parse the remote SKU catalog. Rejects when both sources fail or
+ * the file yields no entries, callers fall back to BUNDLED_SKUS on rejection.
+ * Returns the raw CSV text alongside the parsed entries so callers can cheaply
+ * skip identical re-fetches.
  */
 export async function fetchRemoteSkus(): Promise<{ text: string; entries: SkuEntry[] }> {
-  if (!SKUS_REMOTE_URL) throw new Error('No remote SKU URL configured')
-  const res = await fetch(SKUS_REMOTE_URL, { cache: 'no-store' })
-  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
-  const text = await res.text()
+  // shortcut: the API allows 60 unauthenticated requests per hour per IP; past
+  // that the raw copy is used and can lag a push by 5 minutes. Add a token if
+  // that window matters.
+  const text = await fetchText(SKUS_API_URL, { Accept: 'application/vnd.github.raw+json' }).catch(
+    () => fetchText(SKUS_REMOTE_URL)
+  )
   const entries = parseSkuCsv(text)
   if (entries.length === 0) throw new Error('Remote SKU file is empty')
   return { text, entries }

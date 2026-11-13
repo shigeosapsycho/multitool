@@ -163,15 +163,17 @@ export default function App() {
     window.api.updater.check().catch(() => {})
   }, [])
 
-  // Poll GitHub for a newer release every minute. The check is a cheap API
-  // ping + version compare, so a tight interval is fine. Stop once an update
-  // has been staged: the running version only changes on restart, so further
-  // checks would just re-download the same exe every minute.
+  // Poll GitHub for a newer release every 5 minutes. Each check spends one of
+  // the 60 unauthenticated GitHub API requests allowed per hour per IP, an
+  // allowance the Target SKUs catalog refresh shares, so a one-minute poll
+  // would use all of it. Stop once an update has been staged: the running
+  // version only changes on restart, so further checks would just re-download
+  // the same exe.
   useEffect(() => {
     if (updateReady) return
     const id = setInterval(() => {
       window.api.updater.check().catch(() => {})
-    }, 60_000)
+    }, 300_000)
     return () => clearInterval(id)
   }, [updateReady])
 
