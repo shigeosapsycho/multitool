@@ -145,7 +145,7 @@ jobs:
   build-macos:
     name: Build macOS app (Apple Silicon)
     needs: build
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout
