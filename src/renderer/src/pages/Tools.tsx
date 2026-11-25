@@ -27,6 +27,12 @@ const tools: ToolMeta[] = [
     accent: '#84cc16'
   },
   {
+    id: 'catchall-email-maker',
+    title: 'Catchall Email Maker',
+    description: 'Generate random name-style emails on your catchall domain.',
+    accent: '#5eead4'
+  },
+  {
     id: 'combine-profiles',
     title: 'Combine Profiles',
     description: 'Merge several Refract, Stellar, or Shikari exports into one, in any mix.',
@@ -243,6 +249,13 @@ const RemoveDuplicatesIcon = () => (
     <rect x="3" y="3" width="11" height="11" rx="2" />
     <rect x="10" y="10" width="11" height="11" rx="2" />
     <path d="M5.5 8.5h6" />
+  </svg>
+)
+
+const CatchallEmailIcon = () => (
+  <svg {...SVG_PROPS}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
   </svg>
 )
 
@@ -489,6 +502,7 @@ const OrderTrackerIcon = () => <OrderTrackerLogo className="h-full w-full" />
 const TOOL_ICONS: Record<ToolMeta['id'], () => JSX.Element> = {
   'add-passwords': AddPasswordIcon,
   'sort-list': SortListIcon,
+  'catchall-email-maker': CatchallEmailIcon,
   'combine-profiles': CombineProfilesIcon,
   'csv-email-pass': CsvEmailPassIcon,
   'csv-filter': CsvFilterIcon,

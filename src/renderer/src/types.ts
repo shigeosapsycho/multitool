@@ -1,6 +1,7 @@
 export type Route =
   | 'tools'
   | 'add-passwords'
+  | 'catchall-email-maker'
   | 'combine-profiles'
   | 'csv-email-pass'
   | 'csv-filter'
