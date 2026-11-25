@@ -43,6 +43,7 @@ const items: SidebarItem[] = [
 ]
 
 const TOOL_ROUTES = new Set<Route>([
+  'catchall-email-maker',
   'combine-profiles',
   'csv-email-pass',
   'email-unsubscribe',

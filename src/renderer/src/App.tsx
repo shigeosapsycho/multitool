@@ -8,6 +8,7 @@ import { Sidebar } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
 import { ToolsPage } from './pages/Tools'
 import { AddPasswordToEmailListPage } from './pages/AddPasswordToEmailList'
+import { CatchallEmailMakerPage } from './pages/CatchallEmailMaker'
 import { CombineProfilesPage } from './pages/CombineProfiles'
 import { CsvEmailPassPage } from './pages/CsvEmailPass'
 import { CsvFilterPage } from './pages/CsvFilter'
@@ -46,6 +47,7 @@ type NavState = { history: Route[]; index: number }
 
 const TOOL_ROUTES: Exclude<Route, 'tools' | 'results' | 'settings' | 'logs'>[] = [
   'add-passwords',
+  'catchall-email-maker',
   'combine-profiles',
   'csv-email-pass',
   'csv-filter',
@@ -433,6 +435,8 @@ export default function App() {
     switch (r) {
       case 'add-passwords':
         return <AddPasswordToEmailListPage {...props} />
+      case 'catchall-email-maker':
+        return <CatchallEmailMakerPage {...props} />
       case 'combine-profiles':
         return <CombineProfilesPage {...props} />
       case 'csv-email-pass':
